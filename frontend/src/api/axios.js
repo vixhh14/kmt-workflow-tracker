@@ -1,24 +1,32 @@
 import axios from 'axios';
 
+// Production Render Backend URL - MUST match your actual Render deployment
+const PRODUCTION_BACKEND_URL = 'https://kmt-workflow-backend.onrender.com';
+
 // Get API URL from environment variables
 const getBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL;
-  // Fallback for development if env var is missing
-  if (!envUrl) {
-    if (import.meta.env.DEV) {
-      return 'http://localhost:8000';
-    }
-    // Fallback for production - REPLACE THIS WITH YOUR ACTUAL RENDER URL IF ENV VAR FAILS
-    return 'https://kmt-workflow-backend.onrender.com';
+
+  // Use environment variable if set
+  if (envUrl) {
+    return envUrl.replace(/\/$/, ''); // Remove trailing slash
   }
-  return envUrl;
+
+  // Fallback for development
+  if (import.meta.env.DEV) {
+    return 'http://localhost:8000';
+  }
+
+  // Production fallback - use the hardcoded Render URL
+  return PRODUCTION_BACKEND_URL;
 };
 
-const BASE_URL = getBaseUrl().replace(/\/$/, '');
+const BASE_URL = getBaseUrl();
 
 console.log('🚀 API Service Initialized');
 console.log('📍 Mode:', import.meta.env.MODE);
 console.log('🔗 Base URL:', BASE_URL);
+console.log('📋 Env VITE_API_URL:', import.meta.env.VITE_API_URL || '(not set)');
 
 const api = axios.create({
   baseURL: BASE_URL,
