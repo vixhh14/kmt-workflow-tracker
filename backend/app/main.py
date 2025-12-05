@@ -26,20 +26,17 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS configuration
-origins = [
-    "http://localhost:5173",
-    "https://kmt-workflow-tracker.vercel.app",
-    "https://*.vercel.app"
-]
-
+# CORS configuration - Use centralized config
+# Note: Wildcard patterns don't work with credentials, so we list all origins explicitly
+print(f"🔒 CORS Origins configured: {CORS_ORIGINS}")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 
