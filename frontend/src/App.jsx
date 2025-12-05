@@ -5,7 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import Layout from './components/Layout.jsx';
 import PlanningLayout from './components/PlanningLayout.jsx';
-import Login from './pages/Login.jsx';
+import Login from './pages/login.jsx';
 
 // Dashboards
 import AdminDashboard from './pages/dashboards/AdminDashboard.jsx';
