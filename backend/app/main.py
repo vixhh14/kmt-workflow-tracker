@@ -29,7 +29,7 @@ app = FastAPI(
 # CORS configuration
 origins = [
     "http://localhost:5173",
-    "https://kmt-workflow-tracker-qayt.vercel.app",
+    "https://kmt-workflow-tracker.vercel.app",
     "https://*.vercel.app"
 ]
 
