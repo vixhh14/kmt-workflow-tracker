@@ -12,14 +12,20 @@ backend_cors_origins_str = os.getenv("BACKEND_CORS_ORIGINS", "")
 CORS_ORIGINS = [origin.strip() for origin in backend_cors_origins_str.split(",") if origin.strip()]
 
 # Add default origins if not present
+# Include all frontend deployment URLs (production, preview, and local development)
 default_origins = [
+    # Local development
     "http://localhost:5173",
     "http://localhost:3000",
+    "http://localhost:5174",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
-    "https://kmt-workflow-tracker-qayt.vercel.app",
+    # Production Vercel URL
     "https://kmt-workflow-tracker.vercel.app",
+    # Vercel preview/staging URLs (add more as needed)
+    "https://kmt-workflow-tracker-qayt.vercel.app",
     "https://kmt-workflow-tracker-qayt-l7ytc60vt.vercel.app",
+    "https://kmt-workflow-tracker-i8gyfx9gi-vishnu-sureshs-projects-5ca6ac91.vercel.app",
 ]
 
 for origin in default_origins:
