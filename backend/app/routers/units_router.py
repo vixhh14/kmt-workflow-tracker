@@ -1,99 +1,57 @@
 """
 Units Router - API endpoints for factory units
+Refactored to use SQLAlchemy for better compatibility with Render (Postgres/SQLite)
 """
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from sqlalchemy.orm import Session
 from typing import List, Optional
+from pydantic import BaseModel
 from datetime import datetime
-import sqlite3
-from ..core.database import get_db_connection
+from app.core.database import get_db
+from app.models.models_db import Unit as UnitModel
 
 router = APIRouter(prefix="/api/units", tags=["units"])
 
-class Unit(BaseModel):
+# Pydantic Schemas
+class UnitResponse(BaseModel):
     id: int
     name: str
     description: Optional[str] = None
     created_at: Optional[datetime] = None
+    
+    class Config:
+        orm_mode = True
 
 class UnitCreate(BaseModel):
     name: str
     description: Optional[str] = None
 
-@router.get("", response_model=List[Unit])
-async def get_units():
+# Endpoints
+@router.get("", response_model=List[UnitResponse])
+async def get_units(db: Session = Depends(get_db)):
     """Get all units"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT id, name, description, created_at
-        FROM units
-        ORDER BY id
-    """)
-    
-    units = []
-    for row in cursor.fetchall():
-        units.append({
-            "id": row[0],
-            "name": row[1],
-            "description": row[2],
-            "created_at": row[3]
-        })
-    
-    conn.close()
-    return units
+    return db.query(UnitModel).all()
 
-@router.get("/{unit_id}", response_model=Unit)
-async def get_unit(unit_id: int):
+@router.get("/{unit_id}", response_model=UnitResponse)
+async def get_unit(unit_id: int, db: Session = Depends(get_db)):
     """Get unit by ID"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT id, name, description, created_at
-        FROM units
-        WHERE id = ?
-    """, (unit_id,))
-    
-    row = cursor.fetchone()
-    conn.close()
-    
-    if not row:
+    unit = db.query(UnitModel).filter(UnitModel.id == unit_id).first()
+    if not unit:
         raise HTTPException(status_code=404, detail="Unit not found")
-    
-    return {
-        "id": row[0],
-        "name": row[1],
-        "description": row[2],
-        "created_at": row[3]
-    }
+    return unit
 
-@router.post("", response_model=Unit)
-async def create_unit(unit: UnitCreate):
-    """Create new unit (admin only)"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    try:
-        cursor.execute("""
-            INSERT INTO units (name, description)
-            VALUES (?, ?)
-        """, (unit.name, unit.description))
-        
-        unit_id = cursor.lastrowid
-        conn.commit()
-        
-        cursor.execute("SELECT id, name, description, created_at FROM units WHERE id = ?", (unit_id,))
-        row = cursor.fetchone()
-        
-        return {
-            "id": row[0],
-            "name": row[1],
-            "description": row[2],
-            "created_at": row[3]
-        }
-    except sqlite3.IntegrityError:
+@router.post("", response_model=UnitResponse)
+async def create_unit(unit: UnitCreate, db: Session = Depends(get_db)):
+    """Create new unit"""
+    existing = db.query(UnitModel).filter(UnitModel.name == unit.name).first()
+    if existing:
         raise HTTPException(status_code=400, detail="Unit with this name already exists")
-    finally:
-        conn.close()
+    
+    new_unit = UnitModel(
+        name=unit.name,
+        description=unit.description
+    )
+    db.add(new_unit)
+    db.commit()
+    db.refresh(new_unit)
+    return new_unit
