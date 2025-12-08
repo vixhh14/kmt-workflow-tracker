@@ -54,12 +54,18 @@ async def migrate_passwords(
     Set MIGRATION_SECRET environment variable in production.
     
     Usage: POST /seed/migrate-passwords?secret=your-secret-key
-    
-    After running, SAVE THE RETURNED CREDENTIALS and remove this endpoint!
     """
     # Verify secret
     if secret != MIGRATION_SECRET:
         raise HTTPException(status_code=403, detail="Invalid migration secret")
+    
+    # Fixed secure passwords (matching the ones shared with user)
+    fixed_passwords = {
+        'admin': 'Admin@Secure2024!',
+        'operator': 'Operator#Safe99',
+        'supervisor': 'Super$Visor88',
+        'planning': 'Plan%Ning77'
+    }
     
     demo_usernames = ['admin', 'operator', 'supervisor', 'planning']
     migrated_users = []
@@ -69,7 +75,8 @@ async def migrate_passwords(
             user = db.query(User).filter(User.username == username).first()
             
             if user:
-                new_password = generate_secure_password()
+                # Use fixed secure password
+                new_password = fixed_passwords.get(username, generate_secure_password())
                 user.password_hash = hash_password(new_password)
                 
                 migrated_users.append({
