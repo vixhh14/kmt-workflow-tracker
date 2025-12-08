@@ -97,10 +97,10 @@ const PlanningLayout = ({ children }) => {
                     </div>
 
                     <div className="flex items-center space-x-2 sm:space-x-4">
-                        <div className="text-right hidden sm:block">
+                        <Link to="/profile" className="text-right hidden sm:block hover:bg-gray-50 p-2 rounded-lg transition-colors">
                             <p className="text-sm font-medium text-gray-900">{user?.username || 'User'}</p>
                             <p className="text-xs text-gray-500">{user?.email || ''}</p>
-                        </div>
+                        </Link>
                         <button
                             onClick={handleLogout}
                             className="flex items-center space-x-2 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition"

@@ -200,7 +200,7 @@ const Machines = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Machine ID</label>
                                 <input
                                     type="text"
                                     value={formData.location}
