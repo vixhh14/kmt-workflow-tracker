@@ -58,12 +58,12 @@ def generate_secure_password(length=12):
 def create_demo_users():
     """Create demo users with different roles using secure passwords."""
     
-    # Generate secure passwords for demo users
-    # These will be printed to console for first-time setup
-    admin_password = generate_secure_password()
-    operator_password = generate_secure_password()
-    supervisor_password = generate_secure_password()
-    planning_password = generate_secure_password()
+    # Fixed secure passwords (matching what we shared with the user)
+    # This ensures that if the DB resets (on Render free tier), the passwords remain known
+    admin_password = "Admin@Secure2024!"
+    operator_password = "Operator#Safe99"
+    supervisor_password = "Super$Visor88"
+    planning_password = "Plan%Ning77"
     
     demo_users = [
         {
