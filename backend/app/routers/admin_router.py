@@ -36,9 +36,10 @@ class UserResponse(BaseModel):
     full_name: Optional[str]
     role: str
     approval_status: Optional[str]
-    created_at: Optional[str] = None
+    created_at: Optional[datetime] = None
     
     # Additional fields for approval view
+    unit_id: Optional[str] = None
     machine_types: Optional[str] = None
     contact_number: Optional[str] = None
 
