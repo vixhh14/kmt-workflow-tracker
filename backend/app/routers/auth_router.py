@@ -4,6 +4,7 @@ from app.models.auth_model import LoginRequest, LoginResponse, SecurityQuestionR
 from app.core.auth_utils import verify_password, create_access_token, hash_password
 from app.core.database import get_db
 from app.models.models_db import User
+from app.core.password_validation import validate_password_strength
 
 router = APIRouter(
     prefix="/auth",
@@ -33,6 +34,14 @@ async def reset_password(request: PasswordResetRequest, db: Session = Depends(ge
     # Verify answer (case-insensitive)
     if user.security_answer.lower().strip() != request.security_answer.lower().strip():
         raise HTTPException(status_code=400, detail="Incorrect security answer")
+    
+    # Validate new password strength
+    is_valid, errors = validate_password_strength(request.new_password)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=errors[0] if errors else "Password does not meet security requirements"
+        )
         
     # Update password
     user.password_hash = hash_password(request.new_password)
@@ -190,6 +199,14 @@ async def signup(user_data: dict, db: Session = Depends(get_db)):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already exists"
             )
+    
+    # Validate password strength
+    is_valid, errors = validate_password_strength(user_data.get('password', ''))
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=errors[0] if errors else "Password does not meet security requirements"
+        )
     
     # Create new user
     new_user = User(
