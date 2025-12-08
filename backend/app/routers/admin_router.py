@@ -27,6 +27,7 @@ class ChangePasswordRequest(BaseModel):
 
 class ApproveUserRequest(BaseModel):
     unit_id: str
+    machine_types: str # Comma separated list of machines/types
 
 class UserResponse(BaseModel):
     user_id: str
@@ -81,6 +82,8 @@ async def approve_user(
     current_admin: User = Depends(get_current_active_admin),
     db: Session = Depends(get_db)
 ):
+    from app.core.email_utils import send_approval_email
+    
     user = db.query(User).filter(User.username == username).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -91,6 +94,7 @@ async def approve_user(
     # Update user
     user.approval_status = "approved"
     user.unit_id = request.unit_id
+    user.machine_types = request.machine_types
     
     # Update or create approval record
     approval = db.query(UserApproval).filter(UserApproval.user_id == user.user_id).first()
@@ -100,7 +104,6 @@ async def approve_user(
         approval.approved_at = datetime.utcnow()
     else:
         # Should exist from signup, but just in case
-        from datetime import datetime
         new_approval = UserApproval(
             user_id=user.user_id,
             status="approved",
@@ -110,6 +113,19 @@ async def approve_user(
         db.add(new_approval)
     
     db.commit()
+    
+    # Send email notification
+    login_url = "https://kmt-workflow-tracker.vercel.app/login"
+    
+    if user.email:
+        # We don't await this if it's sync, or we can make it async if needed.
+        # The utils function is sync (smtplib).
+        try:
+            send_approval_email(user.email, user.username, login_url)
+        except Exception as e:
+            print(f"Failed to send email: {e}")
+            # Don't fail the approval if email fails
+    
     return {"message": f"User {username} approved and assigned to unit {request.unit_id}"}
 
 @router.post("/users/{username}/reject")

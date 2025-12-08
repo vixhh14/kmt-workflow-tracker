@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.orm import Session
-from app.models.auth_model import LoginRequest, LoginResponse, SecurityQuestionRequest, PasswordResetRequest, ChangePasswordRequest
+from app.models.auth_model import LoginRequest, LoginResponse, ChangePasswordRequest
 from app.core.auth_utils import verify_password, create_access_token, hash_password
 from app.core.dependencies import get_current_active_user
 from app.core.database import get_db
@@ -11,44 +11,6 @@ router = APIRouter(
     prefix="/auth",
     tags=["authentication"],
 )
-
-@router.post("/get-security-question")
-async def get_security_question(request: SecurityQuestionRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == request.username).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    if not user.security_question:
-        raise HTTPException(status_code=400, detail="No security question set for this user")
-        
-    return {"question": user.security_question}
-
-@router.post("/reset-password")
-async def reset_password(request: PasswordResetRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == request.username).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-        
-    if not user.security_answer:
-        raise HTTPException(status_code=400, detail="No security answer set for this user")
-        
-    # Verify answer (case-insensitive)
-    if user.security_answer.lower().strip() != request.security_answer.lower().strip():
-        raise HTTPException(status_code=400, detail="Incorrect security answer")
-    
-    # Validate new password strength
-    is_valid, errors = validate_password_strength(request.new_password)
-    if not is_valid:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=errors[0] if errors else "Password does not meet security requirements"
-        )
-        
-    # Update password
-    user.password_hash = hash_password(request.new_password)
-    db.commit()
-    
-    return {"message": "Password reset successfully"}
 
 @router.post("/login", response_model=LoginResponse)
 async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
@@ -75,19 +37,21 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
             )
         
         # Check approval status
-        if hasattr(user, 'approval_status') and user.approval_status == 'pending':
-            print("User pending approval")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Your account is pending admin approval. Please wait for approval before logging in.",
-            )
-        
-        if hasattr(user, 'approval_status') and user.approval_status == 'rejected':
-            print("User rejected")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Your account registration was rejected. Please contact admin for more information.",
-            )
+        # Admin bypasses approval check (optional, but good for safety)
+        if user.role != 'admin':
+            if hasattr(user, 'approval_status'):
+                if user.approval_status == 'pending':
+                    print("User pending approval")
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Your account is awaiting approval by the admin.",
+                    )
+                elif user.approval_status == 'rejected':
+                    print("User rejected")
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Your account registration was rejected. Please contact admin.",
+                    )
         
         # Verify password
         t2 = time.time()
@@ -96,11 +60,6 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
         
         if not is_valid:
             print(f"Invalid password for user {user.username}")
-            print(f"Stored hash: {user.password_hash}")
-            # Verify if hash looks like bcrypt
-            if not user.password_hash.startswith('$2b$'):
-                print("CRITICAL: Stored hash does not look like a valid bcrypt hash!")
-            
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username or password",
@@ -135,7 +94,6 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
                     user_id=user.user_id,
                     date=today_str,
                     status='present',
-                    # ip_address=request.client.host # Requires Request object, skipping for now
                 )
                 db.add(new_attendance)
                 db.commit()
@@ -213,12 +171,21 @@ async def change_password(
 @router.post("/signup")
 async def signup(user_data: dict, db: Session = Depends(get_db)):
     """
-    Register new user with onboarding data.
+    Register new user.
     User will be in 'pending' status until admin approves.
     """
     from app.core.auth_utils import hash_password
     import uuid
     
+    # Required fields validation
+    required_fields = ['username', 'password', 'email', 'full_name', 'contact_number']
+    for field in required_fields:
+        if not user_data.get(field):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Field {field} is required"
+            )
+
     # Check if username already exists
     existing_user = db.query(User).filter(User.username == user_data['username']).first()
     if existing_user:
@@ -251,31 +218,18 @@ async def signup(user_data: dict, db: Session = Depends(get_db)):
         password_hash=hash_password(user_data['password']),
         email=user_data.get('email'),
         full_name=user_data.get('full_name'),
-        role='operator', # Enforce operator role for self-signup
-        date_of_birth=user_data.get('date_of_birth'),
-        address=user_data.get('address'),
+        role='operator', # Default role
         contact_number=user_data.get('contact_number'),
-        unit_id=user_data.get('unit_id'),
+        # Map 'contact' from form to address if provided, or just keep it separate if needed.
+        # Assuming 'Contact' in request meant 'Contact Number', but since both are listed, 
+        # I'll check if 'address' is passed or if 'contact' is passed.
+        address=user_data.get('address'), 
         approval_status='pending'
     )
     
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    
-    # Add skills if present
-    if 'skills' in user_data and isinstance(user_data['skills'], list):
-        from app.models.models_db import UserMachine
-        for skill in user_data['skills']:
-            # skill should be {'machine_id': '...', 'skill_level': '...'}
-            if skill.get('machine_id'):
-                new_skill = UserMachine(
-                    user_id=new_user.user_id,
-                    machine_id=skill.get('machine_id'),
-                    skill_level=skill.get('skill_level', 'intermediate')
-                )
-                db.add(new_skill)
-        db.commit()
     
     # Create approval record
     from app.models.models_db import UserApproval
