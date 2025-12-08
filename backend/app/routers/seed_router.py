@@ -1,15 +1,97 @@
 """
-Router for seeding machines into the database.
-This provides an admin-only endpoint to reset and populate machines.
+Router for seeding machines and migrating passwords.
+This provides admin-only endpoints for database management.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.models.models_db import Machine, MachineCategory
+from app.models.models_db import Machine, MachineCategory, User
 from app.core.dependencies import get_current_user
+from app.core.auth_utils import hash_password
 import uuid
+import secrets
+import string
+import os
 
 router = APIRouter(prefix="/seed", tags=["seed"])
+
+# Migration secret - set this as environment variable for security
+MIGRATION_SECRET = os.getenv("MIGRATION_SECRET", "change-this-in-production")
+
+
+def generate_secure_password(length=12):
+    """Generate a secure password meeting all requirements."""
+    uppercase = string.ascii_uppercase
+    lowercase = string.ascii_lowercase
+    digits = string.digits
+    special = "!@#$%^&*"
+    
+    password = [
+        secrets.choice(uppercase),
+        secrets.choice(lowercase),
+        secrets.choice(digits),
+        secrets.choice(special),
+    ]
+    
+    all_chars = uppercase + lowercase + digits + special
+    password.extend(secrets.choice(all_chars) for _ in range(length - 4))
+    
+    password_list = list(password)
+    secrets.SystemRandom().shuffle(password_list)
+    
+    return ''.join(password_list)
+
+
+@router.post("/migrate-passwords")
+async def migrate_passwords(
+    secret: str = Query(..., description="Migration secret key"),
+    db: Session = Depends(get_db)
+):
+    """
+    One-time endpoint to migrate demo user passwords to secure ones.
+    
+    SECURITY: Requires a secret key to execute.
+    Set MIGRATION_SECRET environment variable in production.
+    
+    Usage: POST /seed/migrate-passwords?secret=your-secret-key
+    
+    After running, SAVE THE RETURNED CREDENTIALS and remove this endpoint!
+    """
+    # Verify secret
+    if secret != MIGRATION_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid migration secret")
+    
+    demo_usernames = ['admin', 'operator', 'supervisor', 'planning']
+    migrated_users = []
+    
+    try:
+        for username in demo_usernames:
+            user = db.query(User).filter(User.username == username).first()
+            
+            if user:
+                new_password = generate_secure_password()
+                user.password_hash = hash_password(new_password)
+                
+                migrated_users.append({
+                    "username": username,
+                    "new_password": new_password,
+                    "role": user.role,
+                    "email": user.email
+                })
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "SAVE THESE CREDENTIALS! They won't be shown again.",
+            "warning": "Delete this endpoint after use for security!",
+            "migrated_count": len(migrated_users),
+            "credentials": migrated_users
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
 
 # Unit 1 Machines
 UNIT_1_MACHINES = [
