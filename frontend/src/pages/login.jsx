@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login } from '../api/services';
+import { useAuth } from '../context/AuthContext';
 import { User, Lock, LogIn, Eye, EyeOff, AlertCircle, Server } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login } = useAuth(); // Use login from context
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -34,44 +35,30 @@ const Login = () => {
     console.log('🔍 Attempting login with:', username);
 
     try {
-      const response = await login({ username, password });
+      // Use login from AuthContext
+      const result = await login(username, password);
 
-      console.log('✅ Login success:', response.data);
+      if (result.success) {
+        console.log('✅ Login success:', result.user);
 
-      // Store token and user data
-      localStorage.setItem('token', response.data.access_token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+        // Redirect based on role
+        const role = result.user.role;
+        const dashboardRoutes = {
+          admin: '/dashboard/admin',
+          operator: '/dashboard/operator',
+          supervisor: '/dashboard/supervisor',
+          planning: '/dashboard/planning',
+        };
 
-      // Redirect based on role
-      const role = response.data.user.role;
-      const dashboardRoutes = {
-        admin: '/dashboard/admin',
-        operator: '/dashboard/operator',
-        supervisor: '/dashboard/supervisor',
-        planning: '/dashboard/planning',
-      };
-
-      const targetPath = dashboardRoutes[role] || '/';
-
-      // Use navigate for SPA routing
-      navigate(targetPath);
+        const targetPath = dashboardRoutes[role] || '/';
+        navigate(targetPath);
+      } else {
+        throw new Error(result.error);
+      }
 
     } catch (err) {
       console.error('❌ Login failed:', err);
-
-      let errorMessage = 'An unexpected error occurred. Please try again.';
-
-      if (err.response) {
-        // Server responded with error
-        errorMessage = err.response.data?.detail || `Server error: ${err.response.status}`;
-      } else if (err.request) {
-        // Request made but no response
-        errorMessage = 'Cannot connect to server. Please check your internet connection or if the server is down.';
-      } else {
-        errorMessage = err.message || 'Request failed. Please try again.';
-      }
-
-      setError(errorMessage);
+      setError(err.message || 'Login failed');
     } finally {
       setLoading(false);
       setShowColdStartWarning(false);
