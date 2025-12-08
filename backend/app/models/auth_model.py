@@ -16,3 +16,8 @@ class PasswordResetRequest(BaseModel):
     username: str
     security_answer: str
     new_password: str
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_new_password: str

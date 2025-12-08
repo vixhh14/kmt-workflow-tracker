@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.orm import Session
-from app.models.auth_model import LoginRequest, LoginResponse, SecurityQuestionRequest, PasswordResetRequest
+from app.models.auth_model import LoginRequest, LoginResponse, SecurityQuestionRequest, PasswordResetRequest, ChangePasswordRequest
 from app.core.auth_utils import verify_password, create_access_token, hash_password
+from app.core.dependencies import get_current_active_user
 from app.core.database import get_db
 from app.models.models_db import User
 from app.core.password_validation import validate_password_strength
@@ -167,12 +168,47 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
         )
 
 @router.get("/me")
-async def get_current_user():
-    """
-    Get current user information from token.
-    This is a placeholder - in production, you'd extract user from JWT token in header.
-    """
-    return {"message": "Current user endpoint - requires JWT middleware"}
+async def get_current_user(current_user: User = Depends(get_current_active_user)):
+    """Get current logged in user profile"""
+    return {
+        "user_id": current_user.user_id,
+        "username": current_user.username,
+        "email": current_user.email,
+        "role": current_user.role,
+        "full_name": current_user.full_name,
+        "unit_id": current_user.unit_id,
+        "machine_types": current_user.machine_types,
+        "created_at": current_user.created_at
+    }
+
+@router.post("/change-password")
+async def change_password(
+    request: ChangePasswordRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Change password for logged in user"""
+    # Verify current password
+    if not verify_password(request.current_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Incorrect current password")
+    
+    # Check match
+    if request.new_password != request.confirm_new_password:
+        raise HTTPException(status_code=400, detail="New passwords do not match")
+        
+    # Validate strength
+    is_valid, errors = validate_password_strength(request.new_password)
+    if not is_valid:
+        raise HTTPException(
+            status_code=400,
+            detail=errors[0] if errors else "Password does not meet security requirements"
+        )
+        
+    # Update
+    current_user.password_hash = hash_password(request.new_password)
+    db.commit()
+    
+    return {"message": "Password changed successfully"}
 
 @router.post("/signup")
 async def signup(user_data: dict, db: Session = Depends(get_db)):
