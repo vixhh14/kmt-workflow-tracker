@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Lock, Key, ArrowRight, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { getSecurityQuestion, resetPassword } from '../api/services';
+import { validatePasswordFull } from '../utils/passwordValidation';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 
 const ForgotPassword = () => {
     const navigate = useNavigate();
@@ -48,13 +50,15 @@ const ForgotPassword = () => {
     const handleResetSubmit = async (e) => {
         e.preventDefault();
 
-        if (newPassword !== confirmPassword) {
-            setError('Passwords do not match');
+        // Strong password validation
+        const passwordValidation = validatePasswordFull(newPassword);
+        if (!passwordValidation.isValid) {
+            setError(passwordValidation.errors[0]);
             return;
         }
 
-        if (newPassword.length < 6) {
-            setError('Password must be at least 6 characters');
+        if (newPassword !== confirmPassword) {
+            setError('Passwords do not match');
             return;
         }
 
@@ -187,6 +191,7 @@ const ForgotPassword = () => {
                                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                 </button>
                             </div>
+                            <PasswordStrengthMeter password={newPassword} />
                         </div>
 
                         <div>

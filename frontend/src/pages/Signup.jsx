@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Lock, Phone, Eye, EyeOff } from 'lucide-react';
+import { validatePasswordFull } from '../utils/passwordValidation';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 
 const Signup = () => {
     const navigate = useNavigate();
@@ -23,8 +25,13 @@ const Signup = () => {
 
         if (!formData.username) newErrors.username = 'Username is required';
         if (!formData.email) newErrors.email = 'Email is required';
-        if (!formData.password) newErrors.password = 'Password is required';
-        if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+
+        // Strong password validation
+        const passwordValidation = validatePasswordFull(formData.password);
+        if (!passwordValidation.isValid) {
+            newErrors.password = passwordValidation.errors[0]; // Show first error
+        }
+
         if (formData.password !== formData.confirmPassword) {
             newErrors.confirmPassword = 'Passwords do not match';
         }
@@ -128,6 +135,7 @@ const Signup = () => {
                                 </button>
                             </div>
                             {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
+                            <PasswordStrengthMeter password={formData.password} />
                         </div>
 
                         {/* Confirm Password */}
