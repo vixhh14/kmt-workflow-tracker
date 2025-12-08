@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Lock, Phone, Eye, EyeOff } from 'lucide-react';
+import { User, Mail, Lock, Phone, MapPin, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 import { validatePasswordFull } from '../utils/passwordValidation';
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
+import api from '../api/axios';
 
 const Signup = () => {
     const navigate = useNavigate();
@@ -13,123 +14,208 @@ const Signup = () => {
         confirmPassword: '',
         full_name: '',
         contact_number: '',
-        security_question: '',
-        security_answer: ''
+        address: '' // Mapping 'Contact' requirement to address/location
     });
     const [errors, setErrors] = useState({});
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitSuccess, setSubmitSuccess] = useState(false);
+    const [submitError, setSubmitError] = useState('');
 
     const validate = () => {
         const newErrors = {};
 
-        if (!formData.username) newErrors.username = 'Username is required';
+        if (!formData.full_name) newErrors.full_name = 'Full Name is required';
+        if (!formData.address) newErrors.address = 'Contact/Address is required';
+        if (!formData.contact_number) newErrors.contact_number = 'Phone Number is required';
         if (!formData.email) newErrors.email = 'Email is required';
+        if (!formData.username) newErrors.username = 'Username is required';
 
         // Strong password validation
         const passwordValidation = validatePasswordFull(formData.password);
         if (!passwordValidation.isValid) {
-            newErrors.password = passwordValidation.errors[0]; // Show first error
+            newErrors.password = passwordValidation.errors[0];
         }
 
         if (formData.password !== formData.confirmPassword) {
             newErrors.confirmPassword = 'Passwords do not match';
         }
-        if (!formData.full_name) newErrors.full_name = 'Full name is required';
-        if (!formData.contact_number) newErrors.contact_number = 'Contact number is required';
-        if (!formData.security_question) newErrors.security_question = 'Security question is required';
-        if (!formData.security_answer) newErrors.security_answer = 'Security answer is required';
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        setSubmitError('');
 
         if (validate()) {
-            // Store data in sessionStorage and navigate to skills page
-            sessionStorage.setItem('signupData', JSON.stringify(formData));
-            navigate('/signup/skills');
+            setIsSubmitting(true);
+            try {
+                // Call API directly instead of storing in session
+                const response = await api.post('/auth/signup', {
+                    username: formData.username,
+                    email: formData.email,
+                    password: formData.password,
+                    full_name: formData.full_name,
+                    contact_number: formData.contact_number,
+                    address: formData.address
+                });
+
+                if (response.data) {
+                    setSubmitSuccess(true);
+                }
+            } catch (error) {
+                console.error('Signup error:', error);
+                setSubmitError(error.response?.data?.detail || 'Registration failed. Please try again.');
+            } finally {
+                setIsSubmitting(false);
+            }
         }
     };
+
+    if (submitSuccess) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
+                    <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-6">
+                        <CheckCircle className="text-green-600" size={40} />
+                    </div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-4">Registration Successful!</h2>
+                    <p className="text-gray-600 mb-8 text-lg">
+                        Your account has been created and is currently <strong>Pending Approval</strong>.
+                        <br /><br />
+                        Please wait for an administrator to approve your account. You will receive an email notification once approved.
+                    </p>
+                    <button
+                        onClick={() => navigate('/login')}
+                        className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition shadow-md"
+                    >
+                        Return to Login
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4 sm:p-6 lg:p-8">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 sm:p-8">
-                <div className="text-center mb-6 sm:mb-8">
-                    <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 bg-blue-100 rounded-full mb-4">
-                        <User className="text-blue-600" size={28} />
+                <div className="text-center mb-8">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                        <User className="text-blue-600" size={32} />
                     </div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Create Account</h1>
-                    <p className="text-sm sm:text-base text-gray-600 mt-2">Step 1 of 2: Basic Profile</p>
+                    <h1 className="text-3xl font-bold text-gray-900">Create Account</h1>
+                    <p className="text-gray-600 mt-2">Join the workflow tracker system</p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Username */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                                Username *
-                            </label>
+                {submitError && (
+                    <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 flex items-start">
+                        <AlertCircle className="text-red-500 mt-0.5 mr-3" size={20} />
+                        <p className="text-red-700">{submitError}</p>
+                    </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+                        {/* Full Name */}
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
                             <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <User className="text-gray-400" size={20} />
-                                </div>
+                                <User className="absolute left-3 top-3 text-gray-400" size={20} />
                                 <input
                                     type="text"
-                                    required
-                                    value={formData.username}
-                                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                                    className={`block w-full pl-10 pr-3 py-2.5 sm:py-3 border ${errors.username ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base sm:text-sm`}
-                                    placeholder="Enter username"
+                                    value={formData.full_name}
+                                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                                    className={`block w-full pl-10 pr-3 py-2.5 border ${errors.full_name ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                                    placeholder="John Doe"
                                 />
                             </div>
-                            {errors.username && <p className="text-red-500 text-xs mt-1">{errors.username}</p>}
+                            {errors.full_name && <p className="text-red-500 text-xs mt-1">{errors.full_name}</p>}
+                        </div>
+
+                        {/* Contact (Address) */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Contact / Address *</label>
+                            <div className="relative">
+                                <MapPin className="absolute left-3 top-3 text-gray-400" size={20} />
+                                <input
+                                    type="text"
+                                    value={formData.address}
+                                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                    className={`block w-full pl-10 pr-3 py-2.5 border ${errors.address ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                                    placeholder="City, Location"
+                                />
+                            </div>
+                            {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
+                        </div>
+
+                        {/* Phone Number */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
+                            <div className="relative">
+                                <Phone className="absolute left-3 top-3 text-gray-400" size={20} />
+                                <input
+                                    type="tel"
+                                    value={formData.contact_number}
+                                    onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
+                                    className={`block w-full pl-10 pr-3 py-2.5 border ${errors.contact_number ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                                    placeholder="+1 234 567 8900"
+                                />
+                            </div>
+                            {errors.contact_number && <p className="text-red-500 text-xs mt-1">{errors.contact_number}</p>}
                         </div>
 
                         {/* Email */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                                Email *
-                            </label>
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                             <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Mail className="text-gray-400" size={20} />
-                                </div>
+                                <Mail className="absolute left-3 top-3 text-gray-400" size={20} />
                                 <input
                                     type="email"
-                                    required
                                     value={formData.email}
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    className={`block w-full pl-10 pr-3 py-2.5 sm:py-3 border ${errors.email ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base sm:text-sm`}
-                                    placeholder="Enter email"
+                                    className={`block w-full pl-10 pr-3 py-2.5 border ${errors.email ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                                    placeholder="john@example.com"
                                 />
                             </div>
                             {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
                         </div>
 
+                        {/* Username */}
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
+                            <div className="relative">
+                                <User className="absolute left-3 top-3 text-gray-400" size={20} />
+                                <input
+                                    type="text"
+                                    value={formData.username}
+                                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                                    className={`block w-full pl-10 pr-3 py-2.5 border ${errors.username ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                                    placeholder="johndoe123"
+                                />
+                            </div>
+                            {errors.username && <p className="text-red-500 text-xs mt-1">{errors.username}</p>}
+                        </div>
+
                         {/* Password */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                                Password *
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
                             <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Lock className="text-gray-400" size={20} />
-                                </div>
+                                <Lock className="absolute left-3 top-3 text-gray-400" size={20} />
                                 <input
                                     type={showPassword ? "text" : "password"}
-                                    required
                                     value={formData.password}
                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                    className={`block w-full pl-10 pr-10 py-2.5 sm:py-3 border ${errors.password ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base sm:text-sm`}
-                                    placeholder="Enter password"
+                                    className={`block w-full pl-10 pr-10 py-2.5 border ${errors.password ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                                    placeholder="••••••••"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
                                 >
                                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                 </button>
@@ -140,109 +226,34 @@ const Signup = () => {
 
                         {/* Confirm Password */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                                Confirm Password *
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password *</label>
                             <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Lock className="text-gray-400" size={20} />
-                                </div>
+                                <Lock className="absolute left-3 top-3 text-gray-400" size={20} />
                                 <input
                                     type={showConfirmPassword ? "text" : "password"}
-                                    required
                                     value={formData.confirmPassword}
                                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                                    className={`block w-full pl-10 pr-10 py-2.5 sm:py-3 border ${errors.confirmPassword ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base sm:text-sm`}
-                                    placeholder="Confirm password"
+                                    className={`block w-full pl-10 pr-10 py-2.5 border ${errors.confirmPassword ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                                    placeholder="••••••••"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
                                 >
                                     {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                 </button>
                             </div>
                             {errors.confirmPassword && <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>}
                         </div>
-
-                        {/* Security Question */}
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                                Security Question (for password reset) *
-                            </label>
-                            <select
-                                required
-                                value={formData.security_question}
-                                onChange={(e) => setFormData({ ...formData, security_question: e.target.value })}
-                                className="block w-full px-3 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base sm:text-sm"
-                            >
-                                <option value="">Select a question</option>
-                                <option value="What is your mother's maiden name?">What is your mother's maiden name?</option>
-                                <option value="What was the name of your first pet?">What was the name of your first pet?</option>
-                                <option value="What city were you born in?">What city were you born in?</option>
-                                <option value="What is your favorite food?">What is your favorite food?</option>
-                            </select>
-                        </div>
-
-                        {/* Security Answer */}
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                                Security Answer *
-                            </label>
-                            <input
-                                type="text"
-                                required
-                                value={formData.security_answer}
-                                onChange={(e) => setFormData({ ...formData, security_answer: e.target.value })}
-                                className="block w-full px-3 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base sm:text-sm"
-                                placeholder="Enter your answer"
-                            />
-                        </div>
-
-                        {/* Full Name */}
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                                Full Name *
-                            </label>
-                            <input
-                                type="text"
-                                required
-                                value={formData.full_name}
-                                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                                className={`block w-full px-3 py-2.5 sm:py-3 border ${errors.full_name ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base sm:text-sm`}
-                                placeholder="Enter full name"
-                            />
-                            {errors.full_name && <p className="text-red-500 text-xs mt-1">{errors.full_name}</p>}
-                        </div>
-
-                        {/* Contact Number */}
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
-                                Contact Number *
-                            </label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Phone className="text-gray-400" size={20} />
-                                </div>
-                                <input
-                                    type="tel"
-                                    required
-                                    value={formData.contact_number}
-                                    onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
-                                    className={`block w-full pl-10 pr-3 py-2.5 sm:py-3 border ${errors.contact_number ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base sm:text-sm`}
-                                    placeholder="Enter contact number"
-                                />
-                            </div>
-                            {errors.contact_number && <p className="text-red-500 text-xs mt-1">{errors.contact_number}</p>}
-                        </div>
                     </div>
 
                     <button
                         type="submit"
-                        className="w-full bg-blue-600 text-white py-2.5 sm:py-3 rounded-lg font-semibold hover:bg-blue-700 transition shadow-md hover:shadow-lg transform active:scale-[0.98] text-base sm:text-sm"
+                        disabled={isSubmitting}
+                        className={`w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition shadow-md hover:shadow-lg transform active:scale-[0.98] ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
                     >
-                        Next: Select Skills & Machines →
+                        {isSubmitting ? 'Creating Account...' : 'Create Account'}
                     </button>
 
                     <div className="text-center text-sm text-gray-600">
