@@ -44,7 +44,7 @@ const ChangePassword = () => {
 
         try {
             await changePassword({
-                old_password: formData.oldPassword,
+                current_password: formData.oldPassword,
                 new_password: formData.newPassword,
                 confirm_new_password: formData.confirmNewPassword
             });
