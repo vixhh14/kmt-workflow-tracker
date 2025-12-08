@@ -71,8 +71,8 @@ const PlanningDashboard = () => {
                 <div className="bg-white rounded-lg shadow p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                         <div className="min-w-0">
-                            <p className="text-xs sm:text-sm text-gray-600 mb-1">Total Tasks</p>
-                            <p className="text-2xl sm:text-3xl font-bold text-gray-900">{tasks.length}</p>
+                            <p className="text-xs sm:text-sm text-gray-600 mb-1">Total Projects</p>
+                            <p className="text-2xl sm:text-3xl font-bold text-gray-900">{overview?.projects?.length || 0}</p>
                         </div>
                         <Calendar className="text-blue-500 flex-shrink-0" size={24} />
                     </div>
@@ -80,8 +80,8 @@ const PlanningDashboard = () => {
                 <div className="bg-white rounded-lg shadow p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                         <div className="min-w-0">
-                            <p className="text-xs sm:text-sm text-gray-600 mb-1">Upcoming</p>
-                            <p className="text-2xl sm:text-3xl font-bold text-yellow-600">{upcomingTasks}</p>
+                            <p className="text-xs sm:text-sm text-gray-600 mb-1">Total Tasks Running</p>
+                            <p className="text-2xl sm:text-3xl font-bold text-yellow-600">{tasks.filter(t => t.status === 'in_progress').length}</p>
                         </div>
                         <Calendar className="text-yellow-500 flex-shrink-0" size={24} />
                     </div>
@@ -89,7 +89,7 @@ const PlanningDashboard = () => {
                 <div className="bg-white rounded-lg shadow p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                         <div className="min-w-0">
-                            <p className="text-xs sm:text-sm text-gray-600 mb-1">Machines</p>
+                            <p className="text-xs sm:text-sm text-gray-600 mb-1">Machines Active</p>
                             <p className="text-2xl sm:text-3xl font-bold text-green-600">{activeMachines}</p>
                         </div>
                         <Briefcase className="text-indigo-500 flex-shrink-0" size={24} />

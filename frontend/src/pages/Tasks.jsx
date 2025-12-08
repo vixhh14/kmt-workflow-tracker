@@ -363,35 +363,39 @@ const Tasks = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Project *</label>
                                 <input
                                     type="text"
+                                    required
                                     value={formData.project}
                                     onChange={(e) => setFormData({ ...formData, project: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Part / Item</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Part / Item *</label>
                                 <input
                                     type="text"
+                                    required
                                     value={formData.part_item}
                                     onChange={(e) => setFormData({ ...formData, part_item: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Nos / Unit</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Nos / Unit *</label>
                                 <input
                                     type="text"
+                                    required
                                     value={formData.nos_unit}
                                     onChange={(e) => setFormData({ ...formData, nos_unit: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Priority *</label>
                                 <select
+                                    required
                                     value={formData.priority}
                                     onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -402,13 +406,14 @@ const Tasks = () => {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Machine</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Machine *</label>
                                 <select
+                                    required
                                     value={formData.machine_id}
                                     onChange={(e) => setFormData({ ...formData, machine_id: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 >
-                                    <option value="">No Machine</option>
+                                    <option value="">Select Machine</option>
                                     {machines.map((machine) => (
                                         <option key={machine.id} value={machine.id}>
                                             {machine.name}
@@ -417,13 +422,14 @@ const Tasks = () => {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Assign To</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Assign To *</label>
                                 <select
+                                    required
                                     value={formData.assigned_to}
                                     onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 >
-                                    <option value="">Unassigned</option>
+                                    <option value="">Select Operator</option>
                                     {(() => {
                                         const selectedMachine = machines.find(m => m.id === formData.machine_id);
                                         const machineType = selectedMachine?.type;
@@ -460,8 +466,9 @@ const Tasks = () => {
                                 })()}
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Assigned By</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Assigned By *</label>
                                 <select
+                                    required
                                     value={formData.assigned_by}
                                     onChange={(e) => setFormData({ ...formData, assigned_by: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -475,17 +482,19 @@ const Tasks = () => {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Due Date *</label>
                                 <input
                                     type="date"
+                                    required
                                     value={formData.due_date}
                                     onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
                                 <textarea
+                                    required
                                     value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                     rows="3"

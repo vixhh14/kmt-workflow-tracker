@@ -25,6 +25,7 @@ import UserApprovals from './pages/admin/UserApprovals.jsx';
 import ChangePassword from './pages/admin/ChangePassword.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import WorkflowTracker from './pages/WorkflowTracker.jsx';
+import Profile from './pages/Profile.jsx';
 
 function App() {
     return (
@@ -66,6 +67,7 @@ function App() {
                         <Route path="workflow-tracker" element={<ProtectedRoute allowedRoles={['admin', 'planning']}><WorkflowTracker /></ProtectedRoute>} />
                         <Route path="admin/approvals" element={<ProtectedRoute allowedRoles={['admin', 'planning']}><UserApprovals /></ProtectedRoute>} />
                         <Route path="admin/change-password" element={<ChangePassword />} />
+                        <Route path="profile" element={<Profile />} />
                     </Route>
 
                     <Route path="/unauthorized" element={
