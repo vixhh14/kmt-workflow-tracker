@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getUsers, createUser, deleteUser } from '../api/services';
 import { Plus, Trash2, User, Search, X, Eye, EyeOff, Shield, Mail, Briefcase } from 'lucide-react';
+import { validatePasswordFull } from '../utils/passwordValidation';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 
 const Users = () => {
     const [users, setUsers] = useState([]);
@@ -43,14 +45,18 @@ const Users = () => {
     };
 
     const validateForm = () => {
+        // Strong password validation
+        const passwordValidation = validatePasswordFull(formData.password);
+        if (!passwordValidation.isValid) {
+            setFormError(passwordValidation.errors[0]);
+            return false;
+        }
+
         if (formData.password !== formData.confirm_password) {
             setFormError('Passwords do not match');
             return false;
         }
-        if (formData.password.length < 6) {
-            setFormError('Password must be at least 6 characters');
-            return false;
-        }
+
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (formData.email && !emailRegex.test(formData.email)) {
             setFormError('Invalid email format');
@@ -287,6 +293,7 @@ const Users = () => {
                                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                     </button>
                                 </div>
+                                <PasswordStrengthMeter password={formData.password} />
                             </div>
 
                             {/* Confirm Password */}

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { changePassword } from '../../api/services';
 import { Lock, AlertCircle, CheckCircle } from 'lucide-react';
+import { validatePasswordFull } from '../../utils/passwordValidation';
+import PasswordStrengthMeter from '../../components/PasswordStrengthMeter';
 
 const ChangePassword = () => {
     const [formData, setFormData] = useState({
@@ -26,8 +28,10 @@ const ChangePassword = () => {
         setError('');
         setSuccess('');
 
-        if (formData.newPassword.length < 6) {
-            setError('New password must be at least 6 characters long');
+        // Strong password validation
+        const passwordValidation = validatePasswordFull(formData.newPassword);
+        if (!passwordValidation.isValid) {
+            setError(passwordValidation.errors[0]);
             return;
         }
 
@@ -104,8 +108,9 @@ const ChangePassword = () => {
                         onChange={handleChange}
                         required
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                        placeholder="Min. 6 characters"
+                        placeholder="Enter strong password"
                     />
+                    <PasswordStrengthMeter password={formData.newPassword} />
                 </div>
 
                 <div>
