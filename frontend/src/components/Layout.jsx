@@ -38,8 +38,8 @@ const Layout = ({ children }) => {
             ...(user?.role === 'admin' || user?.role === 'planning'
                 ? [{ path: '/workflow-tracker', label: 'Users', icon: UsersIcon }]
                 : []),
-            // User Approvals - accessible by admin and planning
-            ...(user?.role === 'admin' || user?.role === 'planning'
+            // User Approvals - ADMIN ONLY
+            ...(user?.role === 'admin'
                 ? [{ path: '/admin/approvals', label: 'User Approvals', icon: UserCheck }]
                 : []),
             // Change Password - accessible by all users
