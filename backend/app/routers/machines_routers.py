@@ -132,3 +132,168 @@ async def delete_machine(machine_id: str, db: Session = Depends(get_db)):
     db.delete(db_machine)
     db.commit()
     return {"message": "Machine deleted successfully"}
+
+
+# ----------------------------------------------------------------------
+# SEED MACHINES (One-time endpoint to populate database)
+# ----------------------------------------------------------------------
+@router.post("/seed", response_model=dict)
+async def seed_machines(db: Session = Depends(get_db)):
+    """
+    One-time endpoint to seed the database with machines, units, and categories.
+    Call this once after deployment to populate the machine master list.
+    """
+    
+    # Units data
+    UNITS = [
+        {"id": 1, "name": "Unit 1", "description": "Main production unit"},
+        {"id": 2, "name": "Unit 2", "description": "Secondary production unit"},
+    ]
+    
+    # Categories data
+    CATEGORIES = [
+        {"id": 1, "name": "Material Cutting"},
+        {"id": 2, "name": "Welding"},
+        {"id": 3, "name": "Lathe"},
+        {"id": 4, "name": "CNC"},
+        {"id": 5, "name": "Slotting"},
+        {"id": 6, "name": "Grinding"},
+        {"id": 7, "name": "Drilling"},
+        {"id": 8, "name": "Grinder"},
+        {"id": 9, "name": "VMC"},
+        {"id": 10, "name": "Milling"},
+        {"id": 11, "name": "Engraving"},
+        {"id": 12, "name": "Honing"},
+        {"id": 13, "name": "Buffing"},
+        {"id": 14, "name": "Tooth Rounding"},
+        {"id": 15, "name": "Lapping"},
+        {"id": 16, "name": "Rack Cutting"},
+    ]
+    
+    # Machines data - Unit 2 (11 machines)
+    UNIT2_MACHINES = [
+        {"name": "Gas Cutting", "category_id": 1},
+        {"name": "Tig Welding", "category_id": 2},
+        {"name": "CO2 Welding LD", "category_id": 2},
+        {"name": "CO2 Welding HD", "category_id": 2},
+        {"name": "PSG", "category_id": 3},
+        {"name": "Ace Superjobber", "category_id": 4},
+        {"name": "Slotting Machine", "category_id": 5},
+        {"name": "Surface Grinding", "category_id": 6},
+        {"name": "Thakur Drilling", "category_id": 7},
+        {"name": "Toolvasor Magnetic Drilling", "category_id": 7},
+        {"name": "EIFCO Radial Drilling", "category_id": 7},
+    ]
+    
+    # Machines data - Unit 1 (28 machines)
+    UNIT1_MACHINES = [
+        {"name": "Hand Grinder", "category_id": 8},
+        {"name": "Bench Grinder", "category_id": 8},
+        {"name": "Tool and Cutter Grinder", "category_id": 8},
+        {"name": "Turnmaster", "category_id": 3},
+        {"name": "Leader", "category_id": 3},
+        {"name": "Bandsaw cutting Manual", "category_id": 1},
+        {"name": "Bandsaw cutting Auto", "category_id": 1},
+        {"name": "VMC Pilot", "category_id": 9},
+        {"name": "ESTEEM DRO", "category_id": 10},
+        {"name": "FW Horizontal", "category_id": 10},
+        {"name": "Arno", "category_id": 10},
+        {"name": "BFW No 2", "category_id": 10},
+        {"name": "Engraving Machine", "category_id": 11},
+        {"name": "Delapena Honing Machine", "category_id": 12},
+        {"name": "Bench Grinder 2", "category_id": 8},
+        {"name": "Buffing Machine", "category_id": 13},
+        {"name": "Tooth Rounding Machine", "category_id": 14},
+        {"name": "Lapping Machine", "category_id": 15},
+        {"name": "Hand Drilling 2", "category_id": 7},
+        {"name": "Hand Drilling 1", "category_id": 7},
+        {"name": "Hand Grinding 2", "category_id": 8},
+        {"name": "Hand Grinding 1", "category_id": 8},
+        {"name": "Hitachi Cutting Machine", "category_id": 1},
+        {"name": "HMT Rack Cutting", "category_id": 16},
+        {"name": "L Rack Cutting", "category_id": 16},
+        {"name": "Reinecker", "category_id": 3},
+        {"name": "Zimberman", "category_id": 4},
+        {"name": "EIFCO Stationary Drilling", "category_id": 7},
+    ]
+    
+    added_units = 0
+    added_categories = 0
+    added_machines = 0
+    
+    try:
+        # Insert Units
+        for unit_data in UNITS:
+            existing = db.query(Unit).filter(Unit.id == unit_data["id"]).first()
+            if not existing:
+                unit = Unit(id=unit_data["id"], name=unit_data["name"], description=unit_data.get("description"), created_at=datetime.utcnow())
+                db.add(unit)
+                added_units += 1
+        
+        # Insert Categories
+        for cat_data in CATEGORIES:
+            existing = db.query(MachineCategory).filter(MachineCategory.id == cat_data["id"]).first()
+            if not existing:
+                category = MachineCategory(id=cat_data["id"], name=cat_data["name"], created_at=datetime.utcnow())
+                db.add(category)
+                added_categories += 1
+        
+        db.commit()
+        
+        # Insert Unit 2 Machines
+        for machine_data in UNIT2_MACHINES:
+            existing = db.query(Machine).filter(Machine.name == machine_data["name"]).first()
+            if not existing:
+                machine = Machine(
+                    id=str(uuid.uuid4()),
+                    name=machine_data["name"],
+                    status="active",
+                    hourly_rate=0.0,
+                    category_id=machine_data["category_id"],
+                    unit_id=2,
+                    updated_at=datetime.utcnow()
+                )
+                db.add(machine)
+                added_machines += 1
+        
+        # Insert Unit 1 Machines
+        for machine_data in UNIT1_MACHINES:
+            existing = db.query(Machine).filter(Machine.name == machine_data["name"]).first()
+            if not existing:
+                machine = Machine(
+                    id=str(uuid.uuid4()),
+                    name=machine_data["name"],
+                    status="active",
+                    hourly_rate=0.0,
+                    category_id=machine_data["category_id"],
+                    unit_id=1,
+                    updated_at=datetime.utcnow()
+                )
+                db.add(machine)
+                added_machines += 1
+        
+        db.commit()
+        
+        # Get totals
+        total_units = db.query(Unit).count()
+        total_categories = db.query(MachineCategory).count()
+        total_machines = db.query(Machine).count()
+        
+        return {
+            "message": "Seed completed successfully!",
+            "added": {
+                "units": added_units,
+                "categories": added_categories,
+                "machines": added_machines
+            },
+            "totals": {
+                "units": total_units,
+                "categories": total_categories,
+                "machines": total_machines
+            }
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Seed failed: {str(e)}")
+
