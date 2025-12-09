@@ -11,16 +11,27 @@ load_dotenv()
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DEFAULT_DB_PATH = os.path.join(BACKEND_DIR, "workflow.db")
 
-# Get database URL from environment variable, default to SQLite for local dev
+# Get database URL from environment variable
 database_url_env = os.getenv("DATABASE_URL")
+
+# Check if running on Render
+IS_RENDER = os.getenv("RENDER") == "true"
 
 if database_url_env:
     SQLALCHEMY_DATABASE_URL = database_url_env
     print(f"[DB] Using DATABASE_URL from environment")
+elif IS_RENDER:
+    # Use Render Disk path for persistence
+    # NOTE: You must attach a disk to /var/data in Render dashboard
+    RENDER_DB_PATH = "/var/data/workflow.db"
+    SQLALCHEMY_DATABASE_URL = f"sqlite:///{RENDER_DB_PATH}"
+    print(f"[DB] Running on Render. Using persistent disk at: {RENDER_DB_PATH}")
+    # Update DEFAULT_DB_PATH for get_db_connection legacy support
+    DEFAULT_DB_PATH = RENDER_DB_PATH
 else:
-    # Use absolute path to ensure consistent database location
+    # Use absolute path to ensure consistent database location locally
     SQLALCHEMY_DATABASE_URL = f"sqlite:///{DEFAULT_DB_PATH}"
-    print(f"[DB] Using SQLite database at: {DEFAULT_DB_PATH}")
+    print(f"[DB] Using local SQLite database at: {DEFAULT_DB_PATH}")
 
 # Handle Render's postgres:// URL format (SQLAlchemy requires postgresql://)
 if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
