@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getTasks, startTask, holdTask, resumeTask, completeTask, denyTask } from '../../api/services';
 import { useAuth } from '../../context/AuthContext';
-import { CheckSquare, Clock, AlertCircle, Play, Pause, CheckCircle, XCircle, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckSquare, Clock, AlertCircle, Play, Pause, CheckCircle, XCircle, RotateCcw, ChevronDown, ChevronUp, Timer } from 'lucide-react';
 import {
     LineChart, Line, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -13,6 +13,7 @@ const OperatorDashboard = () => {
     const [loading, setLoading] = useState(true);
     const { user } = useAuth();
     const [expandedTaskId, setExpandedTaskId] = useState(null);
+    const [currentTime, setCurrentTime] = useState(new Date()); // For live timer updates
 
     // Modal states
     const [showHoldModal, setShowHoldModal] = useState(false);
@@ -42,6 +43,14 @@ const OperatorDashboard = () => {
         fetchTasks();
         const interval = setInterval(fetchTasks, 30000);
         return () => clearInterval(interval);
+    }, []);
+
+    // Live timer update - refresh every second for in-progress tasks
+    useEffect(() => {
+        const timerInterval = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 1000);
+        return () => clearInterval(timerInterval);
     }, []);
 
     const fetchTasks = async () => {
@@ -141,18 +150,42 @@ const OperatorDashboard = () => {
     };
 
     const formatDuration = (seconds) => {
-        if (!seconds) return '0m';
+        if (!seconds || seconds < 0) return '0m';
         const hours = Math.floor(seconds / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
-        if (hours > 0) return `${hours}h ${minutes}m`;
-        return `${minutes}m`;
+        const secs = Math.floor(seconds % 60);
+        if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
+        if (minutes > 0) return `${minutes}m ${secs}s`;
+        return `${secs}s`;
+    };
+
+    // Format timestamp to local readable format
+    const formatTimestamp = (timestamp) => {
+        if (!timestamp) return '';
+        const date = new Date(timestamp);
+        return date.toLocaleString('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true,
+            day: '2-digit',
+            month: 'short'
+        });
+    };
+
+    // Calculate live elapsed time for in-progress tasks
+    const getLiveElapsedTime = (task) => {
+        if (!task.started_at || task.status !== 'in_progress') return null;
+        const startTime = new Date(task.started_at);
+        const elapsed = Math.floor((currentTime - startTime) / 1000); // seconds
+        const totalWithPrevious = (task.total_duration_seconds || 0) + elapsed;
+        return totalWithPrevious;
     };
 
     const getTimeSince = (timestamp) => {
         if (!timestamp) return '';
-        const now = new Date();
         const start = new Date(timestamp);
-        const diffMs = now - start;
+        const diffMs = currentTime - start;
         const diffMins = Math.floor(diffMs / 60000);
         if (diffMins < 60) return `${diffMins} mins ago`;
         const diffHours = Math.floor(diffMins / 60);
@@ -308,14 +341,38 @@ const OperatorDashboard = () => {
                                                 <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getPriorityColor(task.priority)}`}>
                                                     {task.priority}
                                                 </span>
-                                                {task.started_at && task.status === 'in_progress' && (
-                                                    <span className="text-xs text-gray-600 hidden sm:inline">
-                                                        Started {getTimeSince(task.started_at)}
+                                                {/* Live Timer for in-progress tasks */}
+                                                {task.status === 'in_progress' && (
+                                                    <span className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold animate-pulse">
+                                                        <Timer size={12} />
+                                                        {formatDuration(getLiveElapsedTime(task))}
                                                     </span>
                                                 )}
-                                                {task.total_duration_seconds > 0 && (
+                                                {/* Started time for in-progress */}
+                                                {task.started_at && task.status === 'in_progress' && (
+                                                    <span className="text-xs text-gray-600 hidden sm:inline">
+                                                        Started: {formatTimestamp(task.started_at)}
+                                                    </span>
+                                                )}
+                                                {/* Completed time and total duration for completed tasks */}
+                                                {task.status === 'completed' && (
+                                                    <>
+                                                        {task.completed_at && (
+                                                            <span className="text-xs text-green-700">
+                                                                Completed: {formatTimestamp(task.completed_at)}
+                                                            </span>
+                                                        )}
+                                                        {task.total_duration_seconds > 0 && (
+                                                            <span className="text-xs text-gray-600">
+                                                                Total: {formatDuration(task.total_duration_seconds)}
+                                                            </span>
+                                                        )}
+                                                    </>
+                                                )}
+                                                {/* Show previous duration for non-completed tasks that have been held before */}
+                                                {task.status !== 'in_progress' && task.status !== 'completed' && task.total_duration_seconds > 0 && (
                                                     <span className="text-xs text-gray-600">
-                                                        Duration: {formatDuration(task.total_duration_seconds)}
+                                                        Previous time: {formatDuration(task.total_duration_seconds)}
                                                     </span>
                                                 )}
                                             </div>
