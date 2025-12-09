@@ -90,6 +90,12 @@ async def startup_event():
         create_demo_users()
         print("✅ Demo users created/verified")
         
+        # 5. Initialize Data (Migrations + Seeding)
+        from app.core.init_data import init_db_data
+        print("🌱 Initializing data...")
+        init_db_data()
+        print("✅ Data initialization complete")
+        
         print("✅ Startup complete")
     except Exception as e:
         print(f"❌ Error during startup: {e}")

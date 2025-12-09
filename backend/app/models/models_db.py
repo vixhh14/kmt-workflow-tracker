@@ -75,6 +75,7 @@ class Machine(Base):
     current_operator = Column(String, nullable=True)  # user_id of current operator
     category_id = Column(Integer, ForeignKey("machine_categories.id"), nullable=True)
     unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class Task(Base):
