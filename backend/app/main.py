@@ -50,12 +50,42 @@ async def startup_event():
     try:
         print("🚀 Running startup tasks...")
         
-        # Create all database tables (including new Subtask table)
+        # 1. Log Database Path
+        from app.core.database import DEFAULT_DB_PATH
+        print(f"📂 Database Path: {DEFAULT_DB_PATH}")
+        
+        # 2. Create all database tables
         print("📊 Creating database tables...")
         Base.metadata.create_all(bind=engine)
         print("✅ Database tables created/verified")
         
-        # Create demo users
+        # 3. Verify Data Integrity
+        from sqlalchemy.orm import Session
+        session = Session(bind=engine)
+        try:
+            from app.models.models_db import Machine, User, Project
+            machine_count = session.query(Machine).count()
+            user_count = session.query(User).count()
+            # Project might not exist in models_db yet if it's in planning_model, check safely
+            try:
+                from app.models.planning_model import Project
+                project_count = session.query(Project).count()
+            except ImportError:
+                project_count = "N/A (Model not loaded)"
+
+            print(f"📈 Data Status:")
+            print(f"   - Machines: {machine_count}")
+            print(f"   - Users:    {user_count}")
+            print(f"   - Projects: {project_count}")
+            
+            if machine_count == 0:
+                print("⚠️ WARNING: Machine table is empty! You may need to run seed_machines.py")
+        except Exception as e:
+            print(f"⚠️ Error checking data counts: {e}")
+        finally:
+            session.close()
+        
+        # 4. Create demo users
         print("👥 Creating demo users...")
         create_demo_users()
         print("✅ Demo users created/verified")
@@ -63,6 +93,7 @@ async def startup_event():
         print("✅ Startup complete")
     except Exception as e:
         print(f"❌ Error during startup: {e}")
+
 
 # Root endpoint
 @app.get("/")
