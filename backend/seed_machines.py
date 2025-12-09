@@ -44,8 +44,8 @@ CATEGORIES = [
     {"id": 16, "name": "Rack Cutting", "description": "Rack cutting machines"},
 ]
 
-# Machines data - Unit 2 (11 machines)
-UNIT2_MACHINES = [
+# Machines data - Unit 1 (11 machines)
+UNIT1_MACHINES = [
     {"name": "Gas Cutting", "category": "Material Cutting"},
     {"name": "Tig Welding", "category": "Welding"},
     {"name": "CO2 Welding LD", "category": "Welding"},
@@ -59,8 +59,8 @@ UNIT2_MACHINES = [
     {"name": "EIFCO Radial Drilling", "category": "Drilling"},
 ]
 
-# Machines data - Unit 1 (28 machines)
-UNIT1_MACHINES = [
+# Machines data - Unit 2 (27 machines)
+UNIT2_MACHINES = [
     {"name": "Hand Grinder", "category": "Grinder"},
     {"name": "Bench Grinder", "category": "Grinder"},
     {"name": "Tool and Cutter Grinder", "category": "Grinder"},
@@ -75,7 +75,6 @@ UNIT1_MACHINES = [
     {"name": "BFW No 2", "category": "Milling"},
     {"name": "Engraving Machine", "category": "Engraving"},
     {"name": "Delapena Honing Machine", "category": "Honing"},
-    {"name": "Bench Grinder 2", "category": "Grinder"},
     {"name": "Buffing Machine", "category": "Buffing"},
     {"name": "Tooth Rounding Machine", "category": "Tooth Rounding"},
     {"name": "Lapping Machine", "category": "Lapping"},
