@@ -208,15 +208,6 @@ const AdminDashboard = () => {
         }));
     };
 
-    const getStatusData = () => {
-        const statuses = ['pending', 'in_progress', 'completed', 'on_hold'];
-        return statuses.map(status => ({
-            name: status.replace('_', ' ').toUpperCase(),
-            value: tasks.filter(t => t.status === status).length,
-            color: COLORS[status]
-        }));
-    };
-
     // Custom label for pie chart that handles overlapping
     const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name, value }) => {
         if (value === 0) return null;
@@ -460,76 +451,7 @@ const AdminDashboard = () => {
                 </div>
             </div>
 
-            {/* Charts Row 1 */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                {/* Project by Status */}
-                <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                    <h3 className="text-base sm:text-lg font-semibold mb-4">Project Completion Status</h3>
-                    <div className="h-64 sm:h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={getProjectCompletionData()}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis
-                                    dataKey="name"
-                                    angle={-45}
-                                    textAnchor="end"
-                                    height={80}
-                                    interval={0}
-                                    tick={{ fontSize: 10 }}
-                                />
-                                <YAxis
-                                    label={{ value: 'Completion %', angle: -90, position: 'insideLeft', fontSize: 12 }}
-                                    domain={[0, 100]}
-                                />
-                                <Tooltip
-                                    content={({ active, payload }) => {
-                                        if (active && payload && payload.length) {
-                                            const data = payload[0].payload;
-                                            return (
-                                                <div className="bg-white p-2 sm:p-3 border border-gray-200 rounded shadow text-xs sm:text-sm">
-                                                    <p className="font-semibold">{data.name}</p>
-                                                    <p className="text-gray-600">Completion: {data.completion}%</p>
-                                                    <p className="text-gray-600">Completed: {data.completed}/{data.total}</p>
-                                                </div>
-                                            );
-                                        }
-                                        return null;
-                                    }}
-                                />
-                                <Bar dataKey="completion" fill="#3b82f6" name="Completion %" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                {/* Tasks by Status */}
-                <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                    <h3 className="text-base sm:text-lg font-semibold mb-4">Tasks by Status</h3>
-                    <div className="h-64 sm:h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={getStatusData()}
-                                    cx="50%"
-                                    cy="50%"
-                                    labelLine={false}
-                                    label={({ name, value }) => `${name}: ${value}`}
-                                    outerRadius={80}
-                                    fill="#8884d8"
-                                    dataKey="value"
-                                >
-                                    {getStatusData().map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                </Pie>
-                                <Tooltip />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            </div>
-
-            {/* Charts Row 2 */}
+            {/* Charts Row - Tasks by Priority */}
             <div className="grid grid-cols-1 gap-4 sm:gap-6">
                 {/* Tasks by Priority */}
                 <div className="bg-white rounded-lg shadow p-4 sm:p-6">

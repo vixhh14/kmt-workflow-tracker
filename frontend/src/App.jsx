@@ -65,7 +65,7 @@ function App() {
                         <Route path="tasks" element={<Tasks />} />
                         <Route path="outsource" element={<ProtectedRoute allowedRoles={['admin', 'planning']}><Outsource /></ProtectedRoute>} />
                         <Route path="workflow-tracker" element={<ProtectedRoute allowedRoles={['admin', 'planning']}><WorkflowTracker /></ProtectedRoute>} />
-                        <Route path="admin/approvals" element={<ProtectedRoute allowedRoles={['admin', 'planning']}><UserApprovals /></ProtectedRoute>} />
+                        <Route path="admin/approvals" element={<ProtectedRoute allowedRoles={['admin']}><UserApprovals /></ProtectedRoute>} />
                         <Route path="admin/change-password" element={<ChangePassword />} />
                         <Route path="profile" element={<Profile />} />
                     </Route>
