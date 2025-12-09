@@ -50,6 +50,8 @@ else:
         SQLALCHEMY_DATABASE_URL,
         pool_pre_ping=True,  # Verify connections before use
         pool_recycle=300,    # Recycle connections after 5 minutes
+        pool_size=5,         # Basic pool size
+        max_overflow=10      # Allow some overflow
     )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
