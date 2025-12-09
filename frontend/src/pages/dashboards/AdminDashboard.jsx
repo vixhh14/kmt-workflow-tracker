@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getAnalytics, getTasks, getMachines, getUsers } from '../../api/services';
-import { CheckSquare, Clock, TrendingUp, Monitor, Users as UsersIcon, Calendar } from 'lucide-react';
+import { CheckSquare, Clock, TrendingUp, Monitor, Users as UsersIcon, Calendar, PieChartIcon } from 'lucide-react';
 import {
     LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -30,6 +30,13 @@ const COLORS = {
     low: '#22c55e'
 };
 
+// Status colors for pie charts
+const STATUS_COLORS = {
+    'Yet to Start': '#6b7280',  // Gray
+    'In Progress': '#3b82f6',   // Blue
+    'Completed': '#10b981',     // Green
+};
+
 const AdminDashboard = () => {
     const [analytics, setAnalytics] = useState(null);
     const [users, setUsers] = useState([]);
@@ -38,6 +45,7 @@ const AdminDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [selectedMonth, setSelectedMonth] = useState(0);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [selectedProject, setSelectedProject] = useState('all');
 
     useEffect(() => {
         fetchData();
@@ -83,6 +91,83 @@ const AdminDashboard = () => {
             setLoading(false);
         }
     };
+
+    // Get unique project list
+    const projectList = useMemo(() => {
+        const projects = [...new Set(tasks.map(t => t.project).filter(Boolean))];
+        return projects.sort();
+    }, [tasks]);
+
+    // Get filtered tasks by selected project
+    const filteredTasks = useMemo(() => {
+        if (selectedProject === 'all') return tasks;
+        return tasks.filter(t => t.project === selectedProject);
+    }, [tasks, selectedProject]);
+
+    // Calculate project-level status for pie chart
+    const getProjectOverviewData = useMemo(() => {
+        const projectStats = {};
+
+        // Group tasks by project
+        tasks.forEach(task => {
+            const project = task.project || 'No Project';
+            if (!projectStats[project]) {
+                projectStats[project] = { total: 0, completed: 0, inProgress: 0 };
+            }
+            projectStats[project].total++;
+            if (task.status === 'completed') {
+                projectStats[project].completed++;
+            } else if (task.status === 'in_progress' || task.status === 'on_hold') {
+                projectStats[project].inProgress++;
+            }
+        });
+
+        // Categorize projects
+        let yetToStart = 0;
+        let inProgress = 0;
+        let completed = 0;
+
+        Object.values(projectStats).forEach(stats => {
+            if (stats.completed === stats.total && stats.total > 0) {
+                completed++;
+            } else if (stats.inProgress > 0 || stats.completed > 0) {
+                inProgress++;
+            } else {
+                yetToStart++;
+            }
+        });
+
+        return [
+            { name: 'Yet to Start', value: yetToStart, color: STATUS_COLORS['Yet to Start'] },
+            { name: 'In Progress', value: inProgress, color: STATUS_COLORS['In Progress'] },
+            { name: 'Completed', value: completed, color: STATUS_COLORS['Completed'] },
+        ];
+    }, [tasks]);
+
+    // Get task status breakdown for selected project
+    const getTaskBreakdownData = useMemo(() => {
+        const taskStats = {
+            'Yet to Start': 0,
+            'In Progress': 0,
+            'Completed': 0,
+        };
+
+        filteredTasks.forEach(task => {
+            if (task.status === 'completed') {
+                taskStats['Completed']++;
+            } else if (task.status === 'in_progress' || task.status === 'on_hold') {
+                taskStats['In Progress']++;
+            } else {
+                taskStats['Yet to Start']++;
+            }
+        });
+
+        return [
+            { name: 'Yet to Start', value: taskStats['Yet to Start'], color: STATUS_COLORS['Yet to Start'] },
+            { name: 'In Progress', value: taskStats['In Progress'], color: STATUS_COLORS['In Progress'] },
+            { name: 'Completed', value: taskStats['Completed'], color: STATUS_COLORS['Completed'] },
+        ];
+    }, [filteredTasks]);
 
     const getPriorityColor = (priority) => {
         switch (priority) {
@@ -130,6 +215,28 @@ const AdminDashboard = () => {
             value: tasks.filter(t => t.status === status).length,
             color: COLORS[status]
         }));
+    };
+
+    // Custom label for pie chart that handles overlapping
+    const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name, value }) => {
+        if (value === 0) return null;
+        const RADIAN = Math.PI / 180;
+        const radius = outerRadius * 1.2;
+        const x = cx + radius * Math.cos(-midAngle * RADIAN);
+        const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+        return (
+            <text
+                x={x}
+                y={y}
+                fill="#374151"
+                textAnchor={x > cx ? 'start' : 'end'}
+                dominantBaseline="central"
+                fontSize={12}
+            >
+                {`${name}: ${value}`}
+            </text>
+        );
     };
 
     const months = [
@@ -208,6 +315,110 @@ const AdminDashboard = () => {
                     icon={UsersIcon}
                     color="bg-red-500"
                 />
+            </div>
+
+            {/* NEW: Project Progress Analytics Section */}
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                    <div className="flex items-center gap-2">
+                        <div className="p-2 bg-purple-100 rounded-lg">
+                            <TrendingUp className="text-purple-600" size={20} />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">Project Progress Analytics</h3>
+                    </div>
+                    <select
+                        value={selectedProject}
+                        onChange={(e) => setSelectedProject(e.target.value)}
+                        className="w-full sm:w-64 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                    >
+                        <option value="all">All Projects (Overview)</option>
+                        {projectList.map(project => (
+                            <option key={project} value={project}>{project}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Project Status Pie Chart */}
+                    <div className="border border-gray-100 rounded-lg p-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-4">
+                            {selectedProject === 'all' ? 'Projects by Status' : `"${selectedProject}" - Project Status`}
+                        </h4>
+                        <div className="h-64">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={selectedProject === 'all' ? getProjectOverviewData : getTaskBreakdownData}
+                                        cx="50%"
+                                        cy="50%"
+                                        labelLine={true}
+                                        label={renderCustomLabel}
+                                        outerRadius={70}
+                                        fill="#8884d8"
+                                        dataKey="value"
+                                    >
+                                        {(selectedProject === 'all' ? getProjectOverviewData : getTaskBreakdownData).map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip
+                                        formatter={(value, name) => [value, name]}
+                                        contentStyle={{ fontSize: '12px' }}
+                                    />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                        {/* Legend */}
+                        <div className="flex flex-wrap justify-center gap-4 mt-4">
+                            {Object.entries(STATUS_COLORS).map(([status, color]) => (
+                                <div key={status} className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
+                                    <span className="text-xs text-gray-600">{status}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Task Breakdown Pie Chart */}
+                    <div className="border border-gray-100 rounded-lg p-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-4">
+                            {selectedProject === 'all' ? 'All Tasks by Status' : `Tasks in "${selectedProject}"`}
+                        </h4>
+                        <div className="h-64">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={getTaskBreakdownData}
+                                        cx="50%"
+                                        cy="50%"
+                                        labelLine={true}
+                                        label={renderCustomLabel}
+                                        outerRadius={70}
+                                        fill="#8884d8"
+                                        dataKey="value"
+                                    >
+                                        {getTaskBreakdownData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip
+                                        formatter={(value, name) => [value, name]}
+                                        contentStyle={{ fontSize: '12px' }}
+                                    />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                        {/* Summary Stats */}
+                        <div className="grid grid-cols-3 gap-2 mt-4 text-center">
+                            {getTaskBreakdownData.map(item => (
+                                <div key={item.name} className="bg-gray-50 rounded-lg p-2">
+                                    <p className="text-lg font-bold" style={{ color: item.color }}>{item.value}</p>
+                                    <p className="text-xs text-gray-500">{item.name}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Attendance Details */}
@@ -386,8 +597,8 @@ const AdminDashboard = () => {
                                     {project.name}
                                 </h4>
                                 <span className={`px-2 py-0.5 text-xs rounded-full ml-2 flex-shrink-0 ${project.completion === 100 ? 'bg-green-100 text-green-800' :
-                                        project.completion >= 50 ? 'bg-blue-100 text-blue-800' :
-                                            'bg-yellow-100 text-yellow-800'
+                                    project.completion >= 50 ? 'bg-blue-100 text-blue-800' :
+                                        'bg-yellow-100 text-yellow-800'
                                     }`}>
                                     {project.completion}%
                                 </span>
@@ -396,8 +607,8 @@ const AdminDashboard = () => {
                             <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
                                 <div
                                     className={`h-2 rounded-full ${project.completion === 100 ? 'bg-green-500' :
-                                            project.completion >= 50 ? 'bg-blue-500' :
-                                                'bg-yellow-500'
+                                        project.completion >= 50 ? 'bg-blue-500' :
+                                            'bg-yellow-500'
                                         }`}
                                     style={{ width: `${project.completion}%` }}
                                 ></div>
@@ -418,3 +629,4 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
+

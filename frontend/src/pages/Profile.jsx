@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getCurrentUser, changePassword } from '../api/services';
 import { User, Mail, Briefcase, Calendar, Lock, AlertCircle, Check } from 'lucide-react';
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
+import PasswordInput from '../components/PasswordInput';
 
 const Profile = () => {
     const [user, setUser] = useState(null);
@@ -31,6 +32,19 @@ const Profile = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handlePasswordInputChange = (e) => {
+        setPasswords({ ...passwords, [e.target.name]: e.target.value });
+        if (error) setError('');
+    };
+
+    // Check if passwords match for button state
+    const isPasswordFormValid = () => {
+        if (!passwords.current_password || !passwords.new_password || !passwords.confirm_new_password) {
+            return false;
+        }
+        return passwords.new_password === passwords.confirm_new_password;
     };
 
     const handlePasswordChange = async (e) => {
@@ -127,42 +141,40 @@ const Profile = () => {
                 )}
 
                 <form onSubmit={handlePasswordChange} className="space-y-4 max-w-md">
+                    <PasswordInput
+                        label="Current Password"
+                        name="current_password"
+                        value={passwords.current_password}
+                        onChange={handlePasswordInputChange}
+                        placeholder="Enter current password"
+                    />
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
-                        <input
-                            type="password"
-                            required
-                            value={passwords.current_password}
-                            onChange={(e) => setPasswords({ ...passwords, current_password: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-                        <input
-                            type="password"
-                            required
+                        <PasswordInput
+                            label="New Password"
+                            name="new_password"
                             value={passwords.new_password}
-                            onChange={(e) => setPasswords({ ...passwords, new_password: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            onChange={handlePasswordInputChange}
+                            placeholder="Enter new password"
                         />
                         <div className="mt-2">
                             <PasswordStrengthMeter password={passwords.new_password} />
                         </div>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-                        <input
-                            type="password"
-                            required
+                        <PasswordInput
+                            label="Confirm New Password"
+                            name="confirm_new_password"
                             value={passwords.confirm_new_password}
-                            onChange={(e) => setPasswords({ ...passwords, confirm_new_password: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            onChange={handlePasswordInputChange}
+                            placeholder="Re-enter new password"
                         />
+                        {passwords.confirm_new_password && passwords.new_password !== passwords.confirm_new_password && (
+                            <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                        )}
                     </div>
                     <button
                         type="submit"
-                        disabled={changingPassword}
+                        disabled={changingPassword || !isPasswordFormValid()}
                         className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
                     >
                         {changingPassword ? 'Updating...' : 'Update Password'}
@@ -174,3 +186,4 @@ const Profile = () => {
 };
 
 export default Profile;
+

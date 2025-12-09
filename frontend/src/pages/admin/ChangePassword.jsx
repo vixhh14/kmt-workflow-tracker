@@ -3,6 +3,7 @@ import { changePassword } from '../../api/services';
 import { Lock, AlertCircle, CheckCircle } from 'lucide-react';
 import { validatePasswordFull } from '../../utils/passwordValidation';
 import PasswordStrengthMeter from '../../components/PasswordStrengthMeter';
+import PasswordInput from '../../components/PasswordInput';
 
 const ChangePassword = () => {
     const [formData, setFormData] = useState({
@@ -21,6 +22,18 @@ const ChangePassword = () => {
         });
         // Clear errors when user types
         if (error) setError('');
+    };
+
+    // Check if passwords match and are valid for button state
+    const isFormValid = () => {
+        if (!formData.oldPassword || !formData.newPassword || !formData.confirmNewPassword) {
+            return false;
+        }
+        if (formData.newPassword !== formData.confirmNewPassword) {
+            return false;
+        }
+        const validation = validatePasswordFull(formData.newPassword);
+        return validation.isValid;
     };
 
     const handleSubmit = async (e) => {
@@ -86,49 +99,41 @@ const ChangePassword = () => {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Old Password</label>
-                    <input
-                        type="password"
-                        name="oldPassword"
-                        value={formData.oldPassword}
-                        onChange={handleChange}
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                        placeholder="Enter current password"
-                    />
-                </div>
+                <PasswordInput
+                    label="Current Password"
+                    name="oldPassword"
+                    value={formData.oldPassword}
+                    onChange={handleChange}
+                    placeholder="Enter current password"
+                />
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-                    <input
-                        type="password"
+                    <PasswordInput
+                        label="New Password"
                         name="newPassword"
                         value={formData.newPassword}
                         onChange={handleChange}
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                         placeholder="Enter strong password"
                     />
                     <PasswordStrengthMeter password={formData.newPassword} />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-                    <input
-                        type="password"
+                    <PasswordInput
+                        label="Confirm New Password"
                         name="confirmNewPassword"
                         value={formData.confirmNewPassword}
                         onChange={handleChange}
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                         placeholder="Re-enter new password"
                     />
+                    {formData.confirmNewPassword && formData.newPassword !== formData.confirmNewPassword && (
+                        <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                    )}
                 </div>
 
                 <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || !isFormValid()}
                     className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition shadow-md disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center"
                 >
                     {loading ? (
@@ -147,3 +152,4 @@ const ChangePassword = () => {
 };
 
 export default ChangePassword;
+

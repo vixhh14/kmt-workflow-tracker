@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users as UsersIcon, Monitor, CheckSquare, Briefcase, Menu, LogOut, X, UserCheck, Lock } from 'lucide-react';
+import { LayoutDashboard, Users as UsersIcon, Monitor, CheckSquare, Briefcase, Menu, LogOut, X, UserCheck, Lock, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Layout = ({ children }) => {
@@ -12,26 +12,42 @@ const Layout = ({ children }) => {
     // Check if we're on a role-specific dashboard
     const isRoleDashboard = location.pathname.startsWith('/dashboard/');
 
-    // Navigation items - Users only visible to admin, Outsource only to admin and planning
-    const navItems = [
-        { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-        { path: '/machines', label: 'Machines', icon: Monitor },
-        { path: '/tasks', label: 'Tasks', icon: CheckSquare },
-        // Outsource - accessible by admin and planning
-        ...(user?.role === 'admin' || user?.role === 'planning'
-            ? [{ path: '/outsource', label: 'Outsource', icon: Briefcase }]
-            : []),
-        // Users - accessible by admin and planning
-        ...(user?.role === 'admin' || user?.role === 'planning'
-            ? [{ path: '/workflow-tracker', label: 'Users', icon: UsersIcon }]
-            : []),
-        // User Approvals - accessible by admin and planning
-        ...(user?.role === 'admin' || user?.role === 'planning'
-            ? [{ path: '/admin/approvals', label: 'User Approvals', icon: UserCheck }]
-            : []),
-        // Change Password - accessible by all users
-        { path: '/admin/change-password', label: 'Change Password', icon: Lock },
-    ];
+    // Determine if user is operator or supervisor (limited access roles)
+    const isLimitedRole = user?.role === 'operator' || user?.role === 'supervisor';
+
+    // Navigation items based on role
+    const getNavItems = () => {
+        // Operators and Supervisors only see Profile and Change Password
+        if (isLimitedRole) {
+            return [
+                { path: '/profile', label: 'View Profile', icon: User },
+                { path: '/admin/change-password', label: 'Change Password', icon: Lock },
+            ];
+        }
+
+        // Full navigation for admin and planning roles
+        return [
+            { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+            { path: '/machines', label: 'Machines', icon: Monitor },
+            { path: '/tasks', label: 'Tasks', icon: CheckSquare },
+            // Outsource - accessible by admin and planning
+            ...(user?.role === 'admin' || user?.role === 'planning'
+                ? [{ path: '/outsource', label: 'Outsource', icon: Briefcase }]
+                : []),
+            // Users - accessible by admin and planning
+            ...(user?.role === 'admin' || user?.role === 'planning'
+                ? [{ path: '/workflow-tracker', label: 'Users', icon: UsersIcon }]
+                : []),
+            // User Approvals - accessible by admin and planning
+            ...(user?.role === 'admin' || user?.role === 'planning'
+                ? [{ path: '/admin/approvals', label: 'User Approvals', icon: UserCheck }]
+                : []),
+            // Change Password - accessible by all users
+            { path: '/admin/change-password', label: 'Change Password', icon: Lock },
+        ];
+    };
+
+    const navItems = getNavItems();
 
     const handleLogout = () => {
         logout();
@@ -44,6 +60,12 @@ const Layout = ({ children }) => {
 
     const closeMobileMenu = () => {
         setIsMobileMenuOpen(false);
+    };
+
+    // Handle role click to navigate to profile
+    const handleRoleClick = () => {
+        navigate('/profile');
+        closeMobileMenu();
     };
 
     return (
@@ -67,7 +89,13 @@ const Layout = ({ children }) => {
                     <div className="p-4 border-b flex justify-between items-center">
                         <div>
                             <h1 className="text-xl font-bold text-blue-600">Workflow Tracker</h1>
-                            <p className="text-xs text-gray-500 mt-1">{user?.role || 'User'}</p>
+                            {/* Clickable role that navigates to profile */}
+                            <button
+                                onClick={handleRoleClick}
+                                className="text-xs text-gray-500 mt-1 hover:text-blue-600 hover:underline transition capitalize cursor-pointer"
+                            >
+                                {user?.role || 'User'} → View Profile
+                            </button>
                         </div>
                         <button onClick={closeMobileMenu} className="lg:hidden text-gray-500 hover:text-gray-700">
                             <X size={24} />
@@ -138,3 +166,4 @@ const Layout = ({ children }) => {
 };
 
 export default Layout;
+

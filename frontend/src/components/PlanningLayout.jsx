@@ -16,7 +16,6 @@ const PlanningLayout = ({ children }) => {
         { path: '/tasks', label: 'Tasks', icon: CheckSquare },
         { path: '/outsource', label: 'Outsource', icon: Briefcase },
         { path: '/workflow-tracker', label: 'Users', icon: Users },
-        { path: '/admin/approvals', label: 'User Approvals', icon: UserCheck },
         { path: '/admin/change-password', label: 'Change Password', icon: Lock },
     ];
 
