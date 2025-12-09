@@ -18,19 +18,40 @@ const UserApprovals = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
+            setError('');
+
             const [usersRes, unitsRes] = await Promise.all([
                 getPendingUsers(),
                 getUnits()
             ]);
-            setUsers(usersRes.data);
-            setUnits(unitsRes.data);
+
+            // Safely handle response data with null checks
+            setUsers(Array.isArray(usersRes?.data) ? usersRes.data : []);
+            setUnits(Array.isArray(unitsRes?.data) ? unitsRes.data : []);
         } catch (err) {
             console.error('Error fetching approval data:', err);
-            setError('Failed to load pending users or units.');
+
+            // Provide more specific error messages
+            if (err.response?.status === 401) {
+                setError('Session expired. Please log in again.');
+            } else if (err.response?.status === 403) {
+                setError('You do not have permission to view this page.');
+            } else if (err.response?.status === 404) {
+                setError('API endpoint not found. Please contact support.');
+            } else if (!err.response) {
+                setError('Cannot connect to server. Please check your internet connection.');
+            } else {
+                setError(err.response?.data?.detail || 'Failed to load pending users or units.');
+            }
+
+            // Set empty arrays to prevent rendering errors
+            setUsers([]);
+            setUnits([]);
         } finally {
             setLoading(false);
         }
     };
+
 
     const handleUnitChange = (username, unitId) => {
         setSelectedUnits(prev => ({
