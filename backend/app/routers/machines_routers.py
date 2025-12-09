@@ -3,7 +3,7 @@ from typing import List
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app.models.machines_model import MachineCreate, MachineUpdate
-from app.models.models_db import Machine
+from app.models.models_db import Machine, Unit, MachineCategory
 from app.core.database import get_db
 import uuid
 
@@ -19,6 +19,11 @@ router = APIRouter(
 @router.get("/", response_model=List[dict])
 async def read_machines(db: Session = Depends(get_db)):
     machines = db.query(Machine).all()
+    
+    # Pre-fetch units and categories for efficient lookup
+    units = {u.id: u.name for u in db.query(Unit).all()}
+    categories = {c.id: c.name for c in db.query(MachineCategory).all()}
+    
     return [
         {
             "id": m.id,
@@ -30,9 +35,12 @@ async def read_machines(db: Session = Depends(get_db)):
             "updated_at": m.updated_at.isoformat() if m.updated_at else None,
             "category_id": m.category_id,
             "unit_id": m.unit_id,
+            "category_name": categories.get(m.category_id, None),
+            "unit_name": units.get(m.unit_id, None),
         }
         for m in machines
     ]
+
 
 # ----------------------------------------------------------------------
 # CREATE MACHINE
