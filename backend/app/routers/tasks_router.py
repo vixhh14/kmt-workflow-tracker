@@ -96,6 +96,27 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
         "due_date": new_task.due_date,
     }
 
+# Get task time logs for a specific task
+@router.get("/{task_id}/time-logs", response_model=List[dict])
+async def get_task_time_logs(task_id: str, db: Session = Depends(get_db)):
+    """Get all time tracking logs for a specific task"""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    logs = db.query(TaskTimeLog).filter(TaskTimeLog.task_id == task_id).order_by(TaskTimeLog.timestamp.asc()).all()
+    
+    return [
+        {
+            "id": log.id,
+            "task_id": log.task_id,
+            "action": log.action,
+            "timestamp": log.timestamp.isoformat() if log.timestamp else None,
+            "reason": log.reason,
+        }
+        for log in logs
+    ]
+
 # Task workflow endpoints
 @router.post("/{task_id}/start")
 async def start_task(task_id: str, db: Session = Depends(get_db)):
