@@ -63,9 +63,11 @@ async def create_machine(machine: MachineCreate, db: Session = Depends(get_db)):
         id=machine_id,
         name=final_name,
         status=machine.status,
-        hourly_rate=machine.hourly_rate,
-        last_maintenance=None, # Not in MachineCreate schema
+        hourly_rate=0.0, # Default to 0 as field is removed from form
+        last_maintenance=None,
         current_operator=machine.current_operator,
+        unit_id=machine.unit_id,
+        category_id=machine.category_id,
         updated_at=datetime.utcnow(),
     )
     db.add(new_machine)

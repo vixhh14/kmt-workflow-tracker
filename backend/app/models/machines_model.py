@@ -7,11 +7,11 @@ class MachineBase(BaseModel):
     type: str
     status: str = "active" # active, maintenance, inactive
     location: Optional[str] = None
-    hourly_rate: float = 0.0
     current_operator: Optional[str] = None
 
 class MachineCreate(MachineBase):
-    pass
+    unit_id: int
+    category_id: int
 
 class MachineUpdate(BaseModel):
     name: Optional[str] = None

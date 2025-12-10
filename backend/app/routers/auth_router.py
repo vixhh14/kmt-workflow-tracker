@@ -16,7 +16,6 @@ router = APIRouter(
 async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     """
     Authenticate user and return JWT token.
-    Uses local SQLite database for instant login.
     """
     import time
     start_time = time.time()
