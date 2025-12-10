@@ -134,8 +134,11 @@ def create_demo_users():
             existing_user = db.query(User).filter(User.username == username).first()
             
             if existing_user:
-                # Don't update existing users - they may have changed their password
-                print(f"ℹ️  User '{username}' already exists, skipping...")
+                # Force update password to ensure login works
+                print(f"ℹ️  User '{username}' exists. Updating password to ensure access...")
+                existing_user.password_hash = hash_password(user_data['password'])
+                existing_user.role = user_data['role']
+                db.add(existing_user)
                 continue
             
             # Create new user
