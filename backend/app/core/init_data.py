@@ -1,50 +1,18 @@
-import sqlite3
 import os
 import uuid
 from datetime import datetime
-from datetime import datetime
-from app.core.database import DEFAULT_DB_PATH
-from app.core.migration_utils import migrate_sqlite_to_postgres
+from sqlalchemy import text
+from sqlalchemy.orm import sessionmaker
+from app.core.database import engine
 
 def init_db_data():
     print(f"Initializing database data...")
     
-    # 0. MIGRATION: Attempt to migrate from SQLite to Postgres if needed
-    migrate_sqlite_to_postgres()
-    
-    print(f"Checking for seeding at: {DEFAULT_DB_PATH}")
-    
-    # Ensure directory exists (only relevant for local SQLite)
-    if "workflow.db" in DEFAULT_DB_PATH:
-        os.makedirs(os.path.dirname(DEFAULT_DB_PATH), exist_ok=True)
-    
-    # Connect to the ACTIVE database (could be SQLite or Postgres)
-    # We use SQLAlchemy engine for agnostic connection or direct sqlite for legacy
-    # For seeding, we'll stick to the configured connection in database.py
-    from app.core.database import engine
-    from sqlalchemy.orm import sessionmaker
-    from sqlalchemy import text
-    
+    # Connect to the ACTIVE database
     SessionLocal = sessionmaker(bind=engine)
     session = SessionLocal()
     
     try:
-        # 1. MIGRATION: Check for created_at in machines (Legacy SQLite check, kept for safety)
-        # In Postgres, Alembic/SQLAlchemy should handle schema, but we'll leave this for SQLite compat
-        if "sqlite" in str(engine.url):
-            conn = sqlite3.connect(DEFAULT_DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute("PRAGMA table_info(machines)")
-            columns = [col[1] for col in cursor.fetchall()]
-            
-            if 'created_at' not in columns:
-                print("Migrating: Adding created_at column to machines table...")
-                cursor.execute("ALTER TABLE machines ADD COLUMN created_at TIMESTAMP")
-                cursor.execute("UPDATE machines SET created_at = ?", (datetime.utcnow(),))
-                conn.commit()
-                print("✅ created_at column added.")
-            conn.close()
-        
         # 2. SEEDING: Ensure Categories
         categories = [
             "Material Cutting", "Welding", "Lathe", "CNC", "Slotting", "Grinding", "Drilling",
@@ -77,9 +45,6 @@ def init_db_data():
                 session.commit()
                 res = session.execute(text("SELECT id FROM units WHERE name = :name"), {"name": u_name}).fetchone()
                 unit_map[u_name] = res.id
-
-        # 4. SEEDING: Machines List
-        # ... (Machine lists remain the same)
 
         # 4. SEEDING: Machines List
         unit2_machines = [
@@ -159,7 +124,7 @@ def init_db_data():
             upsert_machine(name, cat, "Unit 1")
 
         session.commit()
-        print("✅ Database initialization (migration + seeding) complete.")
+        print("✅ Database initialization (seeding) complete.")
             
     except Exception as e:
         print(f"❌ Error during database initialization: {e}")

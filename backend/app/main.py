@@ -51,8 +51,9 @@ async def startup_event():
         print("🚀 Running startup tasks...")
         
         # 1. Log Database Path
-        from app.core.database import DEFAULT_DB_PATH
-        print(f"📂 Database Path: {DEFAULT_DB_PATH}")
+        # from app.core.database import DEFAULT_DB_PATH
+        # print(f"📂 Database Path: {DEFAULT_DB_PATH}")
+        print("📂 Database: Using configured DATABASE_URL")
         
         # 2. Create all database tables
         print("📊 Creating database tables...")

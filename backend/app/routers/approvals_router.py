@@ -1,11 +1,13 @@
 """
 User Approvals Router - API endpoints for user approval workflow
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
-from ..core.database import get_db_connection
+from sqlalchemy.orm import Session
+from ..core.database import get_db
+from ..models.models_db import UserApproval as UserApprovalModel, User as UserModel
 
 router = APIRouter(prefix="/api/approvals", tags=["approvals"])
 
@@ -17,104 +19,91 @@ class UserApproval(BaseModel):
     approved_at: Optional[datetime] = None
     notes: Optional[str] = None
     created_at: Optional[datetime] = None
+    user: Optional[dict] = None # To hold nested user data
+
+    class Config:
+        orm_mode = True
 
 class ApprovalAction(BaseModel):
     notes: Optional[str] = None
 
 @router.get("/pending")
-async def get_pending_approvals():
+async def get_pending_approvals(db: Session = Depends(get_db)):
     """Get all pending user approvals with user details"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT 
-            ua.id, ua.user_id, ua.status, ua.approved_by, ua.approved_at, ua.notes, ua.created_at,
-            u.username, u.full_name, u.email, u.date_of_birth, u.address, u.contact_number, u.unit_id
-        FROM user_approvals ua
-        JOIN users u ON ua.user_id = u.user_id
-        WHERE ua.status = 'pending'
-        ORDER BY ua.created_at DESC
-    """)
+    results = db.query(UserApprovalModel, UserModel).join(
+        UserModel, UserApprovalModel.user_id == UserModel.user_id
+    ).filter(
+        UserApprovalModel.status == 'pending'
+    ).order_by(
+        UserApprovalModel.created_at.desc()
+    ).all()
     
     approvals = []
-    for row in cursor.fetchall():
-        approvals.append({
-            "id": row[0],
-            "user_id": row[1],
-            "status": row[2],
-            "approved_by": row[3],
-            "approved_at": row[4],
-            "notes": row[5],
-            "created_at": row[6],
+    for ua, u in results:
+        approval_dict = {
+            "id": ua.id,
+            "user_id": ua.user_id,
+            "status": ua.status,
+            "approved_by": ua.approved_by,
+            "approved_at": ua.approved_at,
+            "notes": ua.notes,
+            "created_at": ua.created_at,
             "user": {
-                "username": row[7],
-                "full_name": row[8],
-                "email": row[9],
-                "date_of_birth": row[10],
-                "address": row[11],
-                "contact_number": row[12],
-                "unit_id": row[13]
+                "username": u.username,
+                "full_name": u.full_name,
+                "email": u.email,
+                "date_of_birth": u.date_of_birth,
+                "address": u.address,
+                "contact_number": u.contact_number,
+                "unit_id": u.unit_id
             }
-        })
+        }
+        approvals.append(approval_dict)
     
-    conn.close()
     return approvals
 
 @router.post("/{user_id}/approve")
-async def approve_user(user_id: str, action: ApprovalAction, approved_by: str = "admin"):
+async def approve_user(user_id: str, action: ApprovalAction, approved_by: str = "admin", db: Session = Depends(get_db)):
     """Approve a user"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
     try:
         # Update approval record
-        cursor.execute("""
-            UPDATE user_approvals
-            SET status = 'approved', approved_by = ?, approved_at = CURRENT_TIMESTAMP, notes = ?
-            WHERE user_id = ?
-        """, (approved_by, action.notes, user_id))
+        approval = db.query(UserApprovalModel).filter(UserApprovalModel.user_id == user_id).first()
+        if approval:
+            approval.status = 'approved'
+            approval.approved_by = approved_by
+            approval.approved_at = datetime.utcnow()
+            approval.notes = action.notes
         
         # Update user status
-        cursor.execute("""
-            UPDATE users
-            SET approval_status = 'approved'
-            WHERE user_id = ?
-        """, (user_id,))
+        user = db.query(UserModel).filter(UserModel.user_id == user_id).first()
+        if user:
+            user.approval_status = 'approved'
         
-        conn.commit()
+        db.commit()
         return {"message": f"User {user_id} approved successfully"}
     except Exception as e:
-        conn.rollback()
+        db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
-    finally:
-        conn.close()
 
 @router.post("/{user_id}/reject")
-async def reject_user(user_id: str, action: ApprovalAction, rejected_by: str = "admin"):
+async def reject_user(user_id: str, action: ApprovalAction, rejected_by: str = "admin", db: Session = Depends(get_db)):
     """Reject a user"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
     try:
         # Update approval record
-        cursor.execute("""
-            UPDATE user_approvals
-            SET status = 'rejected', approved_by = ?, approved_at = CURRENT_TIMESTAMP, notes = ?
-            WHERE user_id = ?
-        """, (rejected_by, action.notes, user_id))
+        approval = db.query(UserApprovalModel).filter(UserApprovalModel.user_id == user_id).first()
+        if approval:
+            approval.status = 'rejected'
+            approval.approved_by = rejected_by
+            approval.approved_at = datetime.utcnow()
+            approval.notes = action.notes
         
         # Update user status
-        cursor.execute("""
-            UPDATE users
-            SET approval_status = 'rejected'
-            WHERE user_id = ?
-        """, (user_id,))
+        user = db.query(UserModel).filter(UserModel.user_id == user_id).first()
+        if user:
+            user.approval_status = 'rejected'
         
-        conn.commit()
+        db.commit()
         return {"message": f"User {user_id} rejected"}
     except Exception as e:
-        conn.rollback()
+        db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
-    finally:
-        conn.close()
