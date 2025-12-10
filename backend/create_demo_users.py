@@ -60,10 +60,10 @@ def create_demo_users():
     
     # Fixed secure passwords (matching what we shared with the user)
     # This ensures that if the DB resets (on Render free tier), the passwords remain known
-    admin_password = "Admin@Secure2024!"
-    operator_password = "Operator#Safe99"
-    supervisor_password = "Super$Visor88"
-    planning_password = "Plan%Ning77"
+    admin_password = "Admin@Demo2025!"
+    operator_password = "Operator@Demo2025!"
+    supervisor_password = "Supervisor@Demo2025!"
+    planning_password = "Planning@Demo2025!"
     
     demo_users = [
         {
