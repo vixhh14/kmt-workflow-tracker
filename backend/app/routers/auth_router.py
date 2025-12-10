@@ -118,10 +118,12 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Login error: {str(e)}")
+        import traceback
+        print(f"❌ Login error: {str(e)}")
+        print(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Login failed. Please try again."
+            detail=f"Login failed: {str(e)}"
         )
 
 @router.get("/me")
