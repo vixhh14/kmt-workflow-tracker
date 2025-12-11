@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { getTasks, getUsers, updateTask, getAnalytics, getTaskSummary } from '../../api/services';
 import { Users, CheckSquare, TrendingUp, AlertTriangle, Briefcase, UserPlus, Monitor, Clock, Pause } from 'lucide-react';
 import {

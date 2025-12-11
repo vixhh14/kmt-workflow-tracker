@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { getTasks, getOutsource, getMachines, getPlanningTasks, getPlanningOverview, getTaskSummary } from '../../api/services';
 import { Plus, Calendar, Package, ArrowRight, Briefcase, CheckSquare, Clock, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
