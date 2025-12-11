@@ -434,9 +434,11 @@ const Tasks = () => {
                                         const selectedMachine = machines.find(m => m.id === formData.machine_id);
                                         const machineType = selectedMachine?.type;
 
-                                        let filteredUsers = users;
+                                        // Filter for operators only
+                                        let filteredUsers = users.filter(u => u.role === 'operator');
+
                                         if (machineType) {
-                                            filteredUsers = users.filter(user => {
+                                            filteredUsers = filteredUsers.filter(user => {
                                                 if (!user.machine_types) return false;
                                                 const userTypes = user.machine_types.split(',').map(t => t.trim());
                                                 return userTypes.includes(machineType);
@@ -454,6 +456,7 @@ const Tasks = () => {
                                     const selectedMachine = machines.find(m => m.id === formData.machine_id);
                                     const machineType = selectedMachine?.type;
                                     const qualifiedCount = users.filter(user => {
+                                        if (user.role !== 'operator') return false;
                                         if (!user.machine_types) return false;
                                         const userTypes = user.machine_types.split(',').map(t => t.trim());
                                         return userTypes.includes(machineType);
@@ -474,9 +477,9 @@ const Tasks = () => {
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 >
                                     <option value="">Select User</option>
-                                    {users.map((user) => (
+                                    {users.filter(u => ['admin', 'supervisor', 'planning'].includes(u.role)).map((user) => (
                                         <option key={user.user_id} value={user.user_id}>
-                                            {user.username}
+                                            {user.username} ({user.role})
                                         </option>
                                     ))}
                                 </select>

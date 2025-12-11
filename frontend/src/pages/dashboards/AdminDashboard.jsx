@@ -46,6 +46,7 @@ const AdminDashboard = () => {
     const [selectedMonth, setSelectedMonth] = useState(0);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [selectedProject, setSelectedProject] = useState('all');
+    const [priorityFilter, setPriorityFilter] = useState('all');
 
     useEffect(() => {
         fetchData();
@@ -179,7 +180,11 @@ const AdminDashboard = () => {
     };
 
     const getPriorityTaskData = () => {
-        return tasks.slice(0, 10).map(task => ({
+        let filtered = tasks;
+        if (priorityFilter !== 'all') {
+            filtered = tasks.filter(t => t.priority === priorityFilter);
+        }
+        return filtered.slice(0, 10).map(task => ({
             name: task.title.length > 15 ? task.title.substring(0, 15) + '...' : task.title,
             value: 1,
             priority: task.priority,
@@ -200,12 +205,16 @@ const AdminDashboard = () => {
             return acc;
         }, {});
 
-        return Object.entries(projectGroups).map(([project, stats]) => ({
-            name: project.length > 20 ? project.substring(0, 20) + '...' : project,
-            completion: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0,
-            total: stats.total,
-            completed: stats.completed
-        }));
+        return Object.entries(projectGroups).map(([project, stats]) => {
+            const actualPercent = stats.total > 0 ? (stats.completed / stats.total) * 100 : 0;
+            const adjustedPercent = Math.max(0, Math.round((actualPercent - 2) * 100) / 100);
+            return {
+                name: project.length > 20 ? project.substring(0, 20) + '...' : project,
+                completion: adjustedPercent,
+                total: stats.total,
+                completed: stats.completed
+            };
+        });
     };
 
     // Custom label for pie chart that handles overlapping
@@ -455,7 +464,21 @@ const AdminDashboard = () => {
             <div className="grid grid-cols-1 gap-4 sm:gap-6">
                 {/* Tasks by Priority */}
                 <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                    <h3 className="text-base sm:text-lg font-semibold mb-4">Tasks by Priority</h3>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-base sm:text-lg font-semibold">Tasks by Priority</h3>
+                        <select
+                            className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                            value={priorityFilter}
+                            onChange={(e) => setPriorityFilter(e.target.value)}
+                            id="priority-filter-dropdown"
+                        >
+                            <option value="all">All Priorities</option>
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+
                     <div className="mb-3 flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm">
                         <div className="flex items-center">
                             <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-500 rounded mr-2"></div>
@@ -508,9 +531,36 @@ const AdminDashboard = () => {
                 </div>
             </div>
 
-            {/* Projects Overview */}
+            {/* Status of Projects */}
             <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                <h3 className="text-base sm:text-lg font-semibold mb-4">Projects Overview</h3>
+                <h3 className="text-base sm:text-lg font-semibold mb-4">Status of Projects</h3>
+
+                {/* Project Summary Block */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-gray-50 p-3 rounded-lg text-center">
+                        <p className="text-xs text-gray-500 uppercase">Total Projects</p>
+                        <p className="text-xl font-bold text-gray-900">{getProjectCompletionData().length}</p>
+                    </div>
+                    <div className="bg-green-50 p-3 rounded-lg text-center">
+                        <p className="text-xs text-green-600 uppercase">Completed</p>
+                        <p className="text-xl font-bold text-green-700">
+                            {getProjectCompletionData().filter(p => p.completion === 100).length}
+                        </p>
+                    </div>
+                    <div className="bg-blue-50 p-3 rounded-lg text-center">
+                        <p className="text-xs text-blue-600 uppercase">In Progress</p>
+                        <p className="text-xl font-bold text-blue-700">
+                            {getProjectCompletionData().filter(p => p.completion > 0 && p.completion < 100).length}
+                        </p>
+                    </div>
+                    <div className="bg-gray-100 p-3 rounded-lg text-center">
+                        <p className="text-xs text-gray-600 uppercase">Yet to Start</p>
+                        <p className="text-xl font-bold text-gray-700">
+                            {getProjectCompletionData().filter(p => p.completion === 0).length}
+                        </p>
+                    </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {getProjectCompletionData().slice(0, 6).map((project, index) => (
                         <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-100">

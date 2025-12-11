@@ -17,25 +17,20 @@ const OperatorDashboard = () => {
 
     // Modal states
     const [showHoldModal, setShowHoldModal] = useState(false);
-    const [showDenyModal, setShowDenyModal] = useState(false);
+    const [showRescheduleModal, setShowRescheduleModal] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
     const [holdReason, setHoldReason] = useState('');
-    const [denyReason, setDenyReason] = useState('');
+
+    // Reschedule states
+    const [rescheduleDate, setRescheduleDate] = useState('');
+    const [rescheduleReason, setRescheduleReason] = useState('');
 
     const holdReasons = [
         'Waiting for materials',
         'Machine breakdown',
         'Shift change',
         'Waiting for supervisor approval',
-        'Other'
-    ];
-
-    const denyReasons = [
-        'Machine not available',
-        'Missing materials',
-        'Unclear instructions',
-        'Safety concerns',
-        'Insufficient time',
+        'Tool not available',
         'Other'
     ];
 
@@ -113,19 +108,39 @@ const OperatorDashboard = () => {
         }
     };
 
-    const handleDenyTask = async () => {
-        if (!denyReason) {
-            alert('Please select a reason');
+    const handleRequestReschedule = async () => {
+        if (!rescheduleDate || !rescheduleReason) {
+            alert('Please provide both date and reason');
             return;
         }
         try {
-            await denyTask(selectedTask.id, denyReason);
-            setShowDenyModal(false);
-            setDenyReason('');
+            const token = localStorage.getItem('token');
+            // Use VITE_API_URL from env or default
+            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+            const response = await fetch(`${apiUrl}/tasks/${selectedTask.id}/reschedule-request`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    requested_date: new Date(rescheduleDate).toISOString(),
+                    reason: rescheduleReason
+                })
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || 'Failed to submit request');
+            }
+
+            alert('Reschedule request submitted successfully');
+            setShowRescheduleModal(false);
+            setRescheduleDate('');
+            setRescheduleReason('');
             setSelectedTask(null);
-            fetchTasks();
         } catch (error) {
-            alert(error.response?.data?.detail || 'Failed to deny task');
+            alert(error.message || 'Failed to submit request');
         }
     };
 
@@ -180,16 +195,6 @@ const OperatorDashboard = () => {
         const elapsed = Math.floor((currentTime - startTime) / 1000); // seconds
         const totalWithPrevious = (task.total_duration_seconds || 0) + elapsed;
         return totalWithPrevious;
-    };
-
-    const getTimeSince = (timestamp) => {
-        if (!timestamp) return '';
-        const start = new Date(timestamp);
-        const diffMs = currentTime - start;
-        const diffMins = Math.floor(diffMs / 60000);
-        if (diffMins < 60) return `${diffMins} mins ago`;
-        const diffHours = Math.floor(diffMins / 60);
-        return `${diffHours}h ${diffMins % 60}m ago`;
     };
 
     const toggleExpand = (taskId) => {
@@ -393,12 +398,22 @@ const OperatorDashboard = () => {
                                                     <button
                                                         onClick={() => {
                                                             setSelectedTask(task);
-                                                            setShowDenyModal(true);
+                                                            setShowHoldModal(true);
                                                         }}
-                                                        className="flex items-center space-x-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
+                                                        className="flex items-center space-x-1 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition text-sm"
                                                     >
-                                                        <XCircle size={16} />
-                                                        <span>Deny</span>
+                                                        <Pause size={16} />
+                                                        <span>Hold Task</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedTask(task);
+                                                            setShowRescheduleModal(true);
+                                                        }}
+                                                        className="flex items-center space-x-1 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition text-sm"
+                                                    >
+                                                        <Clock size={16} />
+                                                        <span>Reschedule</span>
                                                     </button>
                                                 </>
                                             )}
@@ -484,33 +499,46 @@ const OperatorDashboard = () => {
                 </div>
             )}
 
-            {/* Deny Modal */}
-            {showDenyModal && (
+            {/* Reschedule Modal */}
+            {showRescheduleModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-md">
-                        <h3 className="text-lg font-semibold mb-4">Deny Task</h3>
-                        <p className="text-sm text-gray-600 mb-4">Please select a reason for denying this task:</p>
-                        <select
-                            value={denyReason}
-                            onChange={(e) => setDenyReason(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4 text-sm sm:text-base"
-                        >
-                            <option value="">Select a reason...</option>
-                            {denyReasons.map(reason => (
-                                <option key={reason} value={reason}>{reason}</option>
-                            ))}
-                        </select>
+                        <h3 className="text-lg font-semibold mb-4">Request Reschedule</h3>
+                        <p className="text-sm text-gray-600 mb-4">Please provide a new date and reason:</p>
+
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Requested Date</label>
+                            <input
+                                type="datetime-local"
+                                value={rescheduleDate}
+                                onChange={(e) => setRescheduleDate(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                            />
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
+                            <textarea
+                                value={rescheduleReason}
+                                onChange={(e) => setRescheduleReason(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                rows="3"
+                                placeholder="Why do you need to reschedule?"
+                            ></textarea>
+                        </div>
+
                         <div className="flex flex-col sm:flex-row gap-3">
                             <button
-                                onClick={handleDenyTask}
-                                className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm sm:text-base"
+                                onClick={handleRequestReschedule}
+                                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm sm:text-base"
                             >
-                                Deny Task
+                                Submit Request
                             </button>
                             <button
                                 onClick={() => {
-                                    setShowDenyModal(false);
-                                    setDenyReason('');
+                                    setShowRescheduleModal(false);
+                                    setRescheduleDate('');
+                                    setRescheduleReason('');
                                     setSelectedTask(null);
                                 }}
                                 className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 text-sm sm:text-base"
