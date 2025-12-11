@@ -3,8 +3,9 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from app.models.tasks_model import TaskCreate, TaskUpdate
-from app.models.models_db import Task, TaskTimeLog
+from app.models.models_db import Task, TaskTimeLog, TaskHold, RescheduleRequest
 from app.core.database import get_db
+from app.core.dependencies import get_current_user
 import uuid
 from datetime import datetime
 
@@ -16,6 +17,10 @@ router = APIRouter(
 
 class TaskActionRequest(BaseModel):
     reason: Optional[str] = None
+
+class RescheduleRequestModel(BaseModel):
+    requested_date: datetime
+    reason: str
 
 @router.get("/", response_model=List[dict])
 async def read_tasks(
@@ -57,12 +62,29 @@ async def read_tasks(
             "total_duration_seconds": t.total_duration_seconds,
             "hold_reason": t.hold_reason,
             "denial_reason": t.denial_reason,
+            "actual_start_time": t.actual_start_time.isoformat() if t.actual_start_time else None,
+            "actual_end_time": t.actual_end_time.isoformat() if t.actual_end_time else None,
+            "total_held_seconds": t.total_held_seconds,
         }
         for t in tasks
     ]
 
 @router.post("/", response_model=dict)
 async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
+    from app.models.models_db import User
+    
+    # Validate assigned_to is an operator
+    if task.assigned_to:
+        assignee = db.query(User).filter(User.user_id == task.assigned_to).first()
+        if not assignee or assignee.role != 'operator':
+            raise HTTPException(status_code=400, detail="Tasks can only be assigned to operators")
+
+    # Validate assigned_by is admin/supervisor/planning
+    if task.assigned_by:
+        assigner = db.query(User).filter(User.user_id == task.assigned_by).first()
+        if not assigner or assigner.role not in ['admin', 'supervisor', 'planning']:
+            raise HTTPException(status_code=400, detail="Tasks can only be assigned by admin, supervisor, or planning")
+
     new_task = Task(
         id=str(uuid.uuid4()),
         title=task.title,
@@ -123,42 +145,82 @@ async def start_task(task_id: str, db: Session = Depends(get_db)):
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    if task.status != "pending":
-        raise HTTPException(status_code=400, detail="Task must be in pending status to start")
+    
+    if task.status not in ["pending", "on_hold"]:
+        if task.status == "in_progress":
+             return {"message": "Task already in progress", "started_at": task.started_at.isoformat() if task.started_at else None}
+        raise HTTPException(status_code=400, detail="Task must be pending or on hold to start")
+
+    now = datetime.utcnow()
+    
+    # Set actual start time if not set
+    if not task.actual_start_time:
+        task.actual_start_time = now
+    
+    # Close any open holds (if resuming)
+    open_hold = db.query(TaskHold).filter(TaskHold.task_id == task_id, TaskHold.hold_ended_at == None).first()
+    if open_hold:
+        open_hold.hold_ended_at = now
+        held_duration = (now - open_hold.hold_started_at).total_seconds()
+        task.total_held_seconds = (task.total_held_seconds or 0) + int(held_duration)
+
     task.status = "in_progress"
-    task.started_at = datetime.utcnow()
+    task.started_at = now # Session start
+    task.hold_reason = None # Clear hold reason
+    
     log = TaskTimeLog(
         id=str(uuid.uuid4()),
         task_id=task_id,
         action="start",
-        timestamp=datetime.utcnow(),
+        timestamp=now,
     )
     db.add(log)
     db.commit()
-    return {"message": "Task started", "started_at": task.started_at.isoformat()}
+    return {
+        "message": "Task started", 
+        "started_at": task.started_at.isoformat(),
+        "actual_start_time": task.actual_start_time.isoformat()
+    }
 
 @router.post("/{task_id}/hold")
-async def hold_task(task_id: str, request: TaskActionRequest, db: Session = Depends(get_db)):
+async def hold_task(
+    task_id: str, 
+    request: TaskActionRequest, 
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    if task.status != "in_progress":
-        raise HTTPException(status_code=400, detail="Task must be in progress to hold")
     
-    # Calculate duration since start and add to total
-    if task.started_at:
-        duration = (datetime.utcnow() - task.started_at).total_seconds()
+    if task.status not in ["in_progress", "pending"]:
+        raise HTTPException(status_code=400, detail="Task must be in progress or pending to hold")
+    
+    now = datetime.utcnow()
+    
+    # If holding an in-progress task, calculate session duration
+    if task.status == "in_progress" and task.started_at:
+        duration = (now - task.started_at).total_seconds()
         task.total_duration_seconds = (task.total_duration_seconds or 0) + int(duration)
     
     task.status = "on_hold"
     task.hold_reason = request.reason
-    task.started_at = None  # Clear started_at when holding
+    task.started_at = None  # Clear session start
+    
+    # Create TaskHold record
+    hold = TaskHold(
+        task_id=task_id,
+        user_id=current_user.get("user_id"),
+        hold_reason=request.reason,
+        hold_started_at=now
+    )
+    db.add(hold)
     
     log = TaskTimeLog(
         id=str(uuid.uuid4()),
         task_id=task_id,
         action="hold",
-        timestamp=datetime.utcnow(),
+        timestamp=now,
         reason=request.reason,
     )
     db.add(log)
@@ -167,23 +229,7 @@ async def hold_task(task_id: str, request: TaskActionRequest, db: Session = Depe
 
 @router.post("/{task_id}/resume")
 async def resume_task(task_id: str, db: Session = Depends(get_db)):
-    task = db.query(Task).filter(Task.id == task_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    if task.status != "on_hold":
-        raise HTTPException(status_code=400, detail="Task must be on hold to resume")
-    task.status = "in_progress"
-    task.started_at = datetime.utcnow()
-    task.hold_reason = None
-    log = TaskTimeLog(
-        id=str(uuid.uuid4()),
-        task_id=task_id,
-        action="resume",
-        timestamp=datetime.utcnow(),
-    )
-    db.add(log)
-    db.commit()
-    return {"message": "Task resumed"}
+    return await start_task(task_id, db)
 
 @router.post("/{task_id}/complete")
 async def complete_task(task_id: str, db: Session = Depends(get_db)):
@@ -192,16 +238,35 @@ async def complete_task(task_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Task not found")
     if task.status != "in_progress":
         raise HTTPException(status_code=400, detail="Task must be in progress to complete")
-    if task.started_at:
-        duration = (datetime.utcnow() - task.started_at).total_seconds()
-        task.total_duration_seconds = (task.total_duration_seconds or 0) + int(duration)
+    
+    now = datetime.utcnow()
+    
+    if not task.actual_end_time:
+        task.actual_end_time = now
+        
+    open_hold = db.query(TaskHold).filter(TaskHold.task_id == task_id, TaskHold.hold_ended_at == None).first()
+    if open_hold:
+        open_hold.hold_ended_at = now
+        held_duration = (now - open_hold.hold_started_at).total_seconds()
+        task.total_held_seconds = (task.total_held_seconds or 0) + int(held_duration)
+
+    if task.actual_start_time:
+        total_time = (task.actual_end_time - task.actual_start_time).total_seconds()
+        held_time = task.total_held_seconds or 0
+        task.total_duration_seconds = max(0, int(total_time - held_time))
+    else:
+        if task.started_at:
+            duration = (now - task.started_at).total_seconds()
+            task.total_duration_seconds = (task.total_duration_seconds or 0) + int(duration)
+
     task.status = "completed"
-    task.completed_at = datetime.utcnow()
+    task.completed_at = now
+    
     log = TaskTimeLog(
         id=str(uuid.uuid4()),
         task_id=task_id,
         action="complete",
-        timestamp=datetime.utcnow(),
+        timestamp=now,
     )
     db.add(log)
     db.commit()
@@ -209,15 +274,37 @@ async def complete_task(task_id: str, db: Session = Depends(get_db)):
         "message": "Task completed",
         "completed_at": task.completed_at.isoformat(),
         "total_duration_seconds": task.total_duration_seconds,
+        "actual_end_time": task.actual_end_time.isoformat()
     }
+
+@router.post("/{task_id}/reschedule-request")
+async def request_reschedule(
+    task_id: str, 
+    request: RescheduleRequestModel, 
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+        
+    reschedule = RescheduleRequest(
+        task_id=task_id,
+        requested_by=current_user.get("user_id"),
+        requested_for_date=request.requested_date,
+        reason=request.reason,
+        status="pending"
+    )
+    db.add(reschedule)
+    db.commit()
+    return {"message": "Reschedule request submitted"}
 
 @router.post("/{task_id}/deny")
 async def deny_task(task_id: str, request: TaskActionRequest, db: Session = Depends(get_db)):
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    if task.status != "pending":
-        raise HTTPException(status_code=400, detail="Only pending tasks can be denied")
+    
     task.status = "denied"
     task.denial_reason = request.reason
     log = TaskTimeLog(
