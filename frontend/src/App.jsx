@@ -22,6 +22,7 @@ import Outsource from './pages/Outsource.jsx';
 import Signup from './pages/Signup.jsx';
 import SignupSkills from './pages/SignupSkills.jsx';
 import UserApprovals from './pages/admin/UserApprovals.jsx';
+import UserPerformance from './pages/admin/UserPerformance.jsx';
 import ChangePassword from './pages/admin/ChangePassword.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import WorkflowTracker from './pages/WorkflowTracker.jsx';
@@ -66,6 +67,7 @@ function App() {
                         <Route path="outsource" element={<ProtectedRoute allowedRoles={['admin', 'planning']}><Outsource /></ProtectedRoute>} />
                         <Route path="workflow-tracker" element={<ProtectedRoute allowedRoles={['admin', 'planning']}><WorkflowTracker /></ProtectedRoute>} />
                         <Route path="admin/approvals" element={<ProtectedRoute allowedRoles={['admin']}><UserApprovals /></ProtectedRoute>} />
+                        <Route path="admin/performance" element={<ProtectedRoute allowedRoles={['admin']}><UserPerformance /></ProtectedRoute>} />
                         <Route path="admin/change-password" element={<ChangePassword />} />
                         <Route path="profile" element={<Profile />} />
                     </Route>
