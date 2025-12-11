@@ -101,9 +101,36 @@ class Task(Base):
     total_duration_seconds = Column(Integer, default=0)
     hold_reason = Column(String, nullable=True)
     denial_reason = Column(String, nullable=True)
+    
+    # New accurate timing fields
+    actual_start_time = Column(DateTime, nullable=True)
+    actual_end_time = Column(DateTime, nullable=True)
+    total_held_seconds = Column(BigInteger, default=0)
 
     # Relationships
     machine = relationship("Machine")
+
+class TaskHold(Base):
+    __tablename__ = "task_holds"
+    
+    id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
+    task_id = Column(String, ForeignKey("tasks.id"), index=True)
+    user_id = Column(String, ForeignKey("users.user_id"), index=True)
+    hold_reason = Column(String, nullable=True)
+    hold_started_at = Column(DateTime, default=datetime.utcnow)
+    hold_ended_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class RescheduleRequest(Base):
+    __tablename__ = "reschedule_requests"
+    
+    id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
+    task_id = Column(String, ForeignKey("tasks.id"), index=True)
+    requested_by = Column(String, ForeignKey("users.user_id"))
+    requested_for_date = Column(DateTime)
+    reason = Column(String, nullable=True)
+    status = Column(String, default="pending")  # pending, approved, rejected
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 class TaskTimeLog(Base):
     __tablename__ = "task_time_logs"
