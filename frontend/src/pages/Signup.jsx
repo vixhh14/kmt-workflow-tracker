@@ -13,8 +13,7 @@ const Signup = () => {
         password: '',
         confirmPassword: '',
         full_name: '',
-        contact_number: '',
-        address: '' // Mapping 'Contact' requirement to address/location
+        contact_number: '+91 ',
     });
     const [errors, setErrors] = useState({});
     const [showPassword, setShowPassword] = useState(false);
@@ -27,8 +26,23 @@ const Signup = () => {
         const newErrors = {};
 
         if (!formData.full_name) newErrors.full_name = 'Full Name is required';
-        if (!formData.address) newErrors.address = 'Contact/Address is required';
-        if (!formData.contact_number) newErrors.contact_number = 'Phone Number is required';
+
+        // Phone validation: +91 followed by 10 digits
+        const phoneRegex = /^\+91 \d{5} \d{5}$/;
+        // Or just 10 digits if we strip spaces. The user asked for "+91 XXXXX XXXXX" format.
+        // Let's enforce the length. +91 + space + 10 digits = 14 chars (if space after 91)
+        // Or +91 + 10 digits = 13 chars.
+        // The user said "Placeholder: +91 XXXXX XXXXX".
+        // "Validate 10 digits after +91".
+
+        const cleanPhone = formData.contact_number.replace(/\D/g, '');
+        // +91 is 2 digits. So total digits should be 12.
+        if (!formData.contact_number) {
+            newErrors.contact_number = 'Phone Number is required';
+        } else if (cleanPhone.length !== 12 || !formData.contact_number.startsWith('+91')) {
+            newErrors.contact_number = 'Phone number must be 10 digits after +91';
+        }
+
         if (!formData.email) newErrors.email = 'Email is required';
         if (!formData.username) newErrors.username = 'Username is required';
 
@@ -59,8 +73,7 @@ const Signup = () => {
                     email: formData.email,
                     password: formData.password,
                     full_name: formData.full_name,
-                    contact_number: formData.contact_number,
-                    address: formData.address
+                    contact_number: formData.contact_number
                 });
 
                 if (response.data) {
@@ -136,22 +149,6 @@ const Signup = () => {
                             {errors.full_name && <p className="text-red-500 text-xs mt-1">{errors.full_name}</p>}
                         </div>
 
-                        {/* Contact (Address) */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Contact / Address *</label>
-                            <div className="relative">
-                                <MapPin className="absolute left-3 top-3 text-gray-400" size={20} />
-                                <input
-                                    type="text"
-                                    value={formData.address}
-                                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                    className={`block w-full pl-10 pr-3 py-2.5 border ${errors.address ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                                    placeholder="City, Location"
-                                />
-                            </div>
-                            {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
-                        </div>
-
                         {/* Phone Number */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
@@ -160,9 +157,28 @@ const Signup = () => {
                                 <input
                                     type="tel"
                                     value={formData.contact_number}
-                                    onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
+                                    onChange={(e) => {
+                                        let val = e.target.value;
+                                        // Ensure +91 prefix
+                                        if (!val.startsWith('+91 ')) {
+                                            val = '+91 ' + val.replace(/^\+91\s?/, '').replace(/^\+91/, '');
+                                        }
+
+                                        // Allow only digits after prefix
+                                        const suffix = val.substring(4).replace(/\D/g, '');
+
+                                        // Limit to 10 digits
+                                        if (suffix.length <= 10) {
+                                            // Optional: Add space after 5 digits for "XXXXX XXXXX" look?
+                                            // The user asked for placeholder "+91 XXXXX XXXXX".
+                                            // Let's just keep it simple digits for now to avoid cursor jumping issues, 
+                                            // or implement simple formatting if easy.
+                                            // Let's just stick to digits for robustness.
+                                            setFormData({ ...formData, contact_number: '+91 ' + suffix });
+                                        }
+                                    }}
                                     className={`block w-full pl-10 pr-3 py-2.5 border ${errors.contact_number ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                                    placeholder="+1 234 567 8900"
+                                    placeholder="+91 XXXXX XXXXX"
                                 />
                             </div>
                             {errors.contact_number && <p className="text-red-500 text-xs mt-1">{errors.contact_number}</p>}

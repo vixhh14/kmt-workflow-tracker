@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { getTasks, getOutsource, getMachines, getPlanningTasks, getPlanningOverview } from '../../api/services';
-import { Plus, Calendar, Package, ArrowRight, Briefcase } from 'lucide-react';
+import { getTasks, getOutsource, getMachines, getPlanningTasks, getPlanningOverview, getTaskSummary } from '../../api/services';
+import { Plus, Calendar, Package, ArrowRight, Briefcase, CheckSquare, Clock, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -12,6 +11,13 @@ const PlanningDashboard = () => {
     const [machines, setMachines] = useState([]);
     const [planningTasks, setPlanningTasks] = useState([]);
     const [overview, setOverview] = useState(null);
+    const [taskStats, setTaskStats] = useState({
+        pending_tasks: 0,
+        active_tasks: 0,
+        on_hold_tasks: 0,
+        completed_tasks: 0,
+        total_tasks: 0
+    });
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
@@ -22,18 +28,20 @@ const PlanningDashboard = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [tasksRes, outsourceRes, machinesRes, planningRes, overviewRes] = await Promise.all([
+            const [tasksRes, outsourceRes, machinesRes, planningRes, overviewRes, statsRes] = await Promise.all([
                 getTasks(),
                 getOutsource(),
                 getMachines(),
                 getPlanningTasks(),
-                getPlanningOverview()
+                getPlanningOverview(),
+                getTaskSummary({})
             ]);
             setTasks(tasksRes.data);
             setOutsource(outsourceRes.data);
             setMachines(machinesRes.data);
             setPlanningTasks(planningRes.data);
             setOverview(overviewRes.data);
+            setTaskStats(statsRes.data);
         } catch (error) {
             console.error('Failed to fetch data:', error);
         } finally {
@@ -46,9 +54,6 @@ const PlanningDashboard = () => {
     }
 
     const activeMachines = machines.filter(m => m.status === 'active').length;
-    const upcomingTasks = tasks.filter(t => t.status === 'pending').length;
-    const completedPlanning = planningTasks.filter(p => p.status === 'completed').length;
-    const pendingPlanning = planningTasks.filter(p => p.status === 'pending').length;
 
     return (
         <div className="space-y-4 sm:space-y-6">
@@ -81,9 +86,9 @@ const PlanningDashboard = () => {
                     <div className="flex items-center justify-between">
                         <div className="min-w-0">
                             <p className="text-xs sm:text-sm text-gray-600 mb-1">Total Tasks Running</p>
-                            <p className="text-2xl sm:text-3xl font-bold text-yellow-600">{tasks.filter(t => t.status === 'in_progress').length}</p>
+                            <p className="text-2xl sm:text-3xl font-bold text-yellow-600">{taskStats.active_tasks}</p>
                         </div>
-                        <Calendar className="text-yellow-500 flex-shrink-0" size={24} />
+                        <TrendingUp className="text-yellow-500 flex-shrink-0" size={24} />
                     </div>
                 </div>
                 <div className="bg-white rounded-lg shadow p-4 sm:p-6">
@@ -98,19 +103,19 @@ const PlanningDashboard = () => {
                 <div className="bg-white rounded-lg shadow p-4 sm:p-6">
                     <div className="flex items-center justify-between">
                         <div className="min-w-0">
-                            <p className="text-xs sm:text-sm text-gray-600 mb-1">Pending</p>
-                            <p className="text-2xl sm:text-3xl font-bold text-yellow-600">{pendingPlanning}</p>
+                            <p className="text-xs sm:text-sm text-gray-600 mb-1">Pending Tasks</p>
+                            <p className="text-2xl sm:text-3xl font-bold text-yellow-600">{taskStats.pending_tasks}</p>
                         </div>
-                        <Calendar className="text-yellow-500 flex-shrink-0" size={24} />
+                        <Clock className="text-yellow-500 flex-shrink-0" size={24} />
                     </div>
                 </div>
                 <div className="bg-white rounded-lg shadow p-4 sm:p-6 col-span-2 sm:col-span-1">
                     <div className="flex items-center justify-between">
                         <div className="min-w-0">
-                            <p className="text-xs sm:text-sm text-gray-600 mb-1">Completed</p>
-                            <p className="text-2xl sm:text-3xl font-bold text-green-600">{completedPlanning}</p>
+                            <p className="text-xs sm:text-sm text-gray-600 mb-1">Completed Tasks</p>
+                            <p className="text-2xl sm:text-3xl font-bold text-green-600">{taskStats.completed_tasks}</p>
                         </div>
-                        <Calendar className="text-green-500 flex-shrink-0" size={24} />
+                        <CheckSquare className="text-green-500 flex-shrink-0" size={24} />
                     </div>
                 </div>
             </div>
