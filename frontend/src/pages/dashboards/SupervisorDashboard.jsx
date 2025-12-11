@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { getTasks, getUsers, updateTask, getAnalytics } from '../../api/services';
-import { Users, CheckSquare, TrendingUp, AlertTriangle, Briefcase, UserPlus, Monitor } from 'lucide-react';
+import { getTasks, getUsers, updateTask, getAnalytics, getTaskSummary } from '../../api/services';
+import { Users, CheckSquare, TrendingUp, AlertTriangle, Briefcase, UserPlus, Monitor, Clock, Pause } from 'lucide-react';
 import {
     BarChart, Bar,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
@@ -24,6 +23,13 @@ const SupervisorDashboard = () => {
     const [tasks, setTasks] = useState([]);
     const [users, setUsers] = useState([]);
     const [analytics, setAnalytics] = useState(null);
+    const [taskStats, setTaskStats] = useState({
+        pending_tasks: 0,
+        active_tasks: 0,
+        on_hold_tasks: 0,
+        completed_tasks: 0,
+        total_tasks: 0
+    });
     const [loading, setLoading] = useState(true);
     const [selectedOperator, setSelectedOperator] = useState('all');
 
@@ -34,14 +40,16 @@ const SupervisorDashboard = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [tasksRes, usersRes, analyticsRes] = await Promise.all([
+            const [tasksRes, usersRes, analyticsRes, statsRes] = await Promise.all([
                 getTasks(),
                 getUsers(),
-                getAnalytics()
+                getAnalytics(),
+                getTaskSummary({})
             ]);
             setTasks(tasksRes.data);
             setUsers(usersRes.data.filter(u => u.role === 'operator').sort((a, b) => a.username.localeCompare(b.username)));
             setAnalytics(analyticsRes.data);
+            setTaskStats(statsRes.data);
         } catch (error) {
             console.error('Failed to fetch data:', error);
         } finally {
@@ -126,12 +134,39 @@ const SupervisorDashboard = () => {
             </div>
 
             {/* Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+                <StatCard
+                    title="Total Tasks"
+                    value={taskStats.total_tasks}
+                    icon={CheckSquare}
+                    color="bg-blue-500"
+                />
+                <StatCard
+                    title="Completed Tasks"
+                    value={taskStats.completed_tasks}
+                    icon={CheckSquare}
+                    color="bg-green-500"
+                />
+                <StatCard
+                    title="Pending Tasks"
+                    value={taskStats.pending_tasks}
+                    icon={Clock}
+                    color="bg-yellow-500"
+                />
+                <StatCard
+                    title="Active Tasks"
+                    value={taskStats.active_tasks}
+                    icon={TrendingUp}
+                    color="bg-purple-500"
+                />
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6">
                 <StatCard
                     title="Active Projects"
                     value={analytics?.active_projects_count || 0}
                     icon={CheckSquare}
-                    color="bg-blue-500"
+                    color="bg-indigo-500"
                 />
                 <StatCard
                     title="Present Today"

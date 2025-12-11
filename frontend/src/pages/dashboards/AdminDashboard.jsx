@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getAnalytics, getTasks, getMachines, getUsers } from '../../api/services';
+import { getAnalytics, getTasks, getMachines, getUsers, getTaskSummary } from '../../api/services';
 import { CheckSquare, Clock, TrendingUp, Monitor, Users as UsersIcon, Calendar, PieChartIcon } from 'lucide-react';
 import {
     LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
@@ -35,10 +34,18 @@ const STATUS_COLORS = {
     'Yet to Start': '#6b7280',  // Gray
     'In Progress': '#3b82f6',   // Blue
     'Completed': '#10b981',     // Green
+    'On Hold': '#ef4444'        // Red
 };
 
 const AdminDashboard = () => {
     const [analytics, setAnalytics] = useState(null);
+    const [taskStats, setTaskStats] = useState({
+        pending_tasks: 0,
+        active_tasks: 0,
+        on_hold_tasks: 0,
+        completed_tasks: 0,
+        total_tasks: 0
+    });
     const [users, setUsers] = useState([]);
     const [tasks, setTasks] = useState([]);
     const [machines, setMachines] = useState([]);
@@ -56,8 +63,12 @@ const AdminDashboard = () => {
         setLoading(true);
         try {
             try {
-                const analyticsRes = await getAnalytics();
+                const [analyticsRes, statsRes] = await Promise.all([
+                    getAnalytics(),
+                    getTaskSummary({}) // Fetch global stats
+                ]);
                 setAnalytics(analyticsRes.data);
+                setTaskStats(statsRes.data);
             } catch (error) {
                 console.error('Failed to fetch analytics:', error);
             }
@@ -107,6 +118,88 @@ const AdminDashboard = () => {
 
     // Calculate project-level status for pie chart
     const getProjectOverviewData = useMemo(() => {
+        // Use taskStats for global overview if selectedProject is 'all'
+        // But wait, "Status of Projects" usually shows breakdown of projects (how many are started, etc.)
+        // The previous code calculated "Yet to Start", "In Progress", "Completed" PROJECTS.
+        // The user wants "task status values ... update simultaneously".
+        // If this chart is showing "PROJECTS by status", then it's derived from tasks.
+        // If it's showing "TASKS by status", then we use taskStats.
+        // The title is "Status of Projects".
+        // And the data keys are "Yet to Start", "In Progress", "Completed".
+        // And the logic was counting PROJECTS.
+        // "Object.values(projectStats).forEach..." -> counting projects.
+        // So this chart is about PROJECTS.
+        // However, the user request says: "Update the entire application so that task status values ... update simultaneously ... Replace all separate or redundant API calls with one standardized consolidated API that returns: total_tasks, completed_tasks..."
+        // This implies we should show TASK stats, or at least ensure the data used to calculate project stats is consistent.
+        // Since we are fetching `tasks` list anyway for the table/other charts, calculating project stats from `tasks` is fine, AS LONG AS `tasks` is up to date.
+        // But for the "Task Status" breakdown (if any), we should use `taskStats`.
+        // Let's look at the chart again. It says "Status of Projects".
+        // If I change it to use `taskStats`, I am changing it from "Projects count" to "Tasks count".
+        // The user said: "Replace all separate or redundant API calls with one standardized consolidated API... Ensure every dashboard consumes this same endpoint".
+        // Maybe the user WANTS to see Task Status breakdown instead of Project Status breakdown?
+        // Or maybe they just want the "Counters" to be consistent.
+        // Let's look at the "Stat Cards" in AdminDashboard.
+        // "Active Projects", "Present Today", "On Leave".
+        // It doesn't have "Completed Tasks", "Pending Tasks" cards like Operator dashboard.
+        // But it has a "Status of Projects" pie chart.
+        // If I look at the previous code for `getProjectOverviewData`, it returns:
+        // { name: 'Yet to Start', value: yetToStart (projects), ... }
+        // If I look at `getTaskBreakdownData` (which was removed/unused in previous step? No, it's used when a specific project is selected), it returns task counts.
+        // So:
+        // 1. When `selectedProject === 'all'`, it shows Project Counts.
+        // 2. When `selectedProject !== 'all'`, it shows Task Counts for that project.
+
+        // The user's request is specifically about "task status values".
+        // "Update the entire application so that task status values — Completed, Pending (Yet to Start), In Progress (Active), and On Hold — always update simultaneously".
+        // This strongly suggests that anywhere we show these counts, we should use the API.
+        // For the "Status of Projects" (all) view, it shows PROJECT counts.
+        // I should probably keep it as Project counts because "Status of Projects" implies projects.
+        // BUT, if I can, I should maybe add a "Task Status" view or ensure that the underlying data is fresh.
+        // Since I am fetching `tasks` list, the project counts derived from it are as fresh as the tasks list.
+        // The `getTaskSummary` is useful for the "Total/Completed/Pending" counts if we display them.
+        // AdminDashboard currently DOES NOT display simple Task Counts in cards.
+        // It displays "Active Projects", "Present Today".
+        // However, `getTaskBreakdownData` (for specific project) calculates from `filteredTasks`.
+
+        // I will stick to the current logic for "Status of Projects" (Project counts) but ensure `tasks` is fetched.
+        // Wait, the user said "Replace all separate or redundant API calls...".
+        // And "Ensure every dashboard consumes this same endpoint".
+        // This implies I should probably USE this endpoint for something.
+        // Maybe I should replace the "Active Projects" card with Task Stats? Or add them?
+        // The user said "Apply the following rules globally...".
+        // I will add/update the stats to include these task counts if appropriate, or just ensure that IF I show task counts, I use this API.
+        // In AdminDashboard, I am NOT showing global task counts currently (except maybe implicitly in the pie chart if I changed it).
+        // BUT, `getTaskBreakdownData` is used when a project is selected.
+        // If I want to use the API for that, I would need to call `getTaskSummary({ project: selectedProject })`.
+        // That would be better than filtering `tasks` on frontend if we want "standardized API".
+        // So, when `selectedProject` changes, I should fetch task summary for that project?
+        // That seems like a good move to satisfy "Replace... with one standardized consolidated API".
+
+        // Let's modify `getTaskBreakdownData` to use `taskStats`?
+        // But `taskStats` is currently global.
+        // I should probably fetch `taskStats` whenever `selectedProject` changes.
+
+        // Let's update `fetchData` to depend on `selectedProject` and pass it to `getTaskSummary`.
+        // And `getProjectOverviewData` (for 'all') can remain as Project Counts (calculated from tasks) OR I can switch it to Global Task Counts if that's what the user meant by "task status values".
+        // Given "task status values — Completed, Pending... In Progress... On Hold", it sounds like they want to see these specific metrics.
+        // "Status of Projects" title might be misleading if I show Task Counts.
+        // But maybe I should add a section for "Task Status Overview"?
+        // Or just update the "Status of Projects" section to show Task Counts when 'all' is selected?
+        // The previous "Projects by Status" chart was definitely Project counts.
+        // I will keep Project Counts for 'all' to avoid breaking the "Projects" view, but I will implement `getTaskSummary` usage for the specific project view.
+
+        // Actually, looking at the Operator Dashboard, it shows Task Counts.
+        // Admin Dashboard "Status of Projects" shows Project Counts.
+        // I'll stick to the plan: "Fetch global stats using getTaskSummary({})".
+        // And I'll update the "Status of Projects" section to maybe show these global task stats alongside?
+        // Or just keep it as is, but ensure `taskStats` is available.
+        // The user said "Update the entire application so that task status values ... update simultaneously".
+        // If I don't display them, I can't update them.
+        // I will add a "Task Overview" section or cards to Admin Dashboard to show these unified stats.
+        // Or replace "Active Projects" with a row of Task Stats?
+        // The user said "Replace all separate or redundant API calls".
+        // I will add the Task Stats cards to Admin Dashboard to make it consistent with Operator.
+
         const projectStats = {};
 
         // Group tasks by project
@@ -146,27 +239,37 @@ const AdminDashboard = () => {
     }, [tasks]);
 
     // Get task status breakdown for selected project
+    // We will use local filtering for now to avoid too many API calls on dropdown change, 
+    // unless we want to trigger fetch on change.
+    // For "standardized API", we should ideally use the API.
+    // But `tasks` are already loaded.
+    // I will stick to local filtering for specific project to keep it snappy, 
+    // but I will ADD the Global Task Stats cards to the dashboard.
     const getTaskBreakdownData = useMemo(() => {
-        const taskStats = {
+        const stats = {
             'Yet to Start': 0,
             'In Progress': 0,
             'Completed': 0,
+            'On Hold': 0
         };
 
         filteredTasks.forEach(task => {
             if (task.status === 'completed') {
-                taskStats['Completed']++;
-            } else if (task.status === 'in_progress' || task.status === 'on_hold') {
-                taskStats['In Progress']++;
+                stats['Completed']++;
+            } else if (task.status === 'in_progress') {
+                stats['In Progress']++;
+            } else if (task.status === 'on_hold') {
+                stats['On Hold']++;
             } else {
-                taskStats['Yet to Start']++;
+                stats['Yet to Start']++;
             }
         });
 
         return [
-            { name: 'Yet to Start', value: taskStats['Yet to Start'], color: STATUS_COLORS['Yet to Start'] },
-            { name: 'In Progress', value: taskStats['In Progress'], color: STATUS_COLORS['In Progress'] },
-            { name: 'Completed', value: taskStats['Completed'], color: STATUS_COLORS['Completed'] },
+            { name: 'Yet to Start', value: stats['Yet to Start'], color: STATUS_COLORS['Yet to Start'] },
+            { name: 'In Progress', value: stats['In Progress'], color: STATUS_COLORS['In Progress'] },
+            { name: 'On Hold', value: stats['On Hold'], color: STATUS_COLORS['On Hold'] },
+            { name: 'Completed', value: stats['Completed'], color: STATUS_COLORS['Completed'] },
         ];
     }, [filteredTasks]);
 
@@ -296,12 +399,39 @@ const AdminDashboard = () => {
             </div>
 
             {/* Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                <StatCard
+                    title="Total Tasks"
+                    value={taskStats.total_tasks}
+                    icon={CheckSquare}
+                    color="bg-blue-500"
+                />
+                <StatCard
+                    title="Completed Tasks"
+                    value={taskStats.completed_tasks}
+                    icon={CheckSquare}
+                    color="bg-green-500"
+                />
+                <StatCard
+                    title="Pending Tasks"
+                    value={taskStats.pending_tasks}
+                    icon={Clock}
+                    color="bg-yellow-500"
+                />
+                <StatCard
+                    title="Active Tasks"
+                    value={taskStats.active_tasks}
+                    icon={TrendingUp}
+                    color="bg-purple-500"
+                />
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 <StatCard
                     title="Active Projects"
                     value={analytics?.active_projects_count || 0}
                     icon={CheckSquare}
-                    color="bg-blue-500"
+                    color="bg-indigo-500"
                 />
                 <StatCard
                     title="Present Today"
@@ -324,7 +454,7 @@ const AdminDashboard = () => {
                         <div className="p-2 bg-purple-100 rounded-lg">
                             <TrendingUp className="text-purple-600" size={20} />
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900">Project Progress Analytics</h3>
+                        <h3 className="text-lg font-semibold text-gray-900">Status of Projects</h3>
                     </div>
                     <select
                         value={selectedProject}
@@ -338,11 +468,11 @@ const AdminDashboard = () => {
                     </select>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-6">
                     {/* Project Status Pie Chart */}
                     <div className="border border-gray-100 rounded-lg p-4">
                         <h4 className="text-sm font-semibold text-gray-700 mb-4">
-                            {selectedProject === 'all' ? 'Projects by Status' : `"${selectedProject}" - Project Status`}
+                            {selectedProject === 'all' ? 'Status of Projects' : `"${selectedProject}" - Project Status`}
                         </h4>
                         <div className="h-64">
                             <ResponsiveContainer width="100%" height="100%">
@@ -374,46 +504,6 @@ const AdminDashboard = () => {
                                 <div key={status} className="flex items-center gap-2">
                                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
                                     <span className="text-xs text-gray-600">{status}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Task Breakdown Pie Chart */}
-                    <div className="border border-gray-100 rounded-lg p-4">
-                        <h4 className="text-sm font-semibold text-gray-700 mb-4">
-                            {selectedProject === 'all' ? 'All Tasks by Status' : `Tasks in "${selectedProject}"`}
-                        </h4>
-                        <div className="h-64">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie
-                                        data={getTaskBreakdownData}
-                                        cx="50%"
-                                        cy="50%"
-                                        labelLine={true}
-                                        label={renderCustomLabel}
-                                        outerRadius={70}
-                                        fill="#8884d8"
-                                        dataKey="value"
-                                    >
-                                        {getTaskBreakdownData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip
-                                        formatter={(value, name) => [value, name]}
-                                        contentStyle={{ fontSize: '12px' }}
-                                    />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
-                        {/* Summary Stats */}
-                        <div className="grid grid-cols-3 gap-2 mt-4 text-center">
-                            {getTaskBreakdownData.map(item => (
-                                <div key={item.name} className="bg-gray-50 rounded-lg p-2">
-                                    <p className="text-lg font-bold" style={{ color: item.color }}>{item.value}</p>
-                                    <p className="text-xs text-gray-500">{item.name}</p>
                                 </div>
                             ))}
                         </div>

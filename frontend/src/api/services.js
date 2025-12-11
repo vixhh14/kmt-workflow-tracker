@@ -40,6 +40,7 @@ export const denyTask = (id, reason) => api.post(`/tasks/${id}/deny`, { reason }
 
 /* -------------------- ANALYTICS -------------------- */
 export const getAnalytics = () => api.get('/analytics');
+export const getTaskSummary = (params) => api.get('/analytics/task-summary', { params });
 
 /* -------------------- OUTSOURCE -------------------- */
 export const getOutsource = () => api.get('/outsource');

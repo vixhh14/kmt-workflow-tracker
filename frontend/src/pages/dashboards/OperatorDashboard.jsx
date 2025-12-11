@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { getTasks, startTask, holdTask, resumeTask, completeTask, denyTask } from '../../api/services';
+import { getTasks, startTask, holdTask, resumeTask, completeTask, denyTask, getTaskSummary } from '../../api/services';
 import { useAuth } from '../../context/AuthContext';
 import { CheckSquare, Clock, AlertCircle, Play, Pause, CheckCircle, XCircle, RotateCcw, ChevronDown, ChevronUp, Timer } from 'lucide-react';
 import {
@@ -10,6 +9,13 @@ import Subtask from '../../components/Subtask';
 
 const OperatorDashboard = () => {
     const [tasks, setTasks] = useState([]);
+    const [taskStats, setTaskStats] = useState({
+        pending_tasks: 0,
+        active_tasks: 0,
+        on_hold_tasks: 0,
+        completed_tasks: 0,
+        total_tasks: 0
+    });
     const [loading, setLoading] = useState(true);
     const { user } = useAuth();
     const [expandedTaskId, setExpandedTaskId] = useState(null);
@@ -35,10 +41,10 @@ const OperatorDashboard = () => {
     ];
 
     useEffect(() => {
-        fetchTasks();
-        const interval = setInterval(fetchTasks, 30000);
+        fetchData();
+        const interval = setInterval(fetchData, 30000);
         return () => clearInterval(interval);
-    }, []);
+    }, [user]);
 
     // Live timer update - refresh every second for in-progress tasks
     useEffect(() => {
@@ -48,14 +54,20 @@ const OperatorDashboard = () => {
         return () => clearInterval(timerInterval);
     }, []);
 
-    const fetchTasks = async () => {
+    const fetchData = async () => {
+        if (!user) return;
         try {
             setLoading(true);
-            const response = await getTasks();
-            const myTasks = response.data.filter(task => task.assigned_to === user?.user_id);
+            const [tasksRes, statsRes] = await Promise.all([
+                getTasks(),
+                getTaskSummary({ user_id: user.user_id })
+            ]);
+
+            const myTasks = tasksRes.data.filter(task => task.assigned_to === user.user_id);
             setTasks(myTasks);
+            setTaskStats(statsRes.data);
         } catch (error) {
-            console.error('Failed to fetch tasks:', error);
+            console.error('Failed to fetch data:', error);
         } finally {
             setLoading(false);
         }
@@ -64,7 +76,7 @@ const OperatorDashboard = () => {
     const handleStartTask = async (taskId) => {
         try {
             await startTask(taskId);
-            fetchTasks();
+            fetchData();
         } catch (error) {
             alert(error.response?.data?.detail || 'Failed to start task');
         }
@@ -80,7 +92,7 @@ const OperatorDashboard = () => {
             setShowHoldModal(false);
             setHoldReason('');
             setSelectedTask(null);
-            fetchTasks();
+            fetchData();
         } catch (error) {
             alert(error.response?.data?.detail || 'Failed to hold task');
         }
@@ -89,7 +101,7 @@ const OperatorDashboard = () => {
     const handleResumeTask = async (taskId) => {
         try {
             await resumeTask(taskId);
-            fetchTasks();
+            fetchData();
         } catch (error) {
             alert(error.response?.data?.detail || 'Failed to resume task');
         }
@@ -100,7 +112,7 @@ const OperatorDashboard = () => {
             try {
                 await completeTask(taskId);
                 alert('Task Completed Successfully!');
-                fetchTasks();
+                fetchData();
             } catch (error) {
                 console.error('Complete task error:', error);
                 alert(error.response?.data?.detail || 'Failed to complete task');
@@ -205,11 +217,6 @@ const OperatorDashboard = () => {
         return <div className="text-center py-8">Loading...</div>;
     }
 
-    const pendingTasks = tasks.filter(t => t.status === 'pending');
-    const inProgressTasks = tasks.filter(t => t.status === 'in_progress');
-    const onHoldTasks = tasks.filter(t => t.status === 'on_hold');
-    const completedTasks = tasks.filter(t => t.status === 'completed');
-
     return (
         <div className="space-y-4 sm:space-y-6">
             <div>
@@ -223,7 +230,7 @@ const OperatorDashboard = () => {
                     <div className="flex items-center justify-between">
                         <div className="min-w-0">
                             <p className="text-xs sm:text-sm text-gray-600 mb-1">Pending</p>
-                            <p className="text-2xl sm:text-3xl font-bold text-yellow-600">{pendingTasks.length}</p>
+                            <p className="text-2xl sm:text-3xl font-bold text-yellow-600">{taskStats.pending_tasks}</p>
                         </div>
                         <Clock className="text-yellow-500 flex-shrink-0" size={24} />
                     </div>
@@ -232,7 +239,7 @@ const OperatorDashboard = () => {
                     <div className="flex items-center justify-between">
                         <div className="min-w-0">
                             <p className="text-xs sm:text-sm text-gray-600 mb-1">In Progress</p>
-                            <p className="text-2xl sm:text-3xl font-bold text-blue-600">{inProgressTasks.length}</p>
+                            <p className="text-2xl sm:text-3xl font-bold text-blue-600">{taskStats.active_tasks}</p>
                         </div>
                         <AlertCircle className="text-blue-500 flex-shrink-0" size={24} />
                     </div>
@@ -241,7 +248,7 @@ const OperatorDashboard = () => {
                     <div className="flex items-center justify-between">
                         <div className="min-w-0">
                             <p className="text-xs sm:text-sm text-gray-600 mb-1">On Hold</p>
-                            <p className="text-2xl sm:text-3xl font-bold text-orange-600">{onHoldTasks.length}</p>
+                            <p className="text-2xl sm:text-3xl font-bold text-orange-600">{taskStats.on_hold_tasks}</p>
                         </div>
                         <Pause className="text-orange-500 flex-shrink-0" size={24} />
                     </div>
@@ -250,7 +257,7 @@ const OperatorDashboard = () => {
                     <div className="flex items-center justify-between">
                         <div className="min-w-0">
                             <p className="text-xs sm:text-sm text-gray-600 mb-1">Completed</p>
-                            <p className="text-2xl sm:text-3xl font-bold text-green-600">{completedTasks.length}</p>
+                            <p className="text-2xl sm:text-3xl font-bold text-green-600">{taskStats.completed_tasks}</p>
                         </div>
                         <CheckSquare className="text-green-500 flex-shrink-0" size={24} />
                     </div>
@@ -266,10 +273,10 @@ const OperatorDashboard = () => {
                             <PieChart>
                                 <Pie
                                     data={[
-                                        { name: 'Completed', value: completedTasks.length, color: '#10b981' },
-                                        { name: 'In Progress', value: inProgressTasks.length, color: '#3b82f6' },
-                                        { name: 'Pending', value: pendingTasks.length, color: '#f59e0b' },
-                                        { name: 'On Hold', value: onHoldTasks.length, color: '#ef4444' }
+                                        { name: 'Completed', value: taskStats.completed_tasks, color: '#10b981' },
+                                        { name: 'In Progress', value: taskStats.active_tasks, color: '#3b82f6' },
+                                        { name: 'Pending', value: taskStats.pending_tasks, color: '#f59e0b' },
+                                        { name: 'On Hold', value: taskStats.on_hold_tasks, color: '#ef4444' }
                                     ]}
                                     cx="50%"
                                     cy="50%"
@@ -278,7 +285,7 @@ const OperatorDashboard = () => {
                                     outerRadius={70}
                                     dataKey="value"
                                 >
-                                    {[completedTasks, inProgressTasks, pendingTasks, onHoldTasks].map((_, index) => (
+                                    {[taskStats.completed_tasks, taskStats.active_tasks, taskStats.pending_tasks, taskStats.on_hold_tasks].map((_, index) => (
                                         <Cell key={`cell-${index}`} fill={[
                                             '#10b981', '#3b82f6', '#f59e0b', '#ef4444'
                                         ][index]} />
@@ -296,17 +303,17 @@ const OperatorDashboard = () => {
                         <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                             <span className="text-sm sm:text-base text-gray-700">Completion Rate</span>
                             <span className="text-xl sm:text-2xl font-bold text-green-600">
-                                {tasks.length > 0 ? Math.round((completedTasks.length / tasks.length) * 100) : 0}%
+                                {taskStats.total_tasks > 0 ? Math.round((taskStats.completed_tasks / taskStats.total_tasks) * 100) : 0}%
                             </span>
                         </div>
                         <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                             <span className="text-sm sm:text-base text-gray-700">Total Assigned</span>
-                            <span className="text-xl sm:text-2xl font-bold text-blue-600">{tasks.length}</span>
+                            <span className="text-xl sm:text-2xl font-bold text-blue-600">{taskStats.total_tasks}</span>
                         </div>
                         <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
                             <span className="text-sm sm:text-base text-gray-700">Active Tasks</span>
                             <span className="text-xl sm:text-2xl font-bold text-yellow-600">
-                                {pendingTasks.length + inProgressTasks.length}
+                                {taskStats.pending_tasks + taskStats.active_tasks}
                             </span>
                         </div>
                     </div>

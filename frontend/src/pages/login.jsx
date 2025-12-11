@@ -136,7 +136,6 @@ const Login = () => {
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
-                value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="block w-full pl-10 pr-10 py-2.5 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-base sm:text-sm"
                 placeholder="Enter password"
@@ -183,12 +182,6 @@ const Login = () => {
             </a>
           </div>
         </form>
-
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <p className="text-xs text-gray-500 text-center">
-            Demo credentials: admin / admin123
-          </p>
-        </div>
       </div>
     </div>
   );
