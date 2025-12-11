@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Float, ForeignKey, DateTime, Boolean
+from sqlalchemy import Column, String, Integer, BigInteger, Float, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
@@ -153,7 +153,7 @@ class OutsourceItem(Base):
 class Attendance(Base):
     __tablename__ = "attendance"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
     user_id = Column(String, ForeignKey("users.user_id"))
     date = Column(String)  # YYYY-MM-DD
     login_time = Column(DateTime, default=datetime.utcnow)
