@@ -1,3 +1,4 @@
+import React, { useState, useEffect, useMemo } from 'react';
 import { getAnalytics, getTasks, getMachines, getUsers, getTaskSummary } from '../../api/services';
 import { CheckSquare, Clock, TrendingUp, Monitor, Users as UsersIcon, Calendar, PieChartIcon } from 'lucide-react';
 import {
