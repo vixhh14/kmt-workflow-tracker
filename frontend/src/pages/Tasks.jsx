@@ -47,16 +47,55 @@ const Tasks = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
+            console.log('🔄 Fetching dropdown data...');
+
             const [tasksRes, machinesRes, usersRes] = await Promise.all([
                 getTasks(),
                 getMachines(),
                 getUsers()
             ]);
-            setTasks(tasksRes.data);
-            setMachines(machinesRes.data);
-            setUsers(usersRes.data);
+
+            // Debug API responses
+            console.log('📡 API Responses:', {
+                tasks: tasksRes?.data?.length,
+                machines: machinesRes?.data?.length,
+                users: usersRes?.data?.length
+            });
+
+            // Ensure data is always an array
+            const tasksData = Array.isArray(tasksRes?.data) ? tasksRes.data : [];
+            const machinesData = Array.isArray(machinesRes?.data) ? machinesRes.data : [];
+            const usersData = Array.isArray(usersRes?.data) ? usersRes.data : [];
+
+            console.log('✅ Data loaded:', {
+                tasks: tasksData.length,
+                machines: machinesData.length,
+                users: usersData.length
+            });
+
+            // Log sample data for verification
+            if (machinesData.length > 0) {
+                console.log('Sample machine:', machinesData[0]);
+            } else {
+                console.warn('⚠️ No machines loaded');
+            }
+
+            if (usersData.length > 0) {
+                console.log('Sample user:', usersData[0]);
+            } else {
+                console.warn('⚠️ No users loaded');
+            }
+
+            setTasks(tasksData);
+            setMachines(machinesData);
+            setUsers(usersData);
         } catch (error) {
-            console.error('Failed to fetch data:', error);
+            console.error('❌ Failed to fetch data:', error);
+            console.error('Error details:', error.response?.data || error.message);
+            // Set empty arrays on error to prevent crashes
+            setTasks([]);
+            setMachines([]);
+            setUsers([]);
         } finally {
             setLoading(false);
         }
@@ -414,14 +453,20 @@ const Tasks = () => {
                                     value={formData.machine_id}
                                     onChange={(e) => setFormData({ ...formData, machine_id: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    disabled={loading || machines.length === 0}
                                 >
-                                    <option value="">Select Machine</option>
+                                    <option value="">
+                                        {loading ? 'Loading machines...' : machines.length === 0 ? 'No machines available' : 'Select Machine'}
+                                    </option>
                                     {machines.map((machine) => (
                                         <option key={machine.id} value={machine.id}>
                                             {machine.name}
                                         </option>
                                     ))}
                                 </select>
+                                {machines.length === 0 && !loading && (
+                                    <p className="text-xs text-red-600 mt-1">Please add machines first</p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Assign To *</label>
@@ -430,8 +475,11 @@ const Tasks = () => {
                                     value={formData.assigned_to}
                                     onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    disabled={loading || users.length === 0}
                                 >
-                                    <option value="">Select Operator</option>
+                                    <option value="">
+                                        {loading ? 'Loading operators...' : users.filter(u => u.role === 'operator').length === 0 ? 'No operators available' : 'Select Operator'}
+                                    </option>
                                     {(() => {
                                         const selectedMachine = machines.find(m => m.id === formData.machine_id);
                                         const machineType = selectedMachine?.type;
@@ -445,6 +493,10 @@ const Tasks = () => {
                                                 const userTypes = user.machine_types.split(',').map(t => t.trim());
                                                 return userTypes.includes(machineType);
                                             });
+                                        }
+
+                                        if (filteredUsers.length === 0 && formData.machine_id) {
+                                            return <option value="" disabled>No qualified operators for this machine</option>;
                                         }
 
                                         return filteredUsers.map((user) => (
@@ -477,8 +529,11 @@ const Tasks = () => {
                                     value={formData.assigned_by}
                                     onChange={(e) => setFormData({ ...formData, assigned_by: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    disabled={loading || users.length === 0}
                                 >
-                                    <option value="">Select User</option>
+                                    <option value="">
+                                        {loading ? 'Loading users...' : users.filter(u => ['admin', 'supervisor', 'planning'].includes(u.role)).length === 0 ? 'No assigners available' : 'Select User'}
+                                    </option>
                                     {users.filter(u => ['admin', 'supervisor', 'planning'].includes(u.role)).map((user) => (
                                         <option key={user.user_id} value={user.user_id}>
                                             {user.username} ({user.role})
