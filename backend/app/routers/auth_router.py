@@ -239,3 +239,43 @@ async def signup(user_data: dict, db: Session = Depends(get_db)):
         "user_id": new_user.user_id,
         "username": new_user.username
     }
+
+@router.post("/logout")
+async def logout(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Handle user logout.
+    This is ONLY called when user clicks the LOGOUT button.
+    Records check-out time in attendance.
+    """
+    try:
+        from app.services import attendance_service
+        
+        # Mark checkout in attendance
+        checkout_result = attendance_service.mark_checkout(
+            db=db,
+            user_id=current_user.user_id
+        )
+        
+        if checkout_result.get("success"):
+            print(f"✅ Checkout recorded for {current_user.username}: {checkout_result.get('message')}")
+        else:
+            print(f"⚠️ Checkout failed: {checkout_result.get('message')}")
+        
+        return {
+            "message": "Logged out successfully",
+            "checkout": checkout_result
+        }
+    except Exception as e:
+        print(f"❌ Error during logout: {e}")
+        # Don't fail logout if checkout fails
+        return {
+            "message": "Logged out successfully",
+            "checkout": {
+                "success": False,
+                "error": str(e)
+            }
+        }
+
