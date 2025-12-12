@@ -183,8 +183,10 @@ class Attendance(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
     user_id = Column(String, ForeignKey("users.user_id"))
-    date = Column(String)  # YYYY-MM-DD
-    login_time = Column(DateTime, default=datetime.utcnow)
+    date = Column(DateTime, default=datetime.utcnow)  # Date of attendance
+    check_in = Column(DateTime, nullable=True)  # Check-in time
+    check_out = Column(DateTime, nullable=True)  # Check-out time
+    login_time = Column(DateTime, default=datetime.utcnow)  # Legacy field
     status = Column(String, default="present")  # present, absent, leave
     ip_address = Column(String, nullable=True)
     

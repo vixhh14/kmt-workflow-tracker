@@ -1,11 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from datetime import datetime
-from app.models.planning_model import PlanningTaskCreate, PlanningTaskUpdate
-from app.models.models_db import PlanningTask
+from sqlalchemy import func
+from typing import List
 from app.core.database import get_db
-import uuid
+from app.models.models_db import Task, User, Machine
 
 router = APIRouter(
     prefix="/planning",
@@ -13,161 +11,106 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-# ----------------------------------------------------------------------
-# GET ALL PLANNING TASKS
-# ----------------------------------------------------------------------
-@router.get("/", response_model=List[dict])
-async def read_planning_tasks(db: Session = Depends(get_db)):
-    tasks = db.query(PlanningTask).all()
-    return [
-        {
-            "id": t.id,
-            "task_id": t.task_id,
-            "project_name": t.project_name,
-            "task_sequence": t.task_sequence,
-            "assigned_supervisor": t.assigned_supervisor,
-            "status": t.status,
-            "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+@router.get("/dashboard-summary")
+async def get_planning_dashboard_summary(db: Session = Depends(get_db)):
+    """
+    Get comprehensive dashboard summary for planning dashboard.
+    Includes project metrics, task counts, active machines, and operator status.
+    """
+    try:
+        # Get all tasks
+        all_tasks = db.query(Task).all()
+        
+        # Count total unique projects
+        projects_with_tasks = db.query(Task.project).filter(
+            Task.project != None, 
+            Task.project != ''
+        ).distinct().all()
+        total_projects = len(projects_with_tasks)
+        
+        # Count tasks by status
+        total_tasks_running = len([t for t in all_tasks if t.status == 'in_progress'])
+        pending_tasks = len([t for t in all_tasks if t.status == 'pending'])
+        completed_tasks = len([t for t in all_tasks if t.status == 'completed'])
+        
+        # Count active machines (machines that have in_progress tasks assigned)
+        active_machine_ids = set()
+        for task in all_tasks:
+            if task.status == 'in_progress' and task.machine_id:
+                active_machine_ids.add(task.machine_id)
+        machines_active = len(active_machine_ids)
+        
+        # Project-wise summary
+        project_map = {}
+        for task in all_tasks:
+            if not task.project or task.project == '':
+                continue
+            
+            if task.project not in project_map:
+                project_map[task.project] = {
+                    'total': 0,
+                    'completed': 0,
+                    'in_progress': 0,
+                    'pending': 0
+                }
+            
+            project_map[task.project]['total'] += 1
+            if task.status == 'completed':
+                project_map[task.project]['completed'] += 1
+            elif task.status == 'in_progress':
+                project_map[task.project]['in_progress'] += 1
+            elif task.status == 'pending':
+                project_map[task.project]['pending'] += 1
+        
+        project_summary = []
+        for project_name, stats in project_map.items():
+            progress = 0
+            if stats['total'] > 0:
+                progress = (stats['completed'] / stats['total']) * 100
+            
+            # Determine project status
+            status = "Pending"
+            if stats['completed'] == stats['total']:
+                status = "Completed"
+            elif stats['in_progress'] > 0:
+                status = "In Progress"
+            
+            project_summary.append({
+                "project": project_name,
+                "progress": round(progress, 1),
+                "total_tasks": stats['total'],
+                "completed_tasks": stats['completed'],
+                "status": status
+            })
+        
+        # Sort by progress descending
+        project_summary.sort(key=lambda x: x['progress'], reverse=True)
+        
+        # Operator status
+        operators = db.query(User).filter(User.role == 'operator').all()
+        operator_status = []
+        
+        for operator in operators:
+            # Find current in_progress task for this operator
+            current_task = db.query(Task).filter(
+                Task.assigned_to == operator.user_id,
+                Task.status == 'in_progress'
+            ).first()
+            
+            operator_status.append({
+                "name": operator.full_name if operator.full_name else operator.username,
+                "current_task": current_task.title if current_task else None,
+                "status": "Active" if current_task else "Idle"
+            })
+        
+        return {
+            "total_projects": total_projects,
+            "total_tasks_running": total_tasks_running,
+            "machines_active": machines_active,
+            "pending_tasks": pending_tasks,
+            "completed_tasks": completed_tasks,
+            "project_summary": project_summary,
+            "operator_status": operator_status
         }
-        for t in tasks
-    ]
-
-# ----------------------------------------------------------------------
-# CREATE PLANNING TASK
-# ----------------------------------------------------------------------
-@router.post("/", response_model=dict)
-async def create_planning_task(task: PlanningTaskCreate, db: Session = Depends(get_db)):
-    new_task = PlanningTask(
-        id=str(uuid.uuid4()),
-        task_id=task.task_id,
-        project_name=task.project_name,
-        task_sequence=task.task_sequence,
-        assigned_supervisor=task.assigned_supervisor,
-        status=task.status,
-        updated_at=datetime.utcnow(),
-    )
-    db.add(new_task)
-    db.commit()
-    db.refresh(new_task)
-    
-    return {
-        "id": new_task.id,
-        "task_id": new_task.task_id,
-        "project_name": new_task.project_name,
-        "task_sequence": new_task.task_sequence,
-        "assigned_supervisor": new_task.assigned_supervisor,
-        "status": new_task.status,
-        "updated_at": new_task.updated_at.isoformat(),
-    }
-
-# ----------------------------------------------------------------------
-# UPDATE PLANNING TASK
-# ----------------------------------------------------------------------
-@router.put("/{task_id}", response_model=dict)
-async def update_planning_task(task_id: str, task_update: PlanningTaskUpdate, db: Session = Depends(get_db)):
-    db_task = db.query(PlanningTask).filter(PlanningTask.id == task_id).first()
-    if not db_task:
-        raise HTTPException(status_code=404, detail="Planning task not found")
-    
-    update_data = task_update.dict(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_task, key, value)
-    
-    # Always bump the updated_at timestamp
-    db_task.updated_at = datetime.utcnow()
-    
-    db.commit()
-    db.refresh(db_task)
-    
-    return {
-        "id": db_task.id,
-        "task_id": db_task.task_id,
-        "project_name": db_task.project_name,
-        "task_sequence": db_task.task_sequence,
-        "assigned_supervisor": db_task.assigned_supervisor,
-        "status": db_task.status,
-        "updated_at": db_task.updated_at.isoformat(),
-    }
-
-# ----------------------------------------------------------------------
-# DELETE PLANNING TASK
-# ----------------------------------------------------------------------
-@router.delete("/{task_id}")
-async def delete_planning_task(task_id: str, db: Session = Depends(get_db)):
-    db_task = db.query(PlanningTask).filter(PlanningTask.id == task_id).first()
-    if not db_task:
-        raise HTTPException(status_code=404, detail="Planning task not found")
-    
-    db.delete(db_task)
-    db.commit()
-    return {"message": "Planning task deleted successfully"}
-
-@router.get("/overview")
-async def get_planning_overview(db: Session = Depends(get_db)):
-    from app.models.models_db import Task, User, Machine
-    
-    # 1. Running Projects Overview
-    # Group tasks by project and calculate progress
-    projects = {}
-    tasks = db.query(Task).filter(Task.project != None).all()
-    
-    for task in tasks:
-        if task.project not in projects:
-            projects[task.project] = {
-                "name": task.project,
-                "total_tasks": 0,
-                "completed_tasks": 0,
-                "status": "pending" # pending, in_progress, completed
-            }
-        
-        projects[task.project]["total_tasks"] += 1
-        if task.status == "completed":
-            projects[task.project]["completed_tasks"] += 1
-    
-    # Calculate status and percentage
-    project_list = []
-    for p_name, p_data in projects.items():
-        if p_data["total_tasks"] > 0:
-            percentage = (p_data["completed_tasks"] / p_data["total_tasks"]) * 100
-            p_data["progress"] = round(percentage)
-            
-            if p_data["completed_tasks"] == p_data["total_tasks"]:
-                p_data["status"] = "completed"
-            elif p_data["completed_tasks"] > 0:
-                p_data["status"] = "in_progress"
-            
-            project_list.append(p_data)
-            
-    # 2. Operator Working Status
-    # Get all operators and check if they have an in_progress task
-    operators = db.query(User).filter(User.role == "operator").all()
-    operator_status = []
-    
-    for op in operators:
-        current_task = db.query(Task).filter(
-            Task.assigned_to == op.user_id,
-            Task.status == "in_progress"
-        ).first()
-        
-        status_data = {
-            "id": op.user_id,
-            "name": op.full_name or op.username,
-            "status": "idle",
-            "current_task": None,
-            "machine": None
-        }
-        
-        if current_task:
-            status_data["status"] = "working"
-            status_data["current_task"] = current_task.title
-            if current_task.machine_id:
-                machine = db.query(Machine).filter(Machine.id == current_task.machine_id).first()
-                if machine:
-                    status_data["machine"] = machine.name
-        
-        operator_status.append(status_data)
-        
-    return {
-        "projects": project_list,
-        "operators": operator_status
-    }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch planning dashboard summary: {str(e)}")
