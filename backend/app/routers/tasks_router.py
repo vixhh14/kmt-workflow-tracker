@@ -26,6 +26,7 @@ class RescheduleRequestModel(BaseModel):
 async def read_tasks(
     month: Optional[int] = None,
     year: Optional[int] = None,
+    assigned_to: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     query = db.query(Task)
@@ -40,6 +41,9 @@ async def read_tasks(
     elif year is not None:
         from sqlalchemy import extract
         query = query.filter(extract('year', Task.created_at) == year)
+    
+    if assigned_to:
+        query = query.filter(Task.assigned_to == assigned_to)
     
     tasks = query.all()
     return [
@@ -56,6 +60,7 @@ async def read_tasks(
             "assigned_to": t.assigned_to,
             "machine_id": t.machine_id,
             "due_date": t.due_date,
+            "expected_completion_time": t.expected_completion_time,
             "created_at": t.created_at.isoformat() if t.created_at else None,
             "started_at": t.started_at.isoformat() if t.started_at else None,
             "completed_at": t.completed_at.isoformat() if t.completed_at else None,
@@ -98,6 +103,7 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
         assigned_to=task.assigned_to,
         machine_id=task.machine_id,
         due_date=task.due_date,
+        expected_completion_time=task.expected_completion_time,
         created_at=datetime.utcnow(),
     )
     db.add(new_task)
@@ -116,6 +122,7 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
         "assigned_to": new_task.assigned_to,
         "machine_id": new_task.machine_id,
         "due_date": new_task.due_date,
+        "expected_completion_time": new_task.expected_completion_time,
     }
 
 # Get task time logs for a specific task
@@ -194,6 +201,10 @@ async def hold_task(
         raise HTTPException(status_code=404, detail="Task not found")
     
     if task.status not in ["in_progress", "pending"]:
+        # Allow re-holding if it was somehow interrupted, but generally should be in progress
+        # If it's already on hold, just update the reason?
+        if task.status == "on_hold":
+             return {"message": "Task is already on hold", "reason": task.hold_reason}
         raise HTTPException(status_code=400, detail="Task must be in progress or pending to hold")
     
     now = datetime.utcnow()
@@ -225,7 +236,7 @@ async def hold_task(
     )
     db.add(log)
     db.commit()
-    return {"message": "Task on hold", "reason": request.reason}
+    return {"message": "Task put on hold successfully", "status": "on_hold", "reason": request.reason}
 
 @router.post("/{task_id}/resume")
 async def resume_task(task_id: str, db: Session = Depends(get_db)):
@@ -250,17 +261,26 @@ async def complete_task(task_id: str, db: Session = Depends(get_db)):
         held_duration = (now - open_hold.hold_started_at).total_seconds()
         task.total_held_seconds = (task.total_held_seconds or 0) + int(held_duration)
 
+    # Calculate final duration
+    # Logic: Total Time = (End Time - Start Time) - Total Held Time
     if task.actual_start_time:
-        total_time = (task.actual_end_time - task.actual_start_time).total_seconds()
+        total_elapsed = (task.actual_end_time - task.actual_start_time).total_seconds()
         held_time = task.total_held_seconds or 0
-        task.total_duration_seconds = max(0, int(total_time - held_time))
+        task.total_duration_seconds = max(0, int(total_elapsed - held_time))
     else:
+        # Fallback if actual_start_time is missing (legacy tasks)
         if task.started_at:
+             # If we have a session start time, add the current session to total
             duration = (now - task.started_at).total_seconds()
             task.total_duration_seconds = (task.total_duration_seconds or 0) + int(duration)
+        elif task.created_at:
+             # Last resort: created_at
+            total_elapsed = (now - task.created_at).total_seconds()
+            task.total_duration_seconds = max(0, int(total_elapsed))
 
     task.status = "completed"
     task.completed_at = now
+    task.started_at = None # Clear active session
     
     log = TaskTimeLog(
         id=str(uuid.uuid4()),
@@ -271,7 +291,8 @@ async def complete_task(task_id: str, db: Session = Depends(get_db)):
     db.add(log)
     db.commit()
     return {
-        "message": "Task completed",
+        "message": "Task completed successfully",
+        "status": "completed",
         "completed_at": task.completed_at.isoformat(),
         "total_duration_seconds": task.total_duration_seconds,
         "actual_end_time": task.actual_end_time.isoformat()
@@ -341,6 +362,7 @@ async def update_task(task_id: str, task_update: TaskUpdate, db: Session = Depen
         "assigned_to": db_task.assigned_to,
         "machine_id": db_task.machine_id,
         "due_date": db_task.due_date,
+        "expected_completion_time": db_task.expected_completion_time,
         "started_at": db_task.started_at.isoformat() if db_task.started_at else None,
         "completed_at": db_task.completed_at.isoformat() if db_task.completed_at else None,
         "total_duration_seconds": db_task.total_duration_seconds,
