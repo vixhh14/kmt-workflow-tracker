@@ -19,6 +19,7 @@ from app.routers import (
     performance_router,
     operator_router,
     admin_dashboard_router,
+    attendance_router,
 )
 from app.core.config import CORS_ORIGINS
 import uvicorn
@@ -139,6 +140,7 @@ app.include_router(subtasks_router.router)
 app.include_router(seed_router.router)
 app.include_router(performance_router.router)
 app.include_router(operator_router.router)
+app.include_router(attendance_router.router)
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
