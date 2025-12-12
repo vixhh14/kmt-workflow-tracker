@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { login as loginApi } from '../api/services';
+import { markPresent, markCheckout } from '../api/attendance';
+import api from '../api/axios';
 
 const AuthContext = createContext(null);
 
@@ -38,6 +40,15 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem('token', access_token);
             localStorage.setItem('user', JSON.stringify(userData));
 
+            // Mark user as present (attendance is already marked by backend on login)
+            // This is optional frontend call for confirmation
+            try {
+                await markPresent(userData.user_id);
+                console.log('✅ Attendance marked for user:', userData.username);
+            } catch (attendanceErr) {
+                console.warn('⚠️ Frontend attendance marking failed (backend already handled):', attendanceErr);
+            }
+
             return { success: true, user: userData };
         } catch (error) {
             console.error('Login failed:', error);
@@ -45,11 +56,26 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const logout = () => {
-        setToken(null);
-        setUser(null);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+    const logout = async () => {
+        try {
+            // Call logout endpoint to mark checkout
+            if (token && user) {
+                try {
+                    await api.post('/auth/logout');
+                    console.log('✅ Logout and checkout recorded');
+                } catch (logoutErr) {
+                    console.warn('⚠️ Logout API call failed:', logoutErr);
+                }
+            }
+        } catch (error) {
+            console.error('Logout error:', error);
+        } finally {
+            // Always clear local state
+            setToken(null);
+            setUser(null);
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+        }
     };
 
     const value = {
