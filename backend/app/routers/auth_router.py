@@ -76,29 +76,22 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
         )
         print(f"Token creation took: {time.time() - t3:.4f}s")
         
-        # Record Attendance
+        # Automatically mark user as present for today
         try:
-            from app.models.models_db import Attendance
-            from datetime import datetime
-            today_str = datetime.utcnow().strftime('%Y-%m-%d')
-            
-            # Check if already marked for today
-            existing_attendance = db.query(Attendance).filter(
-                Attendance.user_id == user.user_id,
-                Attendance.date == today_str
-            ).first()
-            
-            if not existing_attendance:
-                new_attendance = Attendance(
-                    user_id=user.user_id,
-                    date=today_str,
-                    status='present',
-                )
-                db.add(new_attendance)
-                db.commit()
-                print(f"Attendance marked for {user.username}")
+            from app.services import attendance_service
+            t4 = time.time()
+            attendance_result = attendance_service.mark_present(
+                db=db,
+                user_id=user.user_id,
+                ip_address=None  # Could get from request if needed
+            )
+            print(f"Attendance marking took: {time.time() - t4:.4f}s")
+            if attendance_result.get("success"):
+                print(f"✅ Attendance marked for {user.username}: {attendance_result.get('message')}")
+            else:
+                print(f"⚠️ Attendance marking failed: {attendance_result.get('message')}")
         except Exception as e:
-            print(f"Error marking attendance: {e}")
+            print(f"❌ Error marking attendance: {e}")
             # Don't fail login if attendance fails
         
         print(f"Total login time: {time.time() - start_time:.4f}s")
