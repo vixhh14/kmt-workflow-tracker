@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getOverallStats, getProjects, getProjectStatus, getTaskStats, getAttendanceSummary } from '../../api/admin';
+import { getProjects, getProjectAnalytics, getAttendanceSummary } from '../../api/admin';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { TrendingUp, CheckCircle, Clock, Pause, Users, UserCheck, UserX, Folder, RefreshCw } from 'lucide-react';
+import { TrendingUp, CheckCircle, Clock, Pause, UserCheck, UserX, Folder, RefreshCw, BarChart3 } from 'lucide-react';
 
 const COLORS = {
     'Yet to Start': '#6b7280',
@@ -26,29 +26,32 @@ const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
 );
 
 const AdminDashboard = () => {
-    const [overallStats, setOverallStats] = useState({
-        total_projects: 0,
-        completed: 0,
-        in_progress: 0,
-        yet_to_start: 0,
-        held: 0
-    });
     const [projects, setProjects] = useState([]);
     const [selectedProject, setSelectedProject] = useState('all');
-    const [projectStatusData, setProjectStatusData] = useState({});
-    const [taskStats, setTaskStats] = useState({
-        total: 0,
-        pending: 0,
-        in_progress: 0,
-        completed: 0,
-        on_hold: 0
+    const [analytics, setAnalytics] = useState({
+        stats: {
+            total: 0,
+            yet_to_start: 0,
+            in_progress: 0,
+            completed: 0,
+            on_hold: 0
+        },
+        chart: {
+            yet_to_start: 0,
+            in_progress: 0,
+            completed: 0,
+            on_hold: 0
+        }
     });
     const [attendanceSummary, setAttendanceSummary] = useState({
+        date: '',
+        present: 0,
+        absent: 0,
+        late: 0,
         present_users: [],
         absent_users: [],
         total_users: 0,
-        present_count: 0,
-        absent_count: 0
+        records: []
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -59,7 +62,7 @@ const AdminDashboard = () => {
 
     useEffect(() => {
         if (!loading) {
-            fetchFilteredData();
+            fetchAnalytics();
         }
     }, [selectedProject]);
 
@@ -70,34 +73,17 @@ const AdminDashboard = () => {
 
             console.log('🔄 Fetching admin dashboard data...');
 
-            const [statsRes, projectsRes, attendanceRes] = await Promise.all([
-                getOverallStats(),
+            const [projectsRes, analyticsRes, attendanceRes] = await Promise.all([
                 getProjects(),
+                getProjectAnalytics('all'),
                 getAttendanceSummary()
             ]);
 
             console.log('✅ Admin dashboard data loaded');
 
-            setOverallStats({
-                total_projects: statsRes.data?.total_projects || 0,
-                completed: statsRes.data?.completed || 0,
-                in_progress: statsRes.data?.in_progress || 0,
-                yet_to_start: statsRes.data?.yet_to_start || 0,
-                held: statsRes.data?.held || 0
-            });
-
             setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : []);
-
-            setAttendanceSummary({
-                present_users: Array.isArray(attendanceRes.data?.present_users) ? attendanceRes.data.present_users : [],
-                absent_users: Array.isArray(attendanceRes.data?.absent_users) ? attendanceRes.data.absent_users : [],
-                total_users: attendanceRes.data?.total_users || 0,
-                present_count: attendanceRes.data?.present_count || 0,
-                absent_count: attendanceRes.data?.absent_count || 0
-            });
-
-            // Fetch initial filtered data
-            await fetchFilteredData();
+            setAnalytics(analyticsRes.data || {});
+            setAttendanceSummary(attendanceRes.data || {});
 
         } catch (err) {
             console.error('❌ Failed to fetch admin dashboard data:', err);
@@ -107,19 +93,23 @@ const AdminDashboard = () => {
         }
     };
 
-    const fetchFilteredData = async () => {
+    const fetchAnalytics = async () => {
         try {
             const project = selectedProject === 'all' ? null : selectedProject;
-
-            const [statusRes, statsRes] = await Promise.all([
-                getProjectStatus(project),
-                getTaskStats(project)
-            ]);
-
-            setProjectStatusData(statusRes.data || {});
-            setTaskStats(statsRes.data || {});
+            const res = await getProjectAnalytics(project);
+            setAnalytics(res.data || {});
         } catch (err) {
-            console.error('Failed to fetch filtered data:', err);
+            console.error('Failed to fetch analytics:', err);
+        }
+    };
+
+    const formatTime = (isoString) => {
+        if (!isoString) return 'N/A';
+        try {
+            const date = new Date(isoString);
+            return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        } catch {
+            return 'N/A';
         }
     };
 
@@ -144,10 +134,10 @@ const AdminDashboard = () => {
     };
 
     const chartData = [
-        { name: 'Yet to Start', value: projectStatusData.yet_to_start || 0, color: COLORS['Yet to Start'] },
-        { name: 'In Progress', value: projectStatusData.in_progress || 0, color: COLORS['In Progress'] },
-        { name: 'Completed', value: projectStatusData.completed || 0, color: COLORS['Completed'] },
-        { name: 'On Hold', value: projectStatusData.on_hold || 0, color: COLORS['On Hold'] }
+        { name: 'Yet to Start', value: analytics.chart?.yet_to_start || 0, color: COLORS['Yet to Start'] },
+        { name: 'In Progress', value: analytics.chart?.in_progress || 0, color: COLORS['In Progress'] },
+        { name: 'Completed', value: analytics.chart?.completed || 0, color: COLORS['Completed'] },
+        { name: 'On Hold', value: analytics.chart?.on_hold || 0, color: COLORS['On Hold'] }
     ].filter(item => item.value > 0);
 
     if (loading) {
@@ -184,7 +174,7 @@ const AdminDashboard = () => {
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                 <div>
                     <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-                    <p className="text-sm sm:text-base text-gray-600">Overview of all projects and tasks</p>
+                    <p className="text-sm sm:text-base text-gray-600">Overview of projects, tasks, and team</p>
                 </div>
                 <button
                     onClick={fetchDashboard}
@@ -195,47 +185,13 @@ const AdminDashboard = () => {
                 </button>
             </div>
 
-            {/* Overall Project Status Overview Cards */}
-            <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-3">Overall Project Status</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-                    <StatCard
-                        title="Total Projects"
-                        value={overallStats.total_projects}
-                        icon={Folder}
-                        color="bg-blue-500"
-                    />
-                    <StatCard
-                        title="Yet to Start"
-                        value={overallStats.yet_to_start}
-                        icon={Clock}
-                        color="bg-gray-500"
-                    />
-                    <StatCard
-                        title="In Progress"
-                        value={overallStats.in_progress}
-                        icon={TrendingUp}
-                        color="bg-blue-500"
-                    />
-                    <StatCard
-                        title="Completed"
-                        value={overallStats.completed}
-                        icon={CheckCircle}
-                        color="bg-green-500"
-                    />
-                    <StatCard
-                        title="Held"
-                        value={overallStats.held}
-                        icon={Pause}
-                        color="bg-yellow-500"
-                    />
-                </div>
-            </div>
-
-            {/* Project Analytics Section */}
-            <div>
-                <div className="flex justify-between items-center mb-3">
-                    <h2 className="text-lg font-semibold text-gray-900">Project Analytics</h2>
+            {/* Unified Project Status Overview */}
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+                    <div className="flex items-center">
+                        <BarChart3 className="text-blue-600 mr-2" size={24} />
+                        <h2 className="text-lg font-semibold text-gray-900">Project Status Overview</h2>
+                    </div>
                     <select
                         value={selectedProject}
                         onChange={(e) => setSelectedProject(e.target.value)}
@@ -248,47 +204,47 @@ const AdminDashboard = () => {
                     </select>
                 </div>
 
-                {/* Task Statistics Cards */}
+                {/* Status Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
                     <StatCard
                         title="Total Tasks"
-                        value={taskStats.total || 0}
+                        value={analytics.stats?.total || 0}
                         icon={Folder}
                         color="bg-purple-500"
                         subtitle={selectedProject !== 'all' ? selectedProject : 'All projects'}
                     />
                     <StatCard
-                        title="Pending"
-                        value={taskStats.pending || 0}
+                        title="Yet to Start"
+                        value={analytics.stats?.yet_to_start || 0}
                         icon={Clock}
                         color="bg-gray-500"
                     />
                     <StatCard
                         title="In Progress"
-                        value={taskStats.in_progress || 0}
+                        value={analytics.stats?.in_progress || 0}
                         icon={TrendingUp}
                         color="bg-blue-500"
                     />
                     <StatCard
                         title="Completed"
-                        value={taskStats.completed || 0}
+                        value={analytics.stats?.completed || 0}
                         icon={CheckCircle}
                         color="bg-green-500"
                     />
                     <StatCard
                         title="On Hold"
-                        value={taskStats.on_hold || 0}
+                        value={analytics.stats?.on_hold || 0}
                         icon={Pause}
                         color="bg-yellow-500"
                     />
                 </div>
 
-                {/* Project Status Distribution Pie Chart */}
-                <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                {/* Task Status Distribution Chart */}
+                <div>
+                    <h3 className="text-md font-semibold text-gray-900 mb-4">
                         Task Status Distribution
                         {selectedProject !== 'all' && <span className="text-sm font-normal text-gray-600"> - {selectedProject}</span>}
-                    </h2>
+                    </h3>
                     {chartData.length > 0 ? (
                         <ResponsiveContainer width="100%" height={300}>
                             <PieChart>
@@ -313,7 +269,7 @@ const AdminDashboard = () => {
                     ) : (
                         <div className="text-center py-12 text-gray-500">
                             <Folder className="mx-auto mb-4" size={48} />
-                            <p>No task data available</p>
+                            <p>No task data available for this project</p>
                         </div>
                     )}
                 </div>
@@ -323,13 +279,16 @@ const AdminDashboard = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 {/* Present Users */}
                 <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                    <div className="flex items-center mb-4">
-                        <UserCheck className="text-green-600 mr-2" size={24} />
-                        <h2 className="text-lg font-semibold text-gray-900">
-                            Present Users ({attendanceSummary.present_count})
-                        </h2>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center">
+                            <UserCheck className="text-green-600 mr-2" size={24} />
+                            <h2 className="text-lg font-semibold text-gray-900">
+                                Present Today ({attendanceSummary.present || 0})
+                            </h2>
+                        </div>
+                        <span className="text-xs text-gray-500">{attendanceSummary.date}</span>
                     </div>
-                    {attendanceSummary.present_users.length > 0 ? (
+                    {attendanceSummary.present_users && attendanceSummary.present_users.length > 0 ? (
                         <div className="space-y-2 max-h-60 overflow-y-auto">
                             {attendanceSummary.present_users.map(user => (
                                 <div
@@ -356,13 +315,20 @@ const AdminDashboard = () => {
 
                 {/* Absent Users */}
                 <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                    <div className="flex items-center mb-4">
-                        <UserX className="text-red-600 mr-2" size={24} />
-                        <h2 className="text-lg font-semibold text-gray-900">
-                            Absent Users ({attendanceSummary.absent_count})
-                        </h2>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center">
+                            <UserX className="text-red-600 mr-2" size={24} />
+                            <h2 className="text-lg font-semibold text-gray-900">
+                                Absent Today ({attendanceSummary.absent || 0})
+                            </h2>
+                        </div>
+                        {attendanceSummary.late > 0 && (
+                            <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded">
+                                {attendanceSummary.late} late
+                            </span>
+                        )}
                     </div>
-                    {attendanceSummary.absent_users.length > 0 ? (
+                    {attendanceSummary.absent_users && attendanceSummary.absent_users.length > 0 ? (
                         <div className="space-y-2 max-h-60 overflow-y-auto">
                             {attendanceSummary.absent_users.map(user => (
                                 <div
@@ -387,6 +353,45 @@ const AdminDashboard = () => {
                     )}
                 </div>
             </div>
+
+            {/* Attendance Records (if available) */}
+            {attendanceSummary.records && attendanceSummary.records.length > 0 && (
+                <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Today's Attendance Records</h2>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check In</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check Out</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {attendanceSummary.records.map((record, index) => (
+                                    <tr key={index}>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            {record.user}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {formatTime(record.check_in)}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {formatTime(record.check_out)}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">
+                                                {record.status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
