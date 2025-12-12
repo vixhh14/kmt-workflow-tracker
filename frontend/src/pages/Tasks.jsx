@@ -324,9 +324,13 @@ const Tasks = () => {
                             className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
                             <option value="all">All Operators</option>
-                            {users.filter(u => u.role === 'operator').map(user => (
-                                <option key={user.user_id} value={user.user_id}>{user.username}</option>
-                            ))}
+                            {Array.isArray(users) && users
+                                .filter(u => u?.role === 'operator')
+                                .map(user => (
+                                    <option key={user?.user_id || Math.random()} value={user?.user_id || ''}>
+                                        {user?.full_name || user?.username || 'Unknown'}
+                                    </option>
+                                ))}
                         </select>
                     </div>
                 </div>
@@ -366,9 +370,13 @@ const Tasks = () => {
                                 className="flex-1 sm:flex-none px-3 py-1.5 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                             >
                                 <option value="">Assign to...</option>
-                                {users.filter(u => u.role === 'operator').map(user => (
-                                    <option key={user.user_id} value={user.user_id}>{user.username}</option>
-                                ))}
+                                {Array.isArray(users) && users
+                                    .filter(u => u?.role === 'operator')
+                                    .map(user => (
+                                        <option key={user?.user_id || Math.random()} value={user?.user_id || ''}>
+                                            {user?.full_name || user?.username || 'Unknown'}
+                                        </option>
+                                    ))}
                             </select>
                             <button
                                 onClick={handleBulkDelete}
@@ -458,14 +466,14 @@ const Tasks = () => {
                                     <option value="">
                                         {loading ? 'Loading machines...' : machines.length === 0 ? 'No machines available' : 'Select Machine'}
                                     </option>
-                                    {machines.map((machine) => (
-                                        <option key={machine.id} value={machine.id}>
-                                            {machine.name}
+                                    {Array.isArray(machines) && machines.map((machine) => (
+                                        <option key={machine?.id || Math.random()} value={machine?.id || ''}>
+                                            {machine?.name || 'Unknown Machine'}
                                         </option>
                                     ))}
                                 </select>
                                 {machines.length === 0 && !loading && (
-                                    <p className="text-xs text-red-600 mt-1">Please add machines first</p>
+                                    <p className="text-xs text-red-600 mt-1">⚠️ No machines available. Please add machines in the Machines page.</p>
                                 )}
                             </div>
                             <div>
@@ -478,46 +486,72 @@ const Tasks = () => {
                                     disabled={loading || users.length === 0}
                                 >
                                     <option value="">
-                                        {loading ? 'Loading operators...' : users.filter(u => u.role === 'operator').length === 0 ? 'No operators available' : 'Select Operator'}
+                                        {loading ? 'Loading operators...' : users.filter(u => u?.role === 'operator').length === 0 ? 'No operators available' : 'Select Operator'}
                                     </option>
                                     {(() => {
-                                        const selectedMachine = machines.find(m => m.id === formData.machine_id);
-                                        const machineType = selectedMachine?.type;
+                                        // Get selected machine and extract category/type
+                                        const selectedMachine = machines.find(m => m?.id === formData.machine_id);
+                                        let machineType = selectedMachine?.category_name || null;
+
+                                        // If no category, try to extract from name (e.g., "CNC Machine (CNC)" -> "CNC")
+                                        if (!machineType && selectedMachine?.name) {
+                                            const match = selectedMachine.name.match(/\(([^)]+)\)/);
+                                            machineType = match ? match[1] : null;
+                                        }
 
                                         // Filter for operators only
-                                        let filteredUsers = users.filter(u => u.role === 'operator');
+                                        let filteredUsers = Array.isArray(users) ? users.filter(u => u?.role === 'operator') : [];
 
-                                        if (machineType) {
-                                            filteredUsers = filteredUsers.filter(user => {
-                                                if (!user.machine_types) return false;
+                                        // Only filter by machine type if we have one and want to restrict
+                                        if (machineType && formData.machine_id) {
+                                            const qualifiedUsers = filteredUsers.filter(user => {
+                                                if (!user?.machine_types) return false;
                                                 const userTypes = user.machine_types.split(',').map(t => t.trim());
                                                 return userTypes.includes(machineType);
                                             });
+
+                                            // If no qualified users, show all operators with a warning
+                                            if (qualifiedUsers.length > 0) {
+                                                filteredUsers = qualifiedUsers;
+                                            }
                                         }
 
-                                        if (filteredUsers.length === 0 && formData.machine_id) {
-                                            return <option value="" disabled>No qualified operators for this machine</option>;
+                                        if (filteredUsers.length === 0) {
+                                            return <option value="" disabled>No operators available</option>;
                                         }
 
                                         return filteredUsers.map((user) => (
-                                            <option key={user.user_id} value={user.user_id}>
-                                                {user.username} {machineType && user.machine_types ? `(${machineType})` : ''}
+                                            <option key={user?.user_id || Math.random()} value={user?.user_id || ''}>
+                                                {user?.full_name || user?.username || 'Unknown User'}
                                             </option>
                                         ));
                                     })()}
                                 </select>
                                 {formData.machine_id && (() => {
-                                    const selectedMachine = machines.find(m => m.id === formData.machine_id);
-                                    const machineType = selectedMachine?.type;
+                                    const selectedMachine = machines.find(m => m?.id === formData.machine_id);
+                                    let machineType = selectedMachine?.category_name;
+                                    if (!machineType && selectedMachine?.name) {
+                                        const match = selectedMachine.name.match(/\(([^)]+)\)/);
+                                        machineType = match ? match[1] : null;
+                                    }
+
+                                    if (!machineType) return null;
+
                                     const qualifiedCount = users.filter(user => {
-                                        if (user.role !== 'operator') return false;
-                                        if (!user.machine_types) return false;
+                                        if (user?.role !== 'operator') return false;
+                                        if (!user?.machine_types) return false;
                                         const userTypes = user.machine_types.split(',').map(t => t.trim());
                                         return userTypes.includes(machineType);
                                     }).length;
+
+                                    const totalOperators = users.filter(u => u?.role === 'operator').length;
+
                                     return (
                                         <p className="text-xs text-gray-500 mt-1">
-                                            {qualifiedCount} operator(s) qualified for {machineType}
+                                            {qualifiedCount > 0
+                                                ? `✅ ${qualifiedCount} of ${totalOperators} operator(s) qualified for ${machineType}`
+                                                : `⚠️ No operators qualified for ${machineType}. Showing all ${totalOperators} operators.`
+                                            }
                                         </p>
                                     );
                                 })()}
@@ -532,13 +566,18 @@ const Tasks = () => {
                                     disabled={loading || users.length === 0}
                                 >
                                     <option value="">
-                                        {loading ? 'Loading users...' : users.filter(u => ['admin', 'supervisor', 'planning'].includes(u.role)).length === 0 ? 'No assigners available' : 'Select User'}
+                                        {loading ? 'Loading users...' : users.filter(u => ['admin', 'supervisor', 'planning'].includes(u?.role)).length === 0 ? 'No assigners available' : 'Select User'}
                                     </option>
-                                    {users.filter(u => ['admin', 'supervisor', 'planning'].includes(u.role)).map((user) => (
-                                        <option key={user.user_id} value={user.user_id}>
-                                            {user.username} ({user.role})
-                                        </option>
-                                    ))}
+                                    {Array.isArray(users) && users
+                                        .filter(u => ['admin', 'supervisor', 'planning'].includes(u?.role))
+                                        .map((user) => (
+                                            <option key={user?.user_id || Math.random()} value={user?.user_id || ''}>
+                                                {user?.full_name || user?.username || 'Unknown'} ({user?.role || 'unknown'})
+                                            </option>
+                                        ))}
+                                    {users.filter(u => ['admin', 'supervisor', 'planning'].includes(u?.role)).length === 0 && !loading && (
+                                        <p className="text-xs text-gray-500 mt-1">⚠️ No admin/supervisor/planning users available</p>
+                                    )}
                                 </select>
                             </div>
                             <div>
