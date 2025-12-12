@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, BigInteger, Float, ForeignKey, DateTime, Boolean
+from sqlalchemy import Column, String, Integer, BigInteger, Float, ForeignKey, DateTime, Boolean, Date, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
@@ -180,14 +180,17 @@ class OutsourceItem(Base):
 
 class Attendance(Base):
     __tablename__ = "attendance"
+    __table_args__ = (
+        UniqueConstraint('user_id', 'date', name='idx_attendance_user_date'),
+    )
 
     id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
     user_id = Column(String, ForeignKey("users.user_id"))
-    date = Column(DateTime, default=datetime.utcnow)  # Date of attendance
-    check_in = Column(DateTime, nullable=True)  # Check-in time
-    check_out = Column(DateTime, nullable=True)  # Check-out time
-    login_time = Column(DateTime, default=datetime.utcnow)  # Legacy field
-    status = Column(String, default="present")  # present, absent, leave
+    date = Column(Date, nullable=False)  # Date of attendance (DATE type, not DATETIME)
+    check_in = Column(DateTime, nullable=True)  # First login time of the day
+    check_out = Column(DateTime, nullable=True)  # Logout time (only on explicit logout)
+    login_time = Column(DateTime, nullable=True)  # Latest login time of the day
+    status = Column(String, default="Present")  # Present, Absent, Leave
     ip_address = Column(String, nullable=True)
     
     # Relationship

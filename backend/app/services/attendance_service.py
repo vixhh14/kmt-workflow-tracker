@@ -97,7 +97,8 @@ def mark_present(db: Session, user_id: str, ip_address: Optional[str] = None) ->
 def mark_checkout(db: Session, user_id: str) -> dict:
     """
     Mark user as checked out for today.
-    Updates the check_out time and changes status to 'Left'.
+    Updates the check_out time ONLY. Status remains 'Present'.
+    Only sets check_out if it's not already set (idempotent).
     """
     try:
         today = date.today()
@@ -116,18 +117,28 @@ def mark_checkout(db: Session, user_id: str) -> dict:
                 "message": "No attendance record found for today"
             }
         
-        attendance.check_out = now
-        attendance.status = 'Left'
-        
-        db.commit()
-        db.refresh(attendance)
-        
-        return {
-            "success": True,
-            "message": "Check-out recorded",
-            "attendance_id": attendance.id,
-            "check_out": attendance.check_out.isoformat() if attendance.check_out else None
-        }
+        # Only set check_out if not already set
+        if not attendance.check_out:
+            attendance.check_out = now
+            # Status remains 'Present' - do NOT change it
+            
+            db.commit()
+            db.refresh(attendance)
+            
+            return {
+                "success": True,
+                "message": "Check-out recorded",
+                "attendance_id": attendance.id,
+                "check_out": attendance.check_out.isoformat() if attendance.check_out else None
+            }
+        else:
+            # Already checked out
+            return {
+                "success": True,
+                "message": "Already checked out",
+                "attendance_id": attendance.id,
+                "check_out": attendance.check_out.isoformat() if attendance.check_out else None
+            }
     
     except Exception as e:
         db.rollback()
