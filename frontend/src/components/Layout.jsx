@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users as UsersIcon, Monitor, CheckSquare, Briefcase, Menu, LogOut, X, UserCheck, Lock, User } from 'lucide-react';
+import { LayoutDashboard, Users as UsersIcon, Monitor, CheckSquare, Briefcase, Menu, LogOut, X, UserCheck, Lock, User, TrendingUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Layout = ({ children }) => {
@@ -40,7 +40,10 @@ const Layout = ({ children }) => {
                 : []),
             // User Approvals - ADMIN ONLY
             ...(user?.role === 'admin'
-                ? [{ path: '/admin/approvals', label: 'User Approvals', icon: UserCheck }]
+                ? [
+                    { path: '/admin/approvals', label: 'User Approvals', icon: UserCheck },
+                    { path: '/admin/monthly-performance', label: 'Monthly Performance', icon: TrendingUp }
+                ]
                 : []),
             // Change Password - accessible by all users
             { path: '/admin/change-password', label: 'Change Password', icon: Lock },

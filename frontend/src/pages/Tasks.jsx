@@ -36,7 +36,8 @@ const Tasks = () => {
         assigned_to: '',
         assigned_by: '',
         machine_id: '',
-        due_date: ''
+        due_date: '',
+        expected_completion_time: ''
     });
 
     useEffect(() => {
@@ -76,7 +77,8 @@ const Tasks = () => {
                 assigned_to: '',
                 assigned_by: '',
                 machine_id: '',
-                due_date: ''
+                due_date: '',
+                expected_completion_time: ''
             });
             setShowForm(false);
             fetchData();
@@ -491,6 +493,17 @@ const Tasks = () => {
                                     required
                                     value={formData.due_date}
                                     onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Expected Time of Completion *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="e.g. 2 hours, 1 day"
+                                    value={formData.expected_completion_time}
+                                    onChange={(e) => setFormData({ ...formData, expected_completion_time: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>

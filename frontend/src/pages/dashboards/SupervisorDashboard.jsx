@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getTasks, getUsers, updateTask, getAnalytics, getTaskSummary } from '../../api/services';
-import { Users, CheckSquare, TrendingUp, AlertTriangle, Briefcase, UserPlus, Monitor, Clock, Pause } from 'lucide-react';
+import { Users, CheckSquare, TrendingUp, AlertTriangle, Briefcase, UserPlus, Monitor, Clock, Pause, Folder } from 'lucide-react';
 import {
     BarChart, Bar,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
@@ -24,23 +24,25 @@ const SupervisorDashboard = () => {
     const [tasks, setTasks] = useState([]);
     const [users, setUsers] = useState([]);
     const [analytics, setAnalytics] = useState(null);
-    const [taskStats, setTaskStats] = useState({
-        pending_tasks: 0,
-        active_tasks: 0,
-        on_hold_tasks: 0,
-        completed_tasks: 0,
-        total_tasks: 0
+    const [projectStats, setProjectStats] = useState({
+        total: 0,
+        completed: 0,
+        in_progress: 0,
+        yet_to_start: 0,
+        held: 0
     });
     const [loading, setLoading] = useState(true);
     const [selectedOperator, setSelectedOperator] = useState('all');
 
     useEffect(() => {
         fetchData();
+        const interval = setInterval(fetchData, 30000); // Real-time updates
+        return () => clearInterval(interval);
     }, []);
 
     const fetchData = async () => {
         try {
-            setLoading(true);
+            // setLoading(true); // Don't show loading on refresh
             const [tasksRes, usersRes, analyticsRes, statsRes] = await Promise.all([
                 getTasks(),
                 getUsers(),
@@ -50,10 +52,13 @@ const SupervisorDashboard = () => {
             setTasks(tasksRes.data);
             setUsers(usersRes.data.filter(u => u.role === 'operator').sort((a, b) => a.username.localeCompare(b.username)));
             setAnalytics(analyticsRes.data);
-            setTaskStats(statsRes.data);
+
+            if (statsRes.data.project_stats) {
+                setProjectStats(statsRes.data.project_stats);
+            }
+            setLoading(false);
         } catch (error) {
             console.error('Failed to fetch data:', error);
-        } finally {
             setLoading(false);
         }
     };
@@ -134,52 +139,31 @@ const SupervisorDashboard = () => {
                 </div>
             </div>
 
-            {/* Stats Cards */}
+            {/* Stats Cards - Updated to Project Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
                 <StatCard
-                    title="Total Tasks"
-                    value={taskStats.total_tasks}
-                    icon={CheckSquare}
+                    title="Total Projects"
+                    value={projectStats.total}
+                    icon={Folder}
                     color="bg-blue-500"
                 />
                 <StatCard
-                    title="Completed Tasks"
-                    value={taskStats.completed_tasks}
+                    title="Completed Projects"
+                    value={projectStats.completed}
                     icon={CheckSquare}
                     color="bg-green-500"
                 />
                 <StatCard
-                    title="Pending Tasks"
-                    value={taskStats.pending_tasks}
+                    title="Pending Projects"
+                    value={projectStats.yet_to_start}
                     icon={Clock}
                     color="bg-yellow-500"
                 />
                 <StatCard
-                    title="Active Tasks"
-                    value={taskStats.active_tasks}
+                    title="Active Projects"
+                    value={projectStats.in_progress}
                     icon={TrendingUp}
                     color="bg-purple-500"
-                />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6">
-                <StatCard
-                    title="Active Projects"
-                    value={analytics?.active_projects_count || 0}
-                    icon={CheckSquare}
-                    color="bg-indigo-500"
-                />
-                <StatCard
-                    title="Present Today"
-                    value={analytics?.attendance?.present_count || 0}
-                    icon={Users}
-                    color="bg-green-500"
-                />
-                <StatCard
-                    title="On Leave / Absent"
-                    value={analytics?.attendance?.absent_count || 0}
-                    icon={Users}
-                    color="bg-red-500"
                 />
             </div>
 
