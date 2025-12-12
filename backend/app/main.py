@@ -8,6 +8,7 @@ from app.routers import (
     outsource_router,
     auth_router,
     planning_router,
+    supervisor_router,
     units_router,
     machine_categories_router,
     user_skills_router,
@@ -16,6 +17,8 @@ from app.routers import (
     subtasks_router,
     seed_router,
     performance_router,
+    operator_router,
+    admin_dashboard_router,
 )
 from app.core.config import CORS_ORIGINS
 import uvicorn
@@ -121,11 +124,13 @@ def health_check():
 app.include_router(auth_router.router)
 app.include_router(users_router.router)
 app.include_router(admin_router.router)
+app.include_router(admin_dashboard_router.router)
 app.include_router(machines_routers.router)
 app.include_router(tasks_router.router)
 app.include_router(analytics_router.router)
 app.include_router(outsource_router.router)
 app.include_router(planning_router.router)
+app.include_router(supervisor_router.router)
 app.include_router(units_router.router)
 app.include_router(machine_categories_router.router)
 app.include_router(user_skills_router.router)
@@ -133,6 +138,7 @@ app.include_router(approvals_router.router)
 app.include_router(subtasks_router.router)
 app.include_router(seed_router.router)
 app.include_router(performance_router.router)
+app.include_router(operator_router.router)
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
