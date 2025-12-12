@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, distinct
 from datetime import datetime, date, timezone
-from typing import List
+from typing import List, Optional
 from app.core.database import get_db
 from app.models.models_db import Task, User, Attendance
 from app.utils.datetime_utils import utc_now, make_aware
@@ -13,9 +13,120 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+@router.get("/overall-stats")
+async def get_overall_stats(db: Session = Depends(get_db)):
+    """Get overall project statistics (not filtered by project)"""
+    try:
+        tasks_with_projects = db.query(Task).filter(Task.project != None, Task.project != '').all()
+        
+        project_map = {}
+        for task in tasks_with_projects:
+            project_name = task.project
+            if project_name not in project_map:
+                project_map[project_name] = []
+            project_map[project_name].append(task.status)
+        
+        total_projects = len(project_map)
+        completed = 0
+        in_progress = 0
+        yet_to_start = 0
+        held = 0
+        
+        for project, statuses in project_map.items():
+            if all(s == 'completed' for s in statuses):
+                completed += 1
+            elif any(s == 'on_hold' for s in statuses) and not any(s == 'in_progress' for s in statuses):
+                held += 1
+            elif any(s == 'in_progress' for s in statuses):
+                in_progress += 1
+            elif all(s == 'pending' for s in statuses):
+                yet_to_start += 1
+            else:
+                in_progress += 1
+        
+        return {
+            "total_projects": total_projects,
+            "completed": completed,
+            "in_progress": in_progress,
+            "yet_to_start": yet_to_start,
+            "held": held
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch overall stats: {str(e)}")
+
+
+@router.get("/projects")
+async def get_projects(db: Session = Depends(get_db)):
+    """Get list of all unique project names"""
+    try:
+        projects = db.query(Task.project).filter(
+            Task.project != None,
+            Task.project != ''
+        ).distinct().all()
+        
+        project_names = [p[0] for p in projects]
+        return project_names
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch projects: {str(e)}")
+
+
+@router.get("/project-status")
+async def get_project_status(project: Optional[str] = None, db: Session = Depends(get_db)):
+    """Get task status distribution for a specific project or all projects"""
+    try:
+        query = db.query(Task)
+        
+        if project and project != 'all':
+            query = query.filter(Task.project == project)
+        
+        tasks = query.all()
+        
+        yet_to_start = len([t for t in tasks if t.status == 'pending'])
+        in_progress = len([t for t in tasks if t.status == 'in_progress'])
+        completed = len([t for t in tasks if t.status == 'completed'])
+        on_hold = len([t for t in tasks if t.status == 'on_hold'])
+        
+        return {
+            "yet_to_start": yet_to_start,
+            "in_progress": in_progress,
+            "completed": completed,
+            "on_hold": on_hold
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch project status: {str(e)}")
+
+
+@router.get("/task-stats")
+async def get_task_stats(project: Optional[str] = None, db: Session = Depends(get_db)):
+    """Get task statistics for a specific project or all projects"""
+    try:
+        query = db.query(Task)
+        
+        if project and project != 'all':
+            query = query.filter(Task.project == project)
+        
+        all_tasks = query.all()
+        
+        total = len(all_tasks)
+        pending = len([t for t in all_tasks if t.status == 'pending'])
+        in_progress = len([t for t in all_tasks if t.status == 'in_progress'])
+        completed = len([t for t in all_tasks if t.status == 'completed'])
+        on_hold = len([t for t in all_tasks if t.status == 'on_hold'])
+        
+        return {
+            "total": total,
+            "pending": pending,
+            "in_progress": in_progress,
+            "completed": completed,
+            "on_hold": on_hold
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch task stats: {str(e)}")
+
+
 @router.get("/project-summary")
 async def get_project_summary(db: Session = Depends(get_db)):
-    """Get project status summary for admin dashboard"""
+    """Get project status summary for admin dashboard (LEGACY - use overall-stats)"""
     try:
         tasks_with_projects = db.query(Task).filter(Task.project != None, Task.project != '').all()
         
@@ -57,7 +168,7 @@ async def get_project_summary(db: Session = Depends(get_db)):
 
 @router.get("/project-status-chart")
 async def get_project_status_chart(db: Session = Depends(get_db)):
-    """Get project status data for pie chart"""
+    """Get project status data for pie chart (LEGACY - use project-status)"""
     try:
         tasks_with_projects = db.query(Task).filter(Task.project != None, Task.project != '').all()
         
@@ -103,13 +214,11 @@ async def get_attendance_summary(db: Session = Depends(get_db)):
         
         today = date.today()
         
-        # Query attendance records for today using check_in column
-        today_attendance = db.query(Attendance).filter(
-            func.date(Attendance.check_in) == today
-        ).all()
-        
-        # Fallback: if check_in doesn't work, try login_time
-        if not today_attendance:
+        try:
+            today_attendance = db.query(Attendance).filter(
+                func.date(Attendance.check_in) == today
+            ).all()
+        except:
             try:
                 today_attendance = db.query(Attendance).filter(
                     func.date(Attendance.login_time) == today
@@ -145,7 +254,6 @@ async def get_attendance_summary(db: Session = Depends(get_db)):
             "absent_count": len(absent_users)
         }
     except Exception as e:
-        # Return safe empty data if attendance table fails
         all_users = db.query(User).filter(User.role.in_(['operator', 'supervisor', 'planning'])).all()
         user_list = [
             {
@@ -167,7 +275,7 @@ async def get_attendance_summary(db: Session = Depends(get_db)):
 
 @router.get("/task-statistics")
 async def get_task_statistics(db: Session = Depends(get_db)):
-    """Get overall task statistics for admin dashboard"""
+    """Get overall task statistics (LEGACY - use task-stats)"""
     try:
         total_tasks = db.query(Task).count()
         completed = db.query(Task).filter(Task.status == 'completed').count()
