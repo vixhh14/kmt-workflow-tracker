@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getProjectSummary, getProjectStatusChart, getAttendanceSummary, getTaskStatistics } from '../../api/admin';
+import { getOverallStats, getProjects, getProjectStatus, getTaskStats, getAttendanceSummary } from '../../api/admin';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { TrendingUp, CheckCircle, Clock, Pause, Users, UserCheck, UserX, Folder, RefreshCw } from 'lucide-react';
 
@@ -7,7 +7,7 @@ const COLORS = {
     'Yet to Start': '#6b7280',
     'In Progress': '#3b82f6',
     'Completed': '#10b981',
-    'Held': '#f59e0b',
+    'On Hold': '#f59e0b',
 };
 
 const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
@@ -26,14 +26,23 @@ const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
 );
 
 const AdminDashboard = () => {
-    const [projectSummary, setProjectSummary] = useState({
+    const [overallStats, setOverallStats] = useState({
         total_projects: 0,
         completed: 0,
         in_progress: 0,
         yet_to_start: 0,
         held: 0
     });
-    const [chartData, setChartData] = useState([]);
+    const [projects, setProjects] = useState([]);
+    const [selectedProject, setSelectedProject] = useState('all');
+    const [projectStatusData, setProjectStatusData] = useState({});
+    const [taskStats, setTaskStats] = useState({
+        total: 0,
+        pending: 0,
+        in_progress: 0,
+        completed: 0,
+        on_hold: 0
+    });
     const [attendanceSummary, setAttendanceSummary] = useState({
         present_users: [],
         absent_users: [],
@@ -41,55 +50,44 @@ const AdminDashboard = () => {
         present_count: 0,
         absent_count: 0
     });
-    const [taskStats, setTaskStats] = useState({
-        total_tasks: 0,
-        completed: 0,
-        in_progress: 0,
-        pending: 0,
-        on_hold: 0
-    });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        fetchDashboardData();
+        fetchDashboard();
     }, []);
 
-    const fetchDashboardData = async () => {
+    useEffect(() => {
+        if (!loading) {
+            fetchFilteredData();
+        }
+    }, [selectedProject]);
+
+    const fetchDashboard = async () => {
         try {
             setLoading(true);
             setError(null);
 
             console.log('🔄 Fetching admin dashboard data...');
 
-            const [summaryRes, chartRes, attendanceRes, statsRes] = await Promise.all([
-                getProjectSummary(),
-                getProjectStatusChart(),
-                getAttendanceSummary(),
-                getTaskStatistics()
+            const [statsRes, projectsRes, attendanceRes] = await Promise.all([
+                getOverallStats(),
+                getProjects(),
+                getAttendanceSummary()
             ]);
 
-            console.log('✅ Admin dashboard data loaded:', {
-                summary: summaryRes.data,
-                chart: chartRes.data,
-                attendance: attendanceRes.data,
-                stats: statsRes.data
+            console.log('✅ Admin dashboard data loaded');
+
+            setOverallStats({
+                total_projects: statsRes.data?.total_projects || 0,
+                completed: statsRes.data?.completed || 0,
+                in_progress: statsRes.data?.in_progress || 0,
+                yet_to_start: statsRes.data?.yet_to_start || 0,
+                held: statsRes.data?.held || 0
             });
 
-            // Set project summary
-            setProjectSummary({
-                total_projects: summaryRes.data?.total_projects || 0,
-                completed: summaryRes.data?.completed || 0,
-                in_progress: summaryRes.data?.in_progress || 0,
-                yet_to_start: summaryRes.data?.yet_to_start || 0,
-                held: summaryRes.data?.held || 0
-            });
+            setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : []);
 
-            // Set chart data
-            const chart = Array.isArray(chartRes.data) ? chartRes.data : [];
-            setChartData(chart.filter(item => item.value > 0)); // Only show non-zero values
-
-            // Set attendance summary
             setAttendanceSummary({
                 present_users: Array.isArray(attendanceRes.data?.present_users) ? attendanceRes.data.present_users : [],
                 absent_users: Array.isArray(attendanceRes.data?.absent_users) ? attendanceRes.data.absent_users : [],
@@ -98,20 +96,30 @@ const AdminDashboard = () => {
                 absent_count: attendanceRes.data?.absent_count || 0
             });
 
-            // Set task statistics
-            setTaskStats({
-                total_tasks: statsRes.data?.total_tasks || 0,
-                completed: statsRes.data?.completed || 0,
-                in_progress: statsRes.data?.in_progress || 0,
-                pending: statsRes.data?.pending || 0,
-                on_hold: statsRes.data?.on_hold || 0
-            });
+            // Fetch initial filtered data
+            await fetchFilteredData();
 
         } catch (err) {
             console.error('❌ Failed to fetch admin dashboard data:', err);
             setError(err.response?.data?.detail || 'Failed to load dashboard data');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchFilteredData = async () => {
+        try {
+            const project = selectedProject === 'all' ? null : selectedProject;
+
+            const [statusRes, statsRes] = await Promise.all([
+                getProjectStatus(project),
+                getTaskStats(project)
+            ]);
+
+            setProjectStatusData(statusRes.data || {});
+            setTaskStats(statsRes.data || {});
+        } catch (err) {
+            console.error('Failed to fetch filtered data:', err);
         }
     };
 
@@ -135,6 +143,13 @@ const AdminDashboard = () => {
         );
     };
 
+    const chartData = [
+        { name: 'Yet to Start', value: projectStatusData.yet_to_start || 0, color: COLORS['Yet to Start'] },
+        { name: 'In Progress', value: projectStatusData.in_progress || 0, color: COLORS['In Progress'] },
+        { name: 'Completed', value: projectStatusData.completed || 0, color: COLORS['Completed'] },
+        { name: 'On Hold', value: projectStatusData.on_hold || 0, color: COLORS['On Hold'] }
+    ].filter(item => item.value > 0);
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen">
@@ -153,7 +168,7 @@ const AdminDashboard = () => {
                     <h3 className="text-lg font-semibold text-red-900 mb-2">Error Loading Dashboard</h3>
                     <p className="text-red-700 mb-4">{error}</p>
                     <button
-                        onClick={fetchDashboardData}
+                        onClick={fetchDashboard}
                         className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
                     >
                         Retry
@@ -172,7 +187,7 @@ const AdminDashboard = () => {
                     <p className="text-sm sm:text-base text-gray-600">Overview of all projects and tasks</p>
                 </div>
                 <button
-                    onClick={fetchDashboardData}
+                    onClick={fetchDashboard}
                     className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition w-full sm:w-auto"
                 >
                     <RefreshCw size={18} />
@@ -180,109 +195,127 @@ const AdminDashboard = () => {
                 </button>
             </div>
 
-            {/* Project Status Overview Cards */}
+            {/* Overall Project Status Overview Cards */}
             <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-3">Project Status Overview</h2>
+                <h2 className="text-lg font-semibold text-gray-900 mb-3">Overall Project Status</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
                     <StatCard
                         title="Total Projects"
-                        value={projectSummary.total_projects}
+                        value={overallStats.total_projects}
                         icon={Folder}
                         color="bg-blue-500"
                     />
                     <StatCard
                         title="Yet to Start"
-                        value={projectSummary.yet_to_start}
+                        value={overallStats.yet_to_start}
                         icon={Clock}
                         color="bg-gray-500"
                     />
                     <StatCard
                         title="In Progress"
-                        value={projectSummary.in_progress}
+                        value={overallStats.in_progress}
                         icon={TrendingUp}
                         color="bg-blue-500"
                     />
                     <StatCard
                         title="Completed"
-                        value={projectSummary.completed}
+                        value={overallStats.completed}
                         icon={CheckCircle}
                         color="bg-green-500"
                     />
                     <StatCard
                         title="Held"
-                        value={projectSummary.held}
+                        value={overallStats.held}
                         icon={Pause}
                         color="bg-yellow-500"
                     />
                 </div>
             </div>
 
-            {/* Project Status Pie Chart */}
-            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Project Status Distribution</h2>
-                {chartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                            <Pie
-                                data={chartData}
-                                cx="50%"
-                                cy="50%"
-                                labelLine={false}
-                                label={renderCustomLabel}
-                                outerRadius={100}
-                                fill="#8884d8"
-                                dataKey="value"
-                            >
-                                {chartData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[entry.label] || '#6b7280'} />
-                                ))}
-                            </Pie>
-                            <Tooltip />
-                            <Legend />
-                        </PieChart>
-                    </ResponsiveContainer>
-                ) : (
-                    <div className="text-center py-12 text-gray-500">
-                        <Folder className="mx-auto mb-4" size={48} />
-                        <p>No project data available</p>
-                    </div>
-                )}
-            </div>
-
-            {/* Task Statistics */}
+            {/* Project Analytics Section */}
             <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-3">Task Statistics</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+                <div className="flex justify-between items-center mb-3">
+                    <h2 className="text-lg font-semibold text-gray-900">Project Analytics</h2>
+                    <select
+                        value={selectedProject}
+                        onChange={(e) => setSelectedProject(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="all">All Projects</option>
+                        {projects.map(proj => (
+                            <option key={proj} value={proj}>{proj}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Task Statistics Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
                     <StatCard
                         title="Total Tasks"
-                        value={taskStats.total_tasks}
+                        value={taskStats.total || 0}
                         icon={Folder}
                         color="bg-purple-500"
+                        subtitle={selectedProject !== 'all' ? selectedProject : 'All projects'}
                     />
                     <StatCard
                         title="Pending"
-                        value={taskStats.pending}
+                        value={taskStats.pending || 0}
                         icon={Clock}
                         color="bg-gray-500"
                     />
                     <StatCard
                         title="In Progress"
-                        value={taskStats.in_progress}
+                        value={taskStats.in_progress || 0}
                         icon={TrendingUp}
                         color="bg-blue-500"
                     />
                     <StatCard
                         title="Completed"
-                        value={taskStats.completed}
+                        value={taskStats.completed || 0}
                         icon={CheckCircle}
                         color="bg-green-500"
                     />
                     <StatCard
                         title="On Hold"
-                        value={taskStats.on_hold}
+                        value={taskStats.on_hold || 0}
                         icon={Pause}
                         color="bg-yellow-500"
                     />
+                </div>
+
+                {/* Project Status Distribution Pie Chart */}
+                <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                        Task Status Distribution
+                        {selectedProject !== 'all' && <span className="text-sm font-normal text-gray-600"> - {selectedProject}</span>}
+                    </h2>
+                    {chartData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                                <Pie
+                                    data={chartData}
+                                    cx="50%"
+                                    cy="50%"
+                                    labelLine={false}
+                                    label={renderCustomLabel}
+                                    outerRadius={100}
+                                    fill="#8884d8"
+                                    dataKey="value"
+                                >
+                                    {chartData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                                <Legend />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="text-center py-12 text-gray-500">
+                            <Folder className="mx-auto mb-4" size={48} />
+                            <p>No task data available</p>
+                        </div>
+                    )}
                 </div>
             </div>
 
