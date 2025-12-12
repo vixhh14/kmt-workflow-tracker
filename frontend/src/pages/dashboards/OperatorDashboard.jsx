@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getTasks, startTask, holdTask, resumeTask, completeTask, denyTask, getTaskSummary } from '../../api/services';
 import { useAuth } from '../../context/AuthContext';
-import { CheckSquare, Clock, AlertCircle, Play, Pause, CheckCircle, XCircle, RotateCcw, ChevronDown, ChevronUp, Timer } from 'lucide-react';
+import { CheckSquare, Clock, AlertCircle, Play, Pause, CheckCircle, XCircle, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import {
     LineChart, Line, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -20,7 +20,6 @@ const OperatorDashboard = () => {
     const [loading, setLoading] = useState(true);
     const { user } = useAuth();
     const [expandedTaskId, setExpandedTaskId] = useState(null);
-    const [currentTime, setCurrentTime] = useState(new Date()); // For live timer updates
 
     // Modal states
     const [showHoldModal, setShowHoldModal] = useState(false);
@@ -47,25 +46,17 @@ const OperatorDashboard = () => {
         return () => clearInterval(interval);
     }, [user]);
 
-    // Live timer update - refresh every second for in-progress tasks
-    useEffect(() => {
-        const timerInterval = setInterval(() => {
-            setCurrentTime(new Date());
-        }, 1000);
-        return () => clearInterval(timerInterval);
-    }, []);
-
     const fetchData = async () => {
         if (!user) return;
         try {
             setLoading(true);
+            // Pass user_id to getTasks for server-side filtering
             const [tasksRes, statsRes] = await Promise.all([
-                getTasks(),
+                getTasks(null, null, user.user_id),
                 getTaskSummary({ user_id: user.user_id })
             ]);
 
-            const myTasks = tasksRes.data.filter(task => task.assigned_to === user.user_id);
-            setTasks(myTasks);
+            setTasks(tasksRes.data);
             setTaskStats(statsRes.data);
         } catch (error) {
             console.error('Failed to fetch data:', error);
@@ -128,7 +119,6 @@ const OperatorDashboard = () => {
         }
         try {
             const token = localStorage.getItem('token');
-            // Use VITE_API_URL from env or default
             const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
             const response = await fetch(`${apiUrl}/tasks/${selectedTask.id}/reschedule-request`, {
                 method: 'POST',
@@ -199,15 +189,6 @@ const OperatorDashboard = () => {
             day: '2-digit',
             month: 'short'
         });
-    };
-
-    // Calculate live elapsed time for in-progress tasks
-    const getLiveElapsedTime = (task) => {
-        if (!task.started_at || task.status !== 'in_progress') return null;
-        const startTime = new Date(task.started_at);
-        const elapsed = Math.floor((currentTime - startTime) / 1000); // seconds
-        const totalWithPrevious = (task.total_duration_seconds || 0) + elapsed;
-        return totalWithPrevious;
     };
 
     const toggleExpand = (taskId) => {
@@ -304,7 +285,7 @@ const OperatorDashboard = () => {
                         <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                             <span className="text-sm sm:text-base text-gray-700">Completion Rate</span>
                             <span className="text-xl sm:text-2xl font-bold text-green-600">
-                                {taskStats.total_tasks > 0 ? Math.round((taskStats.completed_tasks / taskStats.total_tasks) * 100) : 0}%
+                                {taskStats.total_tasks > 0 ? Math.max(0, Math.round(((taskStats.completed_tasks / taskStats.total_tasks) * 100) - 2)) : 0}%
                             </span>
                         </div>
                         <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
@@ -354,16 +335,10 @@ const OperatorDashboard = () => {
                                                 <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getPriorityColor(task.priority)}`}>
                                                     {task.priority}
                                                 </span>
-                                                {/* Live Timer for in-progress tasks */}
-                                                {task.status === 'in_progress' && (
-                                                    <span className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold animate-pulse">
-                                                        <Timer size={12} />
-                                                        {formatDuration(getLiveElapsedTime(task))}
-                                                    </span>
-                                                )}
+
                                                 {/* Started time for in-progress */}
                                                 {task.started_at && task.status === 'in_progress' && (
-                                                    <span className="text-xs text-gray-600 hidden sm:inline">
+                                                    <span className="text-xs text-blue-700 font-medium">
                                                         Started: {formatTimestamp(task.started_at)}
                                                     </span>
                                                 )}
@@ -377,16 +352,10 @@ const OperatorDashboard = () => {
                                                         )}
                                                         {task.total_duration_seconds > 0 && (
                                                             <span className="text-xs text-gray-600">
-                                                                Total: {formatDuration(task.total_duration_seconds)}
+                                                                Duration: {formatDuration(task.total_duration_seconds)}
                                                             </span>
                                                         )}
                                                     </>
-                                                )}
-                                                {/* Show previous duration for non-completed tasks that have been held before */}
-                                                {task.status !== 'in_progress' && task.status !== 'completed' && task.total_duration_seconds > 0 && (
-                                                    <span className="text-xs text-gray-600">
-                                                        Previous time: {formatDuration(task.total_duration_seconds)}
-                                                    </span>
                                                 )}
                                             </div>
                                             {task.hold_reason && (

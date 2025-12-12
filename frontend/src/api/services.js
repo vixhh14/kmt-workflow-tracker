@@ -21,10 +21,11 @@ export const updateMachine = (id, data) => api.put(`/machines/${id}`, data);
 export const deleteMachine = (id) => api.delete(`/machines/${id}`);
 
 /* -------------------- TASKS -------------------- */
-export const getTasks = (month = null, year = null) => {
+export const getTasks = (month = null, year = null, assigned_to = null) => {
     const params = {};
     if (month !== null) params.month = month;
     if (year !== null) params.year = year;
+    if (assigned_to !== null) params.assigned_to = assigned_to;
     return api.get('/tasks', { params });
 };
 
@@ -41,6 +42,11 @@ export const denyTask = (id, reason) => api.post(`/tasks/${id}/deny`, { reason }
 /* -------------------- ANALYTICS -------------------- */
 export const getAnalytics = () => api.get('/analytics');
 export const getTaskSummary = (params) => api.get('/analytics/task-summary', { params });
+export const getOperatorPerformance = (month, year, operator_id = null) => {
+    const params = { month, year };
+    if (operator_id) params.operator_id = operator_id;
+    return api.get('/analytics/operator-performance', { params });
+};
 
 /* -------------------- OUTSOURCE -------------------- */
 export const getOutsource = () => api.get('/outsource');
