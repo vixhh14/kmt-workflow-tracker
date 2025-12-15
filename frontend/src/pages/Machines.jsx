@@ -119,7 +119,11 @@ const Machines = () => {
                 fetchMachines();
             } catch (error) {
                 console.error('Failed to delete machine:', error);
-                alert('Failed to delete machine');
+                if (error.response && error.response.status === 409) {
+                    alert(error.response.data.detail || 'Cannot delete machine because it is in use.');
+                } else {
+                    alert('Failed to delete machine');
+                }
             }
         }
     };
