@@ -20,6 +20,36 @@ export const getAttendanceSummary = () => {
     return api.get('/admin/attendance-summary');
 };
 
+// --- NEW REPORTING APIs ---
+
+export const getMachineDailyReport = (dateStr) => {
+    return api.get('/reports/machines/daily', { params: { date_str: dateStr } });
+};
+
+export const getUserDailyReport = (dateStr) => {
+    return api.get('/reports/users/daily', { params: { date_str: dateStr } });
+};
+
+export const getMonthlyPerformance = (year) => {
+    return api.get('/reports/monthly-performance', { params: { year } });
+};
+
+export const downloadMachineReport = (dateStr) => {
+    return api.get('/reports/machines/export-csv', {
+        params: { date_str: dateStr },
+        responseType: 'blob'
+    });
+};
+
+export const downloadUserReport = (dateStr) => {
+    return api.get('/reports/users/export-csv', {
+        params: { date_str: dateStr },
+        responseType: 'blob'
+    });
+};
+
+// --- LEGACY ---
+
 // Legacy endpoints (for backward compatibility)
 export const getOverallStats = () => {
     return api.get('/admin/overall-stats');

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getProjects, getProjectAnalytics, getAttendanceSummary } from '../../api/admin';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { TrendingUp, CheckCircle, Clock, Pause, UserCheck, UserX, Folder, RefreshCw, BarChart3 } from 'lucide-react';
+import ReportsSection from './ReportsSection';
 
 const COLORS = {
     'Yet to Start': '#6b7280',
@@ -353,6 +354,9 @@ const AdminDashboard = () => {
                     )}
                 </div>
             </div>
+
+            {/* Reports Section */}
+            <ReportsSection />
 
             {/* Attendance Records (if available) */}
             {attendanceSummary.records && attendanceSummary.records.length > 0 && (
