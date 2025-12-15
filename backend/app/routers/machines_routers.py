@@ -6,6 +6,9 @@ from app.models.machines_model import MachineCreate, MachineUpdate
 from app.models.models_db import Machine, Unit, MachineCategory
 from app.core.database import get_db
 import uuid
+import pytz
+
+IST = pytz.timezone('Asia/Kolkata')
 
 router = APIRouter(
     prefix="/machines",
@@ -68,7 +71,7 @@ async def create_machine(machine: MachineCreate, db: Session = Depends(get_db)):
         current_operator=machine.current_operator,
         unit_id=machine.unit_id,
         category_id=machine.category_id,
-        updated_at=datetime.utcnow(),
+        updated_at=datetime.now(IST).replace(tzinfo=None),
     )
     db.add(new_machine)
     db.commit()
@@ -107,7 +110,7 @@ async def update_machine(machine_id: str, machine_update: MachineUpdate, db: Ses
         db_machine.current_operator = machine_update.current_operator
     
     # Always bump the updated_at timestamp
-    db_machine.updated_at = datetime.utcnow()
+    db_machine.updated_at = datetime.now(IST).replace(tzinfo=None)
     
     db.commit()
     db.refresh(db_machine)
@@ -127,12 +130,25 @@ async def update_machine(machine_id: str, machine_update: MachineUpdate, db: Ses
 # ----------------------------------------------------------------------
 @router.delete("/{machine_id}")
 async def delete_machine(machine_id: str, db: Session = Depends(get_db)):
+    from sqlalchemy.exc import IntegrityError
+    
     db_machine = db.query(Machine).filter(Machine.id == machine_id).first()
     if not db_machine:
         raise HTTPException(status_code=404, detail="Machine not found")
     
-    db.delete(db_machine)
-    db.commit()
+    try:
+        db.delete(db_machine)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, 
+            detail="Machine cannot be deleted because it is associated with existing tasks or history."
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete machine: {str(e)}")
+
     return {"message": "Machine deleted successfully"}
 
 
