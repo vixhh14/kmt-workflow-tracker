@@ -6,6 +6,7 @@ from app.models.tasks_model import TaskCreate, TaskUpdate
 from app.models.models_db import Task, TaskTimeLog, TaskHold, RescheduleRequest
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.core.time_utils import get_current_time_ist
 import uuid
 from datetime import datetime
 
@@ -104,7 +105,7 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
         machine_id=task.machine_id,
         due_date=task.due_date,
         expected_completion_time=task.expected_completion_time,
-        created_at=datetime.utcnow(),
+        created_at=get_current_time_ist(),
     )
     db.add(new_task)
     db.commit()
@@ -158,7 +159,7 @@ async def start_task(task_id: str, db: Session = Depends(get_db)):
              return {"message": "Task already in progress", "started_at": task.started_at.isoformat() if task.started_at else None}
         raise HTTPException(status_code=400, detail="Task must be pending or on hold to start")
 
-    now = datetime.utcnow()
+    now = get_current_time_ist()
     
     # Set actual start time if not set
     if not task.actual_start_time:
@@ -207,7 +208,7 @@ async def hold_task(
              return {"message": "Task is already on hold", "reason": task.hold_reason}
         raise HTTPException(status_code=400, detail="Task must be in progress or pending to hold")
     
-    now = datetime.utcnow()
+    now = get_current_time_ist()
     
     # If holding an in-progress task, calculate session duration
     if task.status == "in_progress" and task.started_at:
@@ -250,7 +251,7 @@ async def complete_task(task_id: str, db: Session = Depends(get_db)):
     if task.status != "in_progress":
         raise HTTPException(status_code=400, detail="Task must be in progress to complete")
     
-    now = datetime.utcnow()
+    now = get_current_time_ist()
     
     if not task.actual_end_time:
         task.actual_end_time = now
@@ -332,7 +333,7 @@ async def deny_task(task_id: str, request: TaskActionRequest, db: Session = Depe
         id=str(uuid.uuid4()),
         task_id=task_id,
         action="deny",
-        timestamp=datetime.utcnow(),
+        timestamp=get_current_time_ist(),
         reason=request.reason,
     )
     db.add(log)

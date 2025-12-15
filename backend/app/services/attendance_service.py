@@ -3,25 +3,14 @@ from sqlalchemy import and_, func
 from datetime import datetime, date
 from app.models.models_db import Attendance, User
 from typing import Optional
-import pytz
-
-# Defined IST Timezone
-IST = pytz.timezone('Asia/Kolkata')
-
-def get_current_time_ist():
-    """Get current time in IST"""
-    return datetime.now(IST)
-
-def get_today_date_ist():
-    """Get current date in IST"""
-    return get_current_time_ist().date()
+from app.core.time_utils import get_current_time_ist, get_current_date_ist
 
 def mark_present(db: Session, user_id: str, ip_address: Optional[str] = None) -> dict:
     """
     Mark user as present for today (IST). Idempotent.
     """
     try:
-        today = get_today_date_ist()
+        today = get_current_date_ist()
         now_ist = get_current_time_ist()
         
         # Check if attendance record already exists for this user today
@@ -32,17 +21,16 @@ def mark_present(db: Session, user_id: str, ip_address: Optional[str] = None) ->
             )
         ).first()
         
-        # Store naive IST time to force face-value preservation in DB
-        now_naive = now_ist.replace(tzinfo=None)
+        # Note: We now store Aware IST time in DateTime(timezone=True) column
         
         if existing_attendance:
             # Update existing record
-            existing_attendance.login_time = now_naive
+            existing_attendance.login_time = now_ist
             existing_attendance.status = 'Present'
             
             # Set check_in only if not already set
             if not existing_attendance.check_in:
-                existing_attendance.check_in = now_naive
+                existing_attendance.check_in = now_ist
             
             # Update IP if provided
             if ip_address:
@@ -65,8 +53,8 @@ def mark_present(db: Session, user_id: str, ip_address: Optional[str] = None) ->
             new_attendance = Attendance(
                 user_id=user_id,
                 date=today,
-                check_in=now_naive,
-                login_time=now_naive,
+                check_in=now_ist,
+                login_time=now_ist,
                 status='Present',
                 ip_address=ip_address
             )
@@ -99,9 +87,8 @@ def mark_checkout(db: Session, user_id: str) -> dict:
     Mark user as checked out for today (IST).
     """
     try:
-        today = get_today_date_ist()
+        today = get_current_date_ist()
         now_ist = get_current_time_ist()
-        now_naive = now_ist.replace(tzinfo=None) # Store face-value IST
         
         attendance = db.query(Attendance).filter(
             and_(
@@ -118,7 +105,7 @@ def mark_checkout(db: Session, user_id: str) -> dict:
         
         # Only set check_out if not already set
         if not attendance.check_out:
-            attendance.check_out = now_naive
+            attendance.check_out = now_ist
             
             db.commit()
             db.refresh(attendance)
@@ -153,7 +140,7 @@ def get_attendance_summary(db: Session, target_date: Optional[date] = None) -> d
     """
     try:
         if target_date is None:
-            target_date = get_today_date_ist()
+            target_date = get_current_date_ist()
             
         # Join User and Attendance
         # We want ALL relevant users (operators, etc) and their attendance for the target date
