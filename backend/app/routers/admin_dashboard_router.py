@@ -104,10 +104,10 @@ async def get_attendance_summary(db: Session = Depends(get_db)):
             "present": result.get("present", 0),
             "absent": result.get("absent", 0),
             "late": 0,
-            "present_users": result.get("present_list", []),
-            "absent_users": result.get("absent_list", []),
+            "present_users": result.get("present_users", []),
+            "absent_users": result.get("absent_users", []),
             "total_users": result.get("total_users", 0),
-            "records": result.get("present_list", [])  # Use present_list as records
+            "records": result.get("records", [])  # Explicit records list from service
         }
     except Exception as e:
         # Return safe fallback data on error
