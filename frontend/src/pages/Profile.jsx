@@ -32,9 +32,9 @@ const Profile = () => {
             <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
 
             {/* Profile Info Card */}
-            <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center space-x-4 mb-6">
-                    <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center">
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row items-center sm:space-x-4 mb-6 text-center sm:text-left">
+                    <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center mb-4 sm:mb-0">
                         <span className="text-2xl font-bold text-blue-600">
                             {user?.full_name?.charAt(0) || user?.username?.charAt(0)}
                         </span>
