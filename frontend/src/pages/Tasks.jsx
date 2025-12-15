@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getTasks, createTask, deleteTask, getMachines, getUsers, updateTask } from '../api/services';
+import { getTasks, createTask, deleteTask, getMachines, getUsers, updateTask, getProjects } from '../api/services';
 import { Plus, Trash2, CheckSquare, Search, Filter, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import Subtask from '../components/Subtask';
 
@@ -7,6 +7,7 @@ const Tasks = () => {
     const [tasks, setTasks] = useState([]);
     const [machines, setMachines] = useState([]);
     const [users, setUsers] = useState([]);
+    const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [expandedTaskId, setExpandedTaskId] = useState(null);
@@ -29,6 +30,7 @@ const Tasks = () => {
         title: '',
         description: '',
         project: '',
+        project_id: '',
         part_item: '',
         nos_unit: '',
         status: 'pending',
@@ -49,28 +51,32 @@ const Tasks = () => {
             setLoading(true);
             console.log('🔄 Fetching dropdown data...');
 
-            const [tasksRes, machinesRes, usersRes] = await Promise.all([
+            const [tasksRes, machinesRes, usersRes, projectsRes] = await Promise.all([
                 getTasks(),
                 getMachines(),
-                getUsers()
+                getUsers(),
+                getProjects()
             ]);
 
             // Debug API responses
             console.log('📡 API Responses:', {
                 tasks: tasksRes?.data?.length,
                 machines: machinesRes?.data?.length,
-                users: usersRes?.data?.length
+                users: usersRes?.data?.length,
+                projects: projectsRes?.data?.length
             });
 
             // Ensure data is always an array
             const tasksData = Array.isArray(tasksRes?.data) ? tasksRes.data : [];
             const machinesData = Array.isArray(machinesRes?.data) ? machinesRes.data : [];
             const usersData = Array.isArray(usersRes?.data) ? usersRes.data : [];
+            const projectsData = Array.isArray(projectsRes?.data) ? projectsRes.data : [];
 
             console.log('✅ Data loaded:', {
                 tasks: tasksData.length,
                 machines: machinesData.length,
-                users: usersData.length
+                users: usersData.length,
+                projects: projectsData.length
             });
 
             // Log sample data for verification
@@ -89,6 +95,7 @@ const Tasks = () => {
             setTasks(tasksData);
             setMachines(machinesData);
             setUsers(usersData);
+            setProjects(projectsData);
         } catch (error) {
             console.error('❌ Failed to fetch data:', error);
             console.error('Error details:', error.response?.data || error.message);
@@ -96,6 +103,7 @@ const Tasks = () => {
             setTasks([]);
             setMachines([]);
             setUsers([]);
+            setProjects([]);
         } finally {
             setLoading(false);
         }
@@ -109,6 +117,7 @@ const Tasks = () => {
                 title: '',
                 description: '',
                 project: '',
+                project_id: '',
                 part_item: '',
                 nos_unit: '',
                 status: 'pending',
@@ -413,13 +422,30 @@ const Tasks = () => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Project *</label>
-                                <input
-                                    type="text"
+                                <select
                                     required
-                                    value={formData.project}
-                                    onChange={(e) => setFormData({ ...formData, project: e.target.value })}
+                                    value={formData.project_id || ''}
+                                    onChange={(e) => {
+                                        const selectedProject = projects.find(p => p.project_id === e.target.value);
+                                        setFormData({
+                                            ...formData,
+                                            project_id: e.target.value,
+                                            project: selectedProject ? selectedProject.project_name : ''
+                                        });
+                                    }}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
+                                    disabled={loading || projects.length === 0}
+                                >
+                                    <option value="">Select Project</option>
+                                    {projects.map((p) => (
+                                        <option key={p.project_id} value={p.project_id}>
+                                            {p.project_name} ({p.project_code})
+                                        </option>
+                                    ))}
+                                </select>
+                                {projects.length === 0 && !loading && (
+                                    <p className="text-xs text-red-600 mt-1">⚠️ No projects available. Please add projects first.</p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Part / Item *</label>

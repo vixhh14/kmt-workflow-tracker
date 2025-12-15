@@ -82,3 +82,26 @@ export const operatorStartTask = (taskId) => api.put(`/operator/tasks/${taskId}/
 export const operatorCompleteTask = (taskId) => api.put(`/operator/tasks/${taskId}/complete`);
 export const operatorHoldTask = (taskId, reason = '') => api.put(`/operator/tasks/${taskId}/hold`, null, { params: { reason } });
 export const operatorResumeTask = (taskId) => api.put(`/operator/tasks/${taskId}/resume`);
+
+/* -------------------- PROJECTS -------------------- */
+export const getProjects = () => api.get('/projects');
+export const createProject = (data) => api.post('/projects', data);
+export const getProject = (id) => api.get(`/projects/${id}`);
+export const deleteProject = (id) => api.delete(`/projects/${id}`);
+
+/* -------------------- REPORTS -------------------- */
+export const getDailyMachineReport = (dateStr) => api.get('/reports/machines/daily', { params: { date_str: dateStr } });
+export const getDailyUserReport = (dateStr) => api.get('/reports/users/daily', { params: { date_str: dateStr } });
+export const getMonthlyPerformance = (year) => api.get('/reports/monthly-performance', { params: { year } });
+export const downloadMachineReport = (dateStr) => {
+    return api.get('/reports/machines/export-csv', {
+        params: { date_str: dateStr },
+        responseType: 'blob'
+    });
+};
+export const downloadUserReport = (dateStr) => {
+    return api.get('/reports/users/export-csv', {
+        params: { date_str: dateStr },
+        responseType: 'blob'
+    });
+};

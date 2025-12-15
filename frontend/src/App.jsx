@@ -16,6 +16,7 @@ import PlanningDashboard from './pages/dashboards/PlanningDashboard.jsx';
 // Pages
 import Dashboard from './pages/Dashboard.jsx';
 import Users from './pages/Users.jsx';
+import Projects from './pages/Projects.jsx';
 import Machines from './pages/Machines.jsx';
 import Tasks from './pages/Tasks.jsx';
 import Outsource from './pages/Outsource.jsx';
@@ -63,6 +64,7 @@ function App() {
                     <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
                         <Route index element={<Dashboard />} />
                         <Route path="users" element={<ProtectedRoute allowedRoles={['admin']}><Users /></ProtectedRoute>} />
+                        <Route path="projects" element={<ProtectedRoute allowedRoles={['admin']}><Projects /></ProtectedRoute>} />
                         <Route path="machines" element={<Machines />} />
                         <Route path="tasks" element={<Tasks />} />
                         <Route path="outsource" element={<ProtectedRoute allowedRoles={['admin', 'planning']}><Outsource /></ProtectedRoute>} />
