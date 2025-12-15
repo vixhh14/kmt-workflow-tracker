@@ -672,11 +672,11 @@ const Tasks = () => {
                                     />
                                 </th>
                                 <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                                <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project</th>
-                                <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Part/Item</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Project</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Part/Item</th>
                                 <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                                <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned To</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Priority</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Assigned To</th>
                                 <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
@@ -702,15 +702,13 @@ const Tasks = () => {
                                                 </button>
                                                 <div className="min-w-0">
                                                     <div className="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[100px] sm:max-w-[200px]">{task.title}</div>
-                                                    {/* Show project on mobile */}
-                                                    <div className="md:hidden text-xs text-gray-500 truncate">{task.project || 'No project'}</div>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap">
+                                        <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm text-gray-900 truncate max-w-[150px]">{task.project || '-'}</div>
                                         </td>
-                                        <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap">
+                                        <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm text-gray-900">{task.part_item || '-'}</div>
                                             {task.nos_unit && <div className="text-xs text-gray-500">({task.nos_unit})</div>}
                                         </td>
@@ -719,12 +717,12 @@ const Tasks = () => {
                                                 {task.status.replace('_', ' ')}
                                             </span>
                                         </td>
-                                        <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap">
+                                        <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getPriorityColor(task.priority)}`}>
                                                 {task.priority}
                                             </span>
                                         </td>
-                                        <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                             {users.find(u => u.user_id === task.assigned_to)?.username || 'Unassigned'}
                                         </td>
                                         <td className="px-2 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium">
