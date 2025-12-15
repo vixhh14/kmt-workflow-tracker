@@ -224,3 +224,37 @@ class Subtask(Base):
 
     # Relationship
     task = relationship("Task")
+
+class MachineRuntimeLog(Base):
+    __tablename__ = "machine_runtime_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    machine_id = Column(String, ForeignKey("machines.id"), index=True)
+    task_id = Column(String, ForeignKey("tasks.id"), index=True)
+    start_time = Column(DateTime(timezone=True), nullable=False)
+    end_time = Column(DateTime(timezone=True), nullable=True)
+    duration_seconds = Column(Integer, default=0)
+    date = Column(Date, nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
+
+    # Relationships
+    machine = relationship("Machine")
+    task = relationship("Task")
+
+class UserWorkLog(Base):
+    __tablename__ = "user_work_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.user_id"), index=True)
+    task_id = Column(String, ForeignKey("tasks.id"), index=True)
+    machine_id = Column(String, ForeignKey("machines.id"), nullable=True)
+    start_time = Column(DateTime(timezone=True), nullable=False)
+    end_time = Column(DateTime(timezone=True), nullable=True)
+    duration_seconds = Column(Integer, default=0)
+    date = Column(Date, nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
+
+    # Relationships
+    user = relationship("User")
+    task = relationship("Task")
+    machine = relationship("Machine")

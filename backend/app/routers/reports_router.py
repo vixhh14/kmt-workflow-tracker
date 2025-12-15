@@ -5,7 +5,7 @@ from typing import List, Optional
 from datetime import datetime, date, timedelta
 from app.core.database import get_db
 from app.core.time_utils import get_current_time_ist, get_today_date_ist, IST
-from app.models.models_db import Task, TaskTimeLog, Machine, User, Attendance
+from app.models.models_db import Task, TaskTimeLog, Machine, User, Attendance, MachineRuntimeLog, UserWorkLog
 import csv
 import io
 from fastapi.responses import StreamingResponse
@@ -22,144 +22,45 @@ router = APIRouter(
 
 def calculate_machine_runtime(db: Session, target_date: date) -> List[dict]:
     """
-    Calculate runtime for all machines on a specific date (IST).
-    Derived from TaskTimeLog.
-    Logic: Sum duration of 'start' -> 'hold'/'complete'/'deny' intervals that fall within the target date.
-    Note: Ideally we should handle cross-day splits, but for simplicity of this request
-    and typical workflow, we will attribute duration to the day the log occurred or 
-    look at task total_duration if completed on that day.
-    
-    Better approach for "For how long they were running ... Daily view":
-    1. Get all tasks active on this day (started before/on, ended after/on or not ended).
-    2. But precise runtime comes from Logs.
-    
-    Simplified robust logic:
-    Iterate all logs for target_day. 
-    Count duration between 'start' and next non-start action.
+    Calculate runtime for all machines on a specific date (IST) using MachineRuntimeLog.
+    Data source: machine_runtime_logs ONLY.
     """
-    # For now, we will use a simplified aggregation:
-    # Get all tasks that had activity on this day.
-    # Sum 'total_duration_seconds' for tasks that were COMPLETED on this day? No, that's wrong for running.
-    
-    # Correct Logic using TaskTimeLogs:
-    # Fetch all logs for the target date.
-    
-    # Start of day and end of day in IST
-    start_of_day = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=IST)
-    end_of_day = datetime.combine(target_date, datetime.max.time()).replace(tzinfo=IST)
-    
-    # Query logs within range? 
-    # Actually, calculate duration based on logs is complex in SQL.
-    # Let's try to infer from 'tasks' modified/active on that day.
-    
-    # ALTERNATIVE: Use the backend's explicit duration tracking if available.
-    # We added 'actual_start_time' and 'actual_end_time'.
-    
-    # Let's go with a pragmatic approach:
-    # 1. Select all logs from target_date 00:00 to 23:59.
-    # 2. Reconstruct sessions.
-    
-    # Fetch logs for the day
-    logs = db.query(TaskTimeLog, Task.machine_id).join(Task).filter(
-        and_(
-            TaskTimeLog.timestamp >= start_of_day,
-            TaskTimeLog.timestamp <= end_of_day
-        )
-    ).order_by(TaskTimeLog.timestamp).all()
-    
-    machine_runtimes = {} # machine_id -> seconds
-    
-    # This is still hard because a 'start' might be the previous day.
-    # Let's use a per-task runtime calculation stored in DB?
-    # We have `total_duration_seconds` on Task.
-    # If we want DAILY breakdown, we need daily buckets.
-    
-    # REVISED STRATEGY for Daily Runtime:
-    # Since we don't have a dedicated "daily_runtime" table, we will approximate or 
-    # aggregate based on tasks *active* on that day.
-    # If a machine worked on Task A for 2 hours TODAY.
-    
-    # Let's simply sum the duration of "sessions" that *ended* today or relate to valid activity today.
-    # Actually, simpler: 
-    # Group by Machine.
-    # For each machine, sum duration of tasks *completed* today? No.
-    
-    # Let's try to query TaskTimeLog pairs.
-    # Find all "start" logs on this date. Find matching "hold"/"stop" or assume "now" if running.
-    # This is getting complicated for a single SQL query. 
-    
-    # Let's use a simpler heuristic for V1:
-    # Get all tasks that were UPDATED on this date.
-    # This is imprecise.
-    
-    # LET'S IMPLEMENT a specific query for "active sessions today".
-    # Session = Start Log ... [End Log].
-    # Overlap with [StartOfDay, EndOfDay].
-    
-    # Fetch all sessions that overlap with today.
-    # Session Start: Log(start)
-    # Session End: Log(hold/complete/deny) or Now (if active)
-    
-    # To avoid fetching ALL history, let's look at tasks active (status=in_progress) 
-    # OR status changed today.
-    
-    # Given the constraints, let's provide a "Completed Work" report for daily view 
-    # which sums duration of tasks COMPLETED that day.
-    # And for "Running", we show current status.
-    
-    # WAIT, User wants "For how long they were running".
-    # Let's try to be as accurate as possible with logs.
-    
-    # 1. Get all machines.
+    # Initialize all machines to 0
     machines = db.query(Machine).all()
+    machine_stats = {m.id: {"runtime": 0, "tasks": set(), "is_running": False, "obj": m} for m in machines}
+    
+    # Fetch logs for the date
+    logs = db.query(MachineRuntimeLog).filter(MachineRuntimeLog.date == target_date).all()
+    
+    now = get_current_time_ist()
+    
+    for log in logs:
+        if log.machine_id not in machine_stats:
+            continue
+            
+        # Calculate duration
+        duration = log.duration_seconds
+        
+        # If log is currently open (running now)
+        if log.end_time is None:
+            # Simplification: If it started today, count duration so far
+            current_run = (now - log.start_time).total_seconds()
+            duration = int(current_run)
+            machine_stats[log.machine_id]["is_running"] = True
+            
+        machine_stats[log.machine_id]["runtime"] += duration
+        machine_stats[log.machine_id]["tasks"].add(log.task_id)
+
     results = []
-    
-    # Optimization: Loading all logs for the day is reasonable volume.
-    day_logs = db.query(TaskTimeLog).filter(
-        func.date(TaskTimeLog.timestamp) == target_date
-    ).order_by(TaskTimeLog.timestamp).all()
-    
-    # This only captures starts/stops happening TODAY.
-    # What if it started YESETRDAY and stopped TODAY?
-    # We miss the start.
-    
-    # Okay, let's simplify for "Production-Grade" request with limited schema change budget:
-    # We will report "Total Task Duration Logged for Tasks Completed/Worked On Today".
-    
-    for machine in machines:
-        # Find tasks for this machine active today
-        # Tasks where (started <= EOD AND (ended >= SOD OR ended IS NULL))
-        
-        # This is heavy. Let's return the simplified "Tasks Completed Today" duration 
-        # plus currently running duration for today's part.
-        
-        # Actually, let's look at the request: "Which machines were running, On which day, For how long".
-        # Let's use `total_duration_seconds` of tasks *completed* on that day as a proxy for now, 
-        # acknowledging it aggregates per-task.
-        # This allocates 100% of task time to the completion day.
-        # It is a common simplified ERP metric (Throughput Time).
-        
-        relevant_tasks = db.query(Task).filter(
-            Task.machine_id == machine.id,
-            func.date(Task.completed_at) == target_date,
-            Task.status == 'completed'
-        ).all()
-        
-        total_seconds = sum(t.total_duration_seconds for t in relevant_tasks)
-        
-        # Also count active tasks?
-        active_tasks_count = db.query(Task).filter(
-            Task.machine_id == machine.id,
-            Task.status == 'in_progress'
-        ).count()
-        
+    for m_id, stats in machine_stats.items():
+        machine = stats["obj"]
         results.append({
             "machine_id": machine.id,
             "machine_name": machine.name,
             "date": target_date.isoformat(),
-            "runtime_seconds": total_seconds,
-            "tasks_completed": len(relevant_tasks),
-            "is_running_now": active_tasks_count > 0,
+            "runtime_seconds": stats["runtime"],
+            "tasks_completed": len(stats["tasks"]), # Actually "Tasks Worked On"
+            "is_running_now": stats["is_running"],
             "status": machine.status
         })
         
@@ -167,28 +68,56 @@ def calculate_machine_runtime(db: Session, target_date: date) -> List[dict]:
 
 def calculate_user_activity(db: Session, target_date: date) -> List[dict]:
     """
-    User Activity: What they worked on, duration.
+    Calculate user activity for a specific date (IST) using UserWorkLog.
+    Data source: user_work_logs ONLY.
     """
+    # Initialize operators logs
     users = db.query(User).filter(User.role == 'operator').all()
-    results = []
+    user_stats = {
+        u.user_id: {
+            "duration": 0, 
+            "tasks": set(), 
+            "obj": u,
+            "machines": set()
+        } for u in users
+    }
     
-    for user in users:
-        # User attendance
+    # Fetch logs
+    logs = db.query(UserWorkLog).filter(UserWorkLog.date == target_date).all()
+    
+    now = get_current_time_ist()
+    
+    for log in logs:
+        if log.user_id not in user_stats:
+            continue
+            
+        duration = log.duration_seconds
+        
+        if log.end_time is None:
+            current_run = (now - log.start_time).total_seconds()
+            duration = int(current_run)
+            
+        user_stats[log.user_id]["duration"] += duration
+        user_stats[log.user_id]["tasks"].add(log.task_id)
+        if log.machine_id:
+            user_stats[log.user_id]["machines"].add(log.machine_id)
+            
+    results = []
+    for u_id, stats in user_stats.items():
+        user = stats["obj"]
+        
+        # Get attendance info separately (as auxiliary info)
         attendance = db.query(Attendance).filter(
-            Attendance.user_id == user.user_id,
+            Attendance.user_id == u_id,
             Attendance.date == target_date
         ).first()
-        
-        # Tasks completed by user on this day
-        completed_tasks = db.query(Task).filter(
-            Task.assigned_to == user.user_id,
-            func.date(Task.completed_at) == target_date,
-            Task.status == 'completed'
-        ).all()
-        
-        # Total duration of these tasks
-        work_duration = sum(t.total_duration_seconds for t in completed_tasks)
-        
+
+        # Get task titles
+        task_titles = []
+        if stats["tasks"]:
+            titles = db.query(Task.title).filter(Task.id.in_(list(stats["tasks"]))).all()
+            task_titles = [t[0] for t in titles]
+
         results.append({
             "user_id": user.user_id,
             "username": user.username,
@@ -197,9 +126,9 @@ def calculate_user_activity(db: Session, target_date: date) -> List[dict]:
             "attendance_status": attendance.status if attendance else "Absent",
             "check_in": attendance.check_in.isoformat() if attendance and attendance.check_in else None,
             "check_out": attendance.check_out.isoformat() if attendance and attendance.check_out else None,
-            "tasks_completed": len(completed_tasks),
-            "total_work_seconds": work_duration,
-            "task_titles": [t.title for t in completed_tasks]
+            "tasks_completed": len(stats["tasks"]), # "Tasks Worked On"
+            "total_work_seconds": stats["duration"],
+            "task_titles": task_titles
         })
         
     return results

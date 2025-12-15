@@ -3,10 +3,10 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from app.models.tasks_model import TaskCreate, TaskUpdate
-from app.models.models_db import Task, TaskTimeLog, TaskHold, RescheduleRequest
+from app.models.models_db import Task, TaskTimeLog, TaskHold, RescheduleRequest, MachineRuntimeLog, UserWorkLog
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
-from app.core.time_utils import get_current_time_ist
+from app.core.time_utils import get_current_time_ist, get_today_date_ist
 import uuid
 from datetime import datetime
 
@@ -149,7 +149,11 @@ async def get_task_time_logs(task_id: str, db: Session = Depends(get_db)):
 
 # Task workflow endpoints
 @router.post("/{task_id}/start")
-async def start_task(task_id: str, db: Session = Depends(get_db)):
+async def start_task(
+    task_id: str, 
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -160,6 +164,7 @@ async def start_task(task_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Task must be pending or on hold to start")
 
     now = get_current_time_ist()
+    today = get_today_date_ist()
     
     # Set actual start time if not set
     if not task.actual_start_time:
@@ -176,6 +181,28 @@ async def start_task(task_id: str, db: Session = Depends(get_db)):
     task.started_at = now # Session start
     task.hold_reason = None # Clear hold reason
     
+    # --- LOGGING START ---
+    # 1. Machine Runtime Log
+    if task.machine_id:
+        machine_log = MachineRuntimeLog(
+            machine_id=task.machine_id,
+            task_id=task_id,
+            start_time=now,
+            date=today
+        )
+        db.add(machine_log)
+        
+    # 2. User Work Log
+    user_log = UserWorkLog(
+        user_id=current_user.get("user_id"),
+        task_id=task_id,
+        machine_id=task.machine_id,
+        start_time=now,
+        date=today
+    )
+    db.add(user_log)
+    # --- LOGGING END ---
+
     log = TaskTimeLog(
         id=str(uuid.uuid4()),
         task_id=task_id,
@@ -202,8 +229,6 @@ async def hold_task(
         raise HTTPException(status_code=404, detail="Task not found")
     
     if task.status not in ["in_progress", "pending"]:
-        # Allow re-holding if it was somehow interrupted, but generally should be in progress
-        # If it's already on hold, just update the reason?
         if task.status == "on_hold":
              return {"message": "Task is already on hold", "reason": task.hold_reason}
         raise HTTPException(status_code=400, detail="Task must be in progress or pending to hold")
@@ -214,6 +239,26 @@ async def hold_task(
     if task.status == "in_progress" and task.started_at:
         duration = (now - task.started_at).total_seconds()
         task.total_duration_seconds = (task.total_duration_seconds or 0) + int(duration)
+
+        # --- LOGGING CLOSE ---
+        # Close open machine logs
+        open_machine_logs = db.query(MachineRuntimeLog).filter(
+            MachineRuntimeLog.task_id == task_id,
+            MachineRuntimeLog.end_time == None
+        ).all()
+        for m_log in open_machine_logs:
+            m_log.end_time = now
+            m_log.duration_seconds = int((now - m_log.start_time).total_seconds())
+            
+        # Close open user logs
+        open_user_logs = db.query(UserWorkLog).filter(
+            UserWorkLog.task_id == task_id,
+            UserWorkLog.end_time == None
+        ).all()
+        for u_log in open_user_logs:
+            u_log.end_time = now
+            u_log.duration_seconds = int((now - u_log.start_time).total_seconds())
+        # --- LOGGING END ---
     
     task.status = "on_hold"
     task.hold_reason = request.reason
@@ -240,11 +285,19 @@ async def hold_task(
     return {"message": "Task put on hold successfully", "status": "on_hold", "reason": request.reason}
 
 @router.post("/{task_id}/resume")
-async def resume_task(task_id: str, db: Session = Depends(get_db)):
-    return await start_task(task_id, db)
+async def resume_task(
+    task_id: str, 
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    return await start_task(task_id, db, current_user)
 
 @router.post("/{task_id}/complete")
-async def complete_task(task_id: str, db: Session = Depends(get_db)):
+async def complete_task(
+    task_id: str, 
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -278,6 +331,26 @@ async def complete_task(task_id: str, db: Session = Depends(get_db)):
              # Last resort: created_at
             total_elapsed = (now - task.created_at).total_seconds()
             task.total_duration_seconds = max(0, int(total_elapsed))
+
+    # --- LOGGING CLOSE ---
+    # Close open machine logs
+    open_machine_logs = db.query(MachineRuntimeLog).filter(
+        MachineRuntimeLog.task_id == task_id,
+        MachineRuntimeLog.end_time == None
+    ).all()
+    for m_log in open_machine_logs:
+        m_log.end_time = now
+        m_log.duration_seconds = int((now - m_log.start_time).total_seconds())
+
+    # Close open user logs
+    open_user_logs = db.query(UserWorkLog).filter(
+        UserWorkLog.task_id == task_id,
+        UserWorkLog.end_time == None
+    ).all()
+    for u_log in open_user_logs:
+        u_log.end_time = now
+        u_log.duration_seconds = int((now - u_log.start_time).total_seconds())
+    # --- LOGGING END ---
 
     task.status = "completed"
     task.completed_at = now
