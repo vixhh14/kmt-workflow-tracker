@@ -81,12 +81,22 @@ class Machine(Base):
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
     updated_at = Column(DateTime(timezone=True), default=get_current_time_ist, onupdate=get_current_time_ist)
 
+class Project(Base):
+    __tablename__ = "projects"
+
+    project_id = Column(String, primary_key=True, index=True)
+    project_name = Column(String, index=True)
+    work_order_number = Column(String, nullable=True)
+    client_name = Column(String, nullable=True)
+    project_code = Column(String, unique=True, index=True)
+    created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
+
 class Task(Base):
     __tablename__ = "tasks"
 
     id = Column(String, primary_key=True, index=True)
     title = Column(String, index=True)
-    project = Column(String, nullable=True)  # Project name/code
+    project = Column(String, nullable=True)  # Legacy string field
     description = Column(String, nullable=True)
     part_item = Column(String, nullable=True)  # Part or item name
     nos_unit = Column(String, nullable=True)  # Number of units (e.g., "10 pcs")
@@ -96,6 +106,7 @@ class Task(Base):
     machine_id = Column(String, ForeignKey("machines.id"), nullable=True)
     assigned_by = Column(String, nullable=True)  # user_id who assigned the task
     due_date = Column(String, nullable=True)
+    project_id = Column(String, ForeignKey("projects.project_id"), nullable=True) # New FK
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
     
     # Time tracking fields
@@ -113,6 +124,7 @@ class Task(Base):
 
     # Relationships
     machine = relationship("Machine")
+    project_obj = relationship("Project")
 
 class TaskHold(Base):
     __tablename__ = "task_holds"
