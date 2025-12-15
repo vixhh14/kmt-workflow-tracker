@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func, distinct, text
+from sqlalchemy import func, distinct, text, or_
 from datetime import datetime, date, timezone
 from typing import List, Optional
 from app.core.database import get_db
-from app.models.models_db import Task, User, Attendance
+from app.models.models_db import Task, User, Attendance, Project
 from app.utils.datetime_utils import utc_now, make_aware
 
 router = APIRouter(
@@ -17,13 +17,20 @@ router = APIRouter(
 async def get_projects(db: Session = Depends(get_db)):
     """Get list of all unique project names"""
     try:
-        projects = db.query(Task.project).filter(
+        # Get projects from new table
+        db_projects = db.query(Project.project_name).all()
+        new_project_names = [p[0] for p in db_projects if p[0]]
+        
+        # Get legacy projects from tasks
+        legacy_projects = db.query(Task.project).filter(
             Task.project != None,
             Task.project != ''
         ).distinct().all()
+        legacy_project_names = [p[0] for p in legacy_projects if p[0]]
         
-        project_names = [p[0] for p in projects]
-        return project_names
+        # Merge and sort
+        all_projects = sorted(list(set(new_project_names + legacy_project_names)))
+        return all_projects
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch projects: {str(e)}")
 
@@ -32,11 +39,17 @@ async def get_projects(db: Session = Depends(get_db)):
 async def get_project_analytics(project: Optional[str] = None, db: Session = Depends(get_db)):
     """Get comprehensive project analytics including stats and chart data"""
     try:
-        query = db.query(Task)
+        # Join with Project table to handle both legacy string and foreign key
+        query = db.query(Task).outerjoin(Project, Task.project_id == Project.project_id)
         
         # Filter by project if specified and not "all"
         if project and project != 'all':
-            query = query.filter(Task.project == project)
+            query = query.filter(
+                or_(
+                    Task.project == project,
+                    Project.project_name == project
+                )
+            )
         
         tasks = query.all()
         
