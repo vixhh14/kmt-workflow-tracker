@@ -1,16 +1,10 @@
-import pytz
-from datetime import datetime
+from datetime import datetime, date
+from zoneinfo import ZoneInfo
 
-# Global IST Timezone
-IST = pytz.timezone('Asia/Kolkata')
+IST = ZoneInfo("Asia/Kolkata")
 
-def get_current_time_ist():
-    """
-    Get current time in IST as timezone-aware datetime.
-    Use this for all timestamp creation.
-    """
+def get_current_time_ist() -> datetime:
     return datetime.now(IST)
 
-def get_current_date_ist():
-    """Get current date in IST"""
+def get_today_date_ist() -> date:
     return get_current_time_ist().date()
