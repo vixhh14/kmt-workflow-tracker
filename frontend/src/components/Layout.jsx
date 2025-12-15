@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users as UsersIcon, Monitor, CheckSquare, Briefcase, Menu, LogOut, X, UserCheck, Lock, User, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Users as UsersIcon, Monitor, CheckSquare, Briefcase, Menu, LogOut, X, UserCheck, Lock, User, TrendingUp, Folder } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Layout = ({ children }) => {
@@ -37,6 +37,10 @@ const Layout = ({ children }) => {
             // Users - accessible by admin and planning
             ...(user?.role === 'admin' || user?.role === 'planning'
                 ? [{ path: '/workflow-tracker', label: 'Users', icon: UsersIcon }]
+                : []),
+            // Projects - accessible by admin
+            ...(user?.role === 'admin'
+                ? [{ path: '/projects', label: 'Projects', icon: Folder }]
                 : []),
             // User Approvals - ADMIN ONLY
             ...(user?.role === 'admin'
