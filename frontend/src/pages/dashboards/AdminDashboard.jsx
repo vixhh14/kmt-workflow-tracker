@@ -107,7 +107,7 @@ const AdminDashboard = () => {
         if (!isoString) return 'N/A';
         try {
             const date = new Date(isoString);
-            return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+            return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
         } catch {
             return 'N/A';
         }

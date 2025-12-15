@@ -123,7 +123,7 @@ const Subtask = ({ taskId }) => {
                             {/* Title Section */}
                             <div className="flex-1 min-w-[200px]">
                                 <p className="text-sm font-medium text-gray-900">{subtask.title}</p>
-                                <p className="text-xs text-gray-500 mt-1">Created: {new Date(subtask.created_at).toLocaleDateString()}</p>
+                                <p className="text-xs text-gray-500 mt-1">Created: {new Date(subtask.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</p>
                             </div>
 
                             {/* Status Section */}
