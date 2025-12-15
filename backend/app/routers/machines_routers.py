@@ -6,9 +6,7 @@ from app.models.machines_model import MachineCreate, MachineUpdate
 from app.models.models_db import Machine, Unit, MachineCategory
 from app.core.database import get_db
 import uuid
-import pytz
-
-IST = pytz.timezone('Asia/Kolkata')
+from app.core.time_utils import get_current_time_ist
 
 router = APIRouter(
     prefix="/machines",
@@ -71,7 +69,7 @@ async def create_machine(machine: MachineCreate, db: Session = Depends(get_db)):
         current_operator=machine.current_operator,
         unit_id=machine.unit_id,
         category_id=machine.category_id,
-        updated_at=datetime.now(IST).replace(tzinfo=None),
+        updated_at=get_current_time_ist().replace(tzinfo=None),
     )
     db.add(new_machine)
     db.commit()
@@ -110,7 +108,7 @@ async def update_machine(machine_id: str, machine_update: MachineUpdate, db: Ses
         db_machine.current_operator = machine_update.current_operator
     
     # Always bump the updated_at timestamp
-    db_machine.updated_at = datetime.now(IST).replace(tzinfo=None)
+    db_machine.updated_at = get_current_time_ist().replace(tzinfo=None)
     
     db.commit()
     db.refresh(db_machine)
