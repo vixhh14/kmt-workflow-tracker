@@ -4,9 +4,8 @@ from sqlalchemy import func, and_, extract, case
 from typing import List, Optional
 from datetime import datetime, date, timedelta
 from app.core.database import get_db
-from app.core.time_utils import get_current_time_ist, get_today_date_ist
+from app.core.time_utils import get_current_time_ist, get_today_date_ist, IST
 from app.models.models_db import Task, TaskTimeLog, Machine, User, Attendance
-import pytz
 import csv
 import io
 from fastapi.responses import StreamingResponse
@@ -16,8 +15,6 @@ router = APIRouter(
     tags=["reports"],
     responses={404: {"description": "Not found"}},
 )
-
-IST = pytz.timezone('Asia/Kolkata')
 
 # ----------------------------------------------------------------------
 # HELPER FUNCTIONS (Aggregation Logic)

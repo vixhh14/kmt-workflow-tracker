@@ -3,14 +3,14 @@ from sqlalchemy import and_, func
 from datetime import datetime, date
 from app.models.models_db import Attendance, User
 from typing import Optional
-from app.core.time_utils import get_current_time_ist, get_current_date_ist
+from app.core.time_utils import get_current_time_ist, get_today_date_ist
 
 def mark_present(db: Session, user_id: str, ip_address: Optional[str] = None) -> dict:
     """
     Mark user as present for today (IST). Idempotent.
     """
     try:
-        today = get_current_date_ist()
+        today = get_today_date_ist()
         now_ist = get_current_time_ist()
         
         # Check if attendance record already exists for this user today
@@ -87,7 +87,7 @@ def mark_checkout(db: Session, user_id: str) -> dict:
     Mark user as checked out for today (IST).
     """
     try:
-        today = get_current_date_ist()
+        today = get_today_date_ist()
         now_ist = get_current_time_ist()
         
         attendance = db.query(Attendance).filter(
@@ -140,7 +140,7 @@ def get_attendance_summary(db: Session, target_date: Optional[date] = None) -> d
     """
     try:
         if target_date is None:
-            target_date = get_current_date_ist()
+            target_date = get_today_date_ist()
             
         # Join User and Attendance
         # We want ALL relevant users (operators, etc) and their attendance for the target date
