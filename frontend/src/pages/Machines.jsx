@@ -14,7 +14,7 @@ const Machines = () => {
     const [categoryFilter, setCategoryFilter] = useState('all');
 
     const [formData, setFormData] = useState({
-        name: '',
+        machine_name: '',
         type: '',
         status: 'active',
         location: '',
@@ -103,7 +103,7 @@ const Machines = () => {
                 category_id: parseInt(formData.category_id)
             });
 
-            setFormData({ name: '', type: '', status: 'active', location: '', unit_id: '', category_id: '' });
+            setFormData({ machine_name: '', type: '', status: 'active', location: '', unit_id: '', category_id: '' });
             setShowForm(false);
             fetchMachines();
         } catch (error) {
@@ -289,8 +289,8 @@ const Machines = () => {
                                 <input
                                     type="text"
                                     required
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    value={formData.machine_name}
+                                    onChange={(e) => setFormData({ ...formData, machine_name: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
