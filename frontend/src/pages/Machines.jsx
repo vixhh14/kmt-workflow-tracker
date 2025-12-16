@@ -108,7 +108,7 @@ const Machines = () => {
             fetchMachines();
         } catch (error) {
             console.error('Failed to create machine:', error);
-            alert('Failed to create machine');
+            alert(error.response?.data?.detail || 'Failed to create machine');
         }
     };
 
@@ -134,7 +134,7 @@ const Machines = () => {
             fetchMachines(); // Refresh the list to show updated data
         } catch (error) {
             console.error('Failed to update machine status:', error);
-            alert('Failed to update machine status');
+            alert(error.response?.data?.detail || 'Failed to update machine status');
         }
     };
 

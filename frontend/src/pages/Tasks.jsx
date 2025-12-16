@@ -132,7 +132,7 @@ const Tasks = () => {
             fetchData();
         } catch (error) {
             console.error('Failed to create task:', error);
-            alert('Failed to create task');
+            alert(error.response?.data?.detail || 'Failed to create task');
         }
     };
 
@@ -143,7 +143,7 @@ const Tasks = () => {
                 fetchData();
             } catch (error) {
                 console.error('Failed to delete task:', error);
-                alert('Failed to delete task');
+                alert(error.response?.data?.detail || 'Failed to delete task');
             }
         }
     };
@@ -215,7 +215,7 @@ const Tasks = () => {
             fetchData();
         } catch (error) {
             console.error('Failed to bulk assign:', error);
-            alert('Failed to assign tasks');
+            alert(error.response?.data?.detail || 'Failed to assign tasks');
         }
     };
 
@@ -227,7 +227,7 @@ const Tasks = () => {
                 fetchData();
             } catch (error) {
                 console.error('Failed to bulk delete:', error);
-                alert('Failed to delete tasks');
+                alert(error.response?.data?.detail || 'Failed to delete tasks');
             }
         }
     };
