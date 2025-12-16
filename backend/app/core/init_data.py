@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 from app.core.database import engine
+from app.core.time_utils import get_current_time_ist
 
 def init_db_data():
     print(f"Initializing database data...")
@@ -100,22 +101,22 @@ def init_db_data():
                 return
 
             # Check if existing
-            existing = session.execute(text("SELECT id FROM machines WHERE name = :name AND unit_id = :uid"), {"name": name, "uid": unit_id}).fetchone()
+            existing = session.execute(text("SELECT id FROM machines WHERE machine_name = :name AND unit_id = :uid"), {"name": name, "uid": unit_id}).fetchone()
             
             if existing:
                 # Update existing
                 session.execute(text("""
                     UPDATE machines 
-                    SET category_id = :cat_id, status = 'active', updated_at = :now
+                    SET category_id = :cat_id, status = 'active', updated_at = :now, is_deleted = FALSE
                     WHERE id = :id
-                """), {"cat_id": category_id, "now": datetime.utcnow(), "id": existing.id})
+                """), {"cat_id": category_id, "now": get_current_time_ist().replace(tzinfo=None), "id": existing.id})
             else:
                 # Insert new
                 machine_id = str(uuid.uuid4())
                 session.execute(text("""
-                    INSERT INTO machines (id, name, status, hourly_rate, unit_id, category_id, created_at, updated_at)
-                    VALUES (:id, :name, 'active', 0.0, :uid, :cat_id, :now, :now)
-                """), {"id": machine_id, "name": name, "uid": unit_id, "cat_id": category_id, "now": datetime.utcnow()})
+                    INSERT INTO machines (id, machine_name, status, hourly_rate, unit_id, category_id, created_at, updated_at, is_deleted)
+                    VALUES (:id, :name, 'active', 0.0, :uid, :cat_id, :now, :now, FALSE)
+                """), {"id": machine_id, "name": name, "uid": unit_id, "cat_id": category_id, "now": get_current_time_ist().replace(tzinfo=None)})
 
         for name, cat in unit2_machines:
             upsert_machine(name, cat, "Unit 2")

@@ -185,7 +185,7 @@ async def seed_machines(
             
             machine = Machine(
                 id=str(uuid.uuid4()),
-                name=name,
+                machine_name=name,
                 status="active",
                 hourly_rate=0.0,
                 category_id=category.id,
@@ -200,7 +200,7 @@ async def seed_machines(
             
             machine = Machine(
                 id=str(uuid.uuid4()),
-                name=name,
+                machine_name=name,
                 status="active",
                 hourly_rate=0.0,
                 category_id=category.id,

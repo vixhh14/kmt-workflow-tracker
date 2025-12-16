@@ -34,7 +34,7 @@ async def get_operator_tasks(
             assigned_by_user = user_map.get(task.assigned_by)
             assigned_by_name = assigned_by_user.username if assigned_by_user else "Unknown"
             machine = machine_map.get(task.machine_id)
-            machine_name = machine.name if machine else "Unknown"
+            machine_name = machine.machine_name if machine else "Unknown"
             
             # Safely convert datetimes to ISO format
             task_data = {
