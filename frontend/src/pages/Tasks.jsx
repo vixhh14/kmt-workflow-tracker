@@ -562,15 +562,17 @@ const Tasks = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Expected Time of Completion *</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Expected Duration (Minutes) *</label>
                                 <input
-                                    type="text"
+                                    type="number"
+                                    min="1"
                                     required
-                                    placeholder="e.g. 2 hours, 1 day"
+                                    placeholder="e.g. 120"
                                     value={formData.expected_completion_time}
                                     onChange={(e) => setFormData({ ...formData, expected_completion_time: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
+                                <p className="text-xs text-gray-400 mt-1">Enter total minutes (e.g. 2 hours = 120)</p>
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
