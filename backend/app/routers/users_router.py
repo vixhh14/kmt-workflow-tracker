@@ -8,6 +8,7 @@ from app.models.models_db import User
 from uuid import uuid4
 import hashlib
 from datetime import datetime
+from app.core.time_utils import get_current_time_ist
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -49,7 +50,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
         role=user.role,
         full_name=user.full_name or "",
         machine_types=user.machine_types or "",
-        updated_at=datetime.utcnow()
+        updated_at=get_current_time_ist()
     )
     
     db.add(new_user)
@@ -81,7 +82,7 @@ def update_user_data(user_id: str, updates: UserUpdate, db: Session = Depends(ge
     for key, value in update_data.items():
         setattr(user, key, value)
         
-    user.updated_at = datetime.utcnow()
+    user.updated_at = get_current_time_ist()
         
     db.commit()
     return {"message": "User updated successfully"}

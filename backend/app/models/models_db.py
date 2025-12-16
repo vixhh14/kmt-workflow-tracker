@@ -78,6 +78,7 @@ class Machine(Base):
     current_operator = Column(String, nullable=True)  # user_id of current operator
     category_id = Column(Integer, ForeignKey("machine_categories.id"), nullable=True)
     unit_id = Column(Integer, ForeignKey("units.id"), nullable=True)
+    is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
     updated_at = Column(DateTime(timezone=True), default=get_current_time_ist, onupdate=get_current_time_ist)
 
@@ -89,6 +90,7 @@ class Project(Base):
     work_order_number = Column(String, nullable=True)
     client_name = Column(String, nullable=True)
     project_code = Column(String, unique=True, index=True)
+    is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
 
 class Task(Base):
@@ -107,6 +109,7 @@ class Task(Base):
     assigned_by = Column(String, nullable=True)  # user_id who assigned the task
     due_date = Column(String, nullable=True)
     project_id = Column(String, ForeignKey("projects.project_id"), nullable=True) # New FK
+    is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
     
     # Time tracking fields

@@ -1,5 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from sqlalchemy.exc import IntegrityError, DataError, OperationalError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from app.core.exceptions import (
+    validation_exception_handler,
+    integrity_error_handler,
+    data_error_handler,
+    operational_error_handler,
+    http_exception_handler,
+    global_exception_handler
+)
 from app.routers import (
     users_router,
     machines_routers,
@@ -32,6 +43,14 @@ app = FastAPI(
     description="Backend API for KMT Workflow Tracker",
     version="1.0.0",
 )
+
+# Register Exception Handlers
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(IntegrityError, integrity_error_handler)
+app.add_exception_handler(DataError, data_error_handler)
+app.add_exception_handler(OperationalError, operational_error_handler)
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(Exception, global_exception_handler)
 
 # CORS configuration - Use centralized config
 # Note: Wildcard patterns don't work with credentials, so we list all origins explicitly

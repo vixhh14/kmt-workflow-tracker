@@ -19,7 +19,7 @@ router = APIRouter(
 # ----------------------------------------------------------------------
 @router.get("/", response_model=List[dict])
 async def read_machines(db: Session = Depends(get_db)):
-    machines = db.query(Machine).all()
+    machines = db.query(Machine).filter(Machine.is_deleted == False).all()
     
     # Pre-fetch units and categories for efficient lookup
     units = {u.id: u.name for u in db.query(Unit).all()}
@@ -49,27 +49,27 @@ async def read_machines(db: Session = Depends(get_db)):
 @router.post("/", response_model=dict)
 async def create_machine(machine: MachineCreate, db: Session = Depends(get_db)):
     # Use provided location (Machine ID) as the primary key ID if provided, else UUID
-    # This maps the frontend "Machine ID" input to the database ID column
     machine_id = machine.location if machine.location else str(uuid.uuid4())
     
-    # Check if ID already exists
-    existing = db.query(Machine).filter(Machine.id == machine_id).first()
-    if existing:
-        raise HTTPException(status_code=400, detail=f"Machine with ID {machine_id} already exists")
+    # Validation
+    if not machine.unit_id:
+        raise HTTPException(status_code=400, detail="Unit ID is required")
+    if not machine.category_id:
+        raise HTTPException(status_code=400, detail="Category ID is required")
 
-    # Combine name and type if type is provided, since DB lacks type column
     final_name = f"{machine.name} ({machine.type})" if machine.type else machine.name
 
     new_machine = Machine(
         id=machine_id,
         name=final_name,
         status=machine.status,
-        hourly_rate=0.0, # Default to 0 as field is removed from form
+        hourly_rate=0.0, 
         last_maintenance=None,
         current_operator=machine.current_operator,
         unit_id=machine.unit_id,
         category_id=machine.category_id,
         updated_at=get_current_time_ist().replace(tzinfo=None),
+        is_deleted=False
     )
     db.add(new_machine)
     db.commit()
@@ -135,14 +135,9 @@ async def delete_machine(machine_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Machine not found")
     
     try:
-        db.delete(db_machine)
+        db_machine.is_deleted = True
+        # db_machine.status = "archived" # Optional
         db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=409, 
-            detail="Machine cannot be deleted because it is associated with existing tasks or history."
-        )
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to delete machine: {str(e)}")
