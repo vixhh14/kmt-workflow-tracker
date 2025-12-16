@@ -94,23 +94,23 @@ class Project(Base):
     is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
 
-class Task(Base):
+class Task(BaseModel):
     __tablename__ = "tasks"
 
-    # Changed from String UUID to Integer Autoincrement
-    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    # Tasks use UUID (Safe for existing data)
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     title = Column(String, index=True)
-    project = Column(String, nullable=True)  # Legacy string field
+    project = Column(String, nullable=True)  # Legacy string field (optional)
     description = Column(String, nullable=True)
-    part_item = Column(String, nullable=True)  # Part or item name
-    nos_unit = Column(String, nullable=True)  # Number of units (e.g., "10 pcs")
-    status = Column(String)  # pending, in_progress, on_hold, completed, denied
-    priority = Column(String)  # low, medium, high
-    assigned_to = Column(String, nullable=True)  # operator user_id
+    part_item = Column(String, nullable=True)
+    nos_unit = Column(String, nullable=True)
+    status = Column(String)
+    priority = Column(String)
+    assigned_to = Column(String, nullable=True)
     machine_id = Column(String, ForeignKey("machines.id"), nullable=True)
-    assigned_by = Column(String, nullable=True)  # user_id who assigned the task
+    assigned_by = Column(String, nullable=True)
     due_date = Column(String, nullable=True)
-    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=True) # New FK references Integer PK
+    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=True)
     is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
     
@@ -125,7 +125,7 @@ class Task(Base):
     actual_start_time = Column(DateTime(timezone=True), nullable=True)
     actual_end_time = Column(DateTime(timezone=True), nullable=True)
     total_held_seconds = Column(BigInteger, default=0)
-    expected_completion_time = Column(String, nullable=True)  # Format: "HH:MM" or ISO datetime
+    expected_completion_time = Column(String, nullable=True)
 
     # Relationships
     machine = relationship("Machine")
@@ -135,7 +135,7 @@ class TaskHold(Base):
     __tablename__ = "task_holds"
     
     id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
-    task_id = Column(Integer, ForeignKey("tasks.id"), index=True) # Changed FK to Integer
+    task_id = Column(String, ForeignKey("tasks.id"), index=True) # UUID FK
     user_id = Column(String, ForeignKey("users.user_id"), index=True)
     hold_reason = Column(String, nullable=True)
     hold_started_at = Column(DateTime(timezone=True), default=get_current_time_ist)
@@ -146,19 +146,19 @@ class RescheduleRequest(Base):
     __tablename__ = "reschedule_requests"
     
     id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
-    task_id = Column(Integer, ForeignKey("tasks.id"), index=True) # Changed FK to Integer
+    task_id = Column(String, ForeignKey("tasks.id"), index=True) # UUID FK
     requested_by = Column(String, ForeignKey("users.user_id"))
     requested_for_date = Column(DateTime(timezone=True))
     reason = Column(String, nullable=True)
-    status = Column(String, default="pending")  # pending, approved, rejected
+    status = Column(String, default="pending")
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
 
 class TaskTimeLog(Base):
     __tablename__ = "task_time_logs"
 
-    id = Column(String, primary_key=True, index=True)
-    task_id = Column(Integer, ForeignKey("tasks.id"), index=True) # Changed FK to Integer
-    action = Column(String)  # start, hold, resume, complete, deny
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    task_id = Column(String, ForeignKey("tasks.id"), index=True) # UUID FK
+    action = Column(String)
     timestamp = Column(DateTime(timezone=True), default=get_current_time_ist)
     reason = Column(String, nullable=True)
     
@@ -168,12 +168,12 @@ class TaskTimeLog(Base):
 class PlanningTask(Base):
     __tablename__ = "planning_tasks"
 
-    id = Column(String, primary_key=True, index=True)
-    task_id = Column(Integer, ForeignKey("tasks.id"), index=True) # Changed FK to Integer
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    task_id = Column(String, ForeignKey("tasks.id"), index=True) # UUID FK
     project_name = Column(String)
-    task_sequence = Column(Integer)  # Order in project (1, 2, 3...)
-    assigned_supervisor = Column(String, nullable=True)  # supervisor user_id
-    status = Column(String)  # planning, approved, in_progress, completed
+    task_sequence = Column(Integer)
+    assigned_supervisor = Column(String, nullable=True)
+    status = Column(String)
     updated_at = Column(DateTime(timezone=True), default=get_current_time_ist, onupdate=get_current_time_ist)
     
     # Relationship
@@ -182,15 +182,15 @@ class PlanningTask(Base):
 class OutsourceItem(Base):
     __tablename__ = "outsource_items"
 
-    id = Column(String, primary_key=True, index=True)
-    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)  # Changed FK to Integer
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    task_id = Column(String, ForeignKey("tasks.id"), nullable=True)  # UUID FK
     title = Column(String, index=True)
     vendor = Column(String)
-    dc_generated = Column(Boolean, default=False)  # Delivery challan generated
-    transport_status = Column(String, default="pending")  # pending, in_transit, delivered
-    follow_up_time = Column(DateTime(timezone=True), nullable=True)  # Next follow-up date/time
-    pickup_status = Column(String, default="pending")  # pending, scheduled, picked_up
-    status = Column(String)  # pending, received
+    dc_generated = Column(Boolean, default=False)
+    transport_status = Column(String, default="pending")
+    follow_up_time = Column(DateTime(timezone=True), nullable=True)
+    pickup_status = Column(String, default="pending")
+    status = Column(String)
     cost = Column(Float)
     expected_date = Column(String, nullable=True)
     updated_at = Column(DateTime(timezone=True), default=get_current_time_ist, onupdate=get_current_time_ist)
@@ -206,11 +206,11 @@ class Attendance(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
     user_id = Column(String, ForeignKey("users.user_id"))
-    date = Column(Date, nullable=False)  # Date of attendance (DATE type, not DATETIME)
-    check_in = Column(DateTime(timezone=True), nullable=True)  # First login time of the day
-    check_out = Column(DateTime(timezone=True), nullable=True)  # Logout time (only on explicit logout)
-    login_time = Column(DateTime(timezone=True), nullable=True)  # Latest login time of the day
-    status = Column(String, default="Present")  # Present, Absent, Leave
+    date = Column(Date, nullable=False)
+    check_in = Column(DateTime(timezone=True), nullable=True)
+    check_out = Column(DateTime(timezone=True), nullable=True)
+    login_time = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String, default="Present")
     ip_address = Column(String, nullable=True)
     
     # Relationship
@@ -219,10 +219,10 @@ class Attendance(Base):
 class Subtask(Base):
     __tablename__ = "subtasks"
 
-    id = Column(String, primary_key=True, index=True)
-    task_id = Column(Integer, ForeignKey("tasks.id"), index=True) # Changed FK to Integer
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    task_id = Column(String, ForeignKey("tasks.id"), index=True) # UUID FK
     title = Column(String)
-    status = Column(String, default="pending")  # pending, completed
+    status = Column(String, default="pending")
     notes = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
     updated_at = Column(DateTime(timezone=True), default=get_current_time_ist, onupdate=get_current_time_ist)
@@ -235,7 +235,7 @@ class MachineRuntimeLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     machine_id = Column(String, ForeignKey("machines.id"), index=True)
-    task_id = Column(Integer, ForeignKey("tasks.id"), index=True) # Changed FK to Integer
+    task_id = Column(String, ForeignKey("tasks.id"), index=True) # UUID FK
     start_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True), nullable=True)
     duration_seconds = Column(Integer, default=0)
@@ -251,7 +251,7 @@ class UserWorkLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.user_id"), index=True)
-    task_id = Column(Integer, ForeignKey("tasks.id"), index=True) # Changed FK to Integer
+    task_id = Column(String, ForeignKey("tasks.id"), index=True) # UUID FK
     machine_id = Column(String, ForeignKey("machines.id"), nullable=True)
     start_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True), nullable=True)
