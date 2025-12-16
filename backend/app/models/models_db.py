@@ -71,7 +71,7 @@ class Machine(Base):
     __tablename__ = "machines"
 
     id = Column(String, primary_key=True, index=True)
-    name = Column(String, index=True)
+    machine_name = Column(String, index=True) # Renamed from name
     status = Column(String)  # active, maintenance, offline
     hourly_rate = Column(Float)
     last_maintenance = Column(String, nullable=True)

@@ -28,7 +28,7 @@ async def read_machines(db: Session = Depends(get_db)):
     return [
         {
             "id": m.id,
-            "name": m.name,
+            "name": m.machine_name,
             "status": m.status,
             "hourly_rate": m.hourly_rate,
             "last_maintenance": m.last_maintenance,
@@ -57,11 +57,11 @@ async def create_machine(machine: MachineCreate, db: Session = Depends(get_db)):
     if not machine.category_id:
         raise HTTPException(status_code=400, detail="Category ID is required")
 
-    final_name = f"{machine.name} ({machine.type})" if machine.type else machine.name
+    final_name = f"{machine.machine_name} ({machine.type})" if machine.type else machine.machine_name
 
     new_machine = Machine(
         id=machine_id,
-        name=final_name,
+        machine_name=final_name,
         status=machine.status,
         hourly_rate=0.0, 
         last_maintenance=None,
@@ -77,7 +77,7 @@ async def create_machine(machine: MachineCreate, db: Session = Depends(get_db)):
     
     return {
         "id": new_machine.id,
-        "name": new_machine.name,
+        "name": new_machine.machine_name,
         "status": new_machine.status,
         "hourly_rate": new_machine.hourly_rate,
         "last_maintenance": new_machine.last_maintenance,
@@ -95,8 +95,8 @@ async def update_machine(machine_id: str, machine_update: MachineUpdate, db: Ses
         raise HTTPException(status_code=404, detail="Machine not found")
     
     # Manually update fields to avoid AttributeError for fields not in DB model (like type, location)
-    if machine_update.name is not None:
-        db_machine.name = machine_update.name
+    if machine_update.machine_name is not None:
+        db_machine.machine_name = machine_update.machine_name
         
     if machine_update.status is not None:
         db_machine.status = machine_update.status
