@@ -48,6 +48,13 @@ export const downloadUserReport = (dateStr) => {
     });
 };
 
+export const downloadMonthlyPerformance = (year) => {
+    return api.get('/reports/monthly/export-csv', {
+        params: { year },
+        responseType: 'blob'
+    });
+};
+
 // --- LEGACY ---
 
 // Legacy endpoints (for backward compatibility)
