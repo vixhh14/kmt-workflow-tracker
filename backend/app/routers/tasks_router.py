@@ -81,10 +81,11 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
     from app.models.models_db import User, Project as DBProject
     
     # Validate assigned_to is an operator
+    # Validate assigned_to exists (Removed strict 'operator' role check as per user request to allow any assignment)
     if task.assigned_to:
         assignee = db.query(User).filter(User.user_id == task.assigned_to).first()
-        if not assignee or assignee.role != 'operator':
-            raise HTTPException(status_code=400, detail="Tasks can only be assigned to operators")
+        if not assignee:
+             raise HTTPException(status_code=400, detail="Assigned user does not exist")
 
     # Validate assigned_by is admin/supervisor/planning
     if task.assigned_by:

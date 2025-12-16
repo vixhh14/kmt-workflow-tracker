@@ -12,6 +12,16 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+from app.services.dashboard_analytics_service import get_dashboard_overview
+
+@router.get("/overview")
+async def dashboard_overview(db: Session = Depends(get_db)):
+    """
+    Unified dashboard overview for Admin, Supervisor, and Planning.
+    """
+    return get_dashboard_overview(db)
+
+
 @router.get("/operator-performance")
 async def get_operator_performance(
     month: int,
