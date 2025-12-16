@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from datetime import datetime
 from app.models.machines_model import MachineCreate, MachineUpdate
 from app.models.models_db import Machine, Unit, MachineCategory
@@ -19,7 +20,7 @@ router = APIRouter(
 # ----------------------------------------------------------------------
 @router.get("/", response_model=List[dict])
 async def read_machines(db: Session = Depends(get_db)):
-    machines = db.query(Machine).filter(Machine.is_deleted == False).all()
+    machines = db.query(Machine).filter(or_(Machine.is_deleted == False, Machine.is_deleted == None)).all()
     
     # Pre-fetch units and categories for efficient lookup
     units = {u.id: u.name for u in db.query(Unit).all()}

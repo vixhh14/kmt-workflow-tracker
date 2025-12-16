@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import datetime
 
 class OutsourceBase(BaseModel):
-    task_id: Optional[str] = None
+    task_id: Optional[int] = None
     title: str
     vendor: str
     description: Optional[str] = None
@@ -19,7 +19,7 @@ class OutsourceCreate(OutsourceBase):
     pass
 
 class OutsourceUpdate(BaseModel):
-    task_id: Optional[str] = None
+    task_id: Optional[int] = None
     title: Optional[str] = None
     vendor: Optional[str] = None
     description: Optional[str] = None

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, extract, case
+from sqlalchemy import func, and_, extract, case, or_
 from typing import List, Optional
 from datetime import datetime, date, timedelta
 from app.core.database import get_db
@@ -25,7 +25,7 @@ def calculate_machine_runtime(db: Session, target_date: date) -> List[dict]:
     Calculate runtime for all machines on a specific date (IST) using MachineRuntimeLog.
     """
     # Fetch all machines with related info
-    machines = db.query(Machine).all()
+    machines = db.query(Machine).filter(or_(Machine.is_deleted == False, Machine.is_deleted == None)).all()
     
     # Pre-fetch lookup dicts for performance (can be joined, but this is fine for low volume)
     units = {u.id: u.name for u in db.query(Unit).all()}

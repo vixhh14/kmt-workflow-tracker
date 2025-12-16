@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from pydantic import BaseModel
 from app.models.tasks_model import TaskCreate, TaskUpdate
 from app.models.models_db import Task, TaskTimeLog, TaskHold, RescheduleRequest, MachineRuntimeLog, UserWorkLog
@@ -30,7 +31,7 @@ async def read_tasks(
     assigned_to: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    query = db.query(Task).filter(Task.is_deleted == False)
+    query = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None))
     
     # Filter by month and year if provided
     if month is not None and year is not None:
@@ -98,7 +99,7 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail=f"Project with ID {task.project_id} does not exist")
 
     new_task = Task(
-        id=str(uuid.uuid4()),
+        # id is auto-generated
         title=task.title,
         description=task.description,
         project=task.project,
@@ -135,7 +136,7 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
 
 # Get task time logs for a specific task
 @router.get("/{task_id}/time-logs", response_model=List[dict])
-async def get_task_time_logs(task_id: str, db: Session = Depends(get_db)):
+async def get_task_time_logs(task_id: int, db: Session = Depends(get_db)):
     """Get all time tracking logs for a specific task"""
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
@@ -157,7 +158,7 @@ async def get_task_time_logs(task_id: str, db: Session = Depends(get_db)):
 # Task workflow endpoints
 @router.post("/{task_id}/start")
 async def start_task(
-    task_id: str, 
+    task_id: int, 
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -226,7 +227,7 @@ async def start_task(
 
 @router.post("/{task_id}/hold")
 async def hold_task(
-    task_id: str, 
+    task_id: int, 
     request: TaskActionRequest, 
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
@@ -293,7 +294,7 @@ async def hold_task(
 
 @router.post("/{task_id}/resume")
 async def resume_task(
-    task_id: str, 
+    task_id: int, 
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -301,7 +302,7 @@ async def resume_task(
 
 @router.post("/{task_id}/complete")
 async def complete_task(
-    task_id: str, 
+    task_id: int, 
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -381,7 +382,7 @@ async def complete_task(
 
 @router.post("/{task_id}/reschedule-request")
 async def request_reschedule(
-    task_id: str, 
+    task_id: int, 
     request: RescheduleRequestModel, 
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
@@ -402,7 +403,7 @@ async def request_reschedule(
     return {"message": "Reschedule request submitted"}
 
 @router.post("/{task_id}/deny")
-async def deny_task(task_id: str, request: TaskActionRequest, db: Session = Depends(get_db)):
+async def deny_task(task_id: int, request: TaskActionRequest, db: Session = Depends(get_db)):
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -421,7 +422,7 @@ async def deny_task(task_id: str, request: TaskActionRequest, db: Session = Depe
     return {"message": "Task denied", "reason": request.reason}
 
 @router.put("/{task_id}", response_model=dict)
-async def update_task(task_id: str, task_update: TaskUpdate, db: Session = Depends(get_db)):
+async def update_task(task_id: int, task_update: TaskUpdate, db: Session = Depends(get_db)):
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -452,7 +453,7 @@ async def update_task(task_id: str, task_update: TaskUpdate, db: Session = Depen
     }
 
 @router.delete("/{task_id}")
-async def delete_task(task_id: str, db: Session = Depends(get_db)):
+async def delete_task(task_id: int, db: Session = Depends(get_db)):
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")

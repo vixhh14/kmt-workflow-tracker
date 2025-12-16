@@ -95,10 +95,9 @@ async def startup_event():
             user_count = session.query(User).count()
             # Project might not exist in models_db yet if it's in planning_model, check safely
             try:
-                from app.models.planning_model import Project
                 project_count = session.query(Project).count()
-            except ImportError:
-                project_count = "N/A (Model not loaded)"
+            except Exception:
+                project_count = "Error querying"
 
             print(f"📈 Data Status:")
             print(f"   - Machines: {machine_count}")

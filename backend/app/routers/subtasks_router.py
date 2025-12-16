@@ -14,7 +14,7 @@ router = APIRouter(
 )
 
 class SubtaskCreate(BaseModel):
-    task_id: str
+    task_id: int
     title: str
     notes: Optional[str] = None
 
@@ -24,7 +24,7 @@ class SubtaskUpdate(BaseModel):
 
 class SubtaskResponse(BaseModel):
     id: str
-    task_id: str
+    task_id: int
     title: str
     status: str
     notes: Optional[str]
@@ -35,7 +35,7 @@ class SubtaskResponse(BaseModel):
         orm_mode = True
 
 @router.get("/{task_id}", response_model=List[SubtaskResponse])
-async def get_subtasks(task_id: str, db: Session = Depends(get_db)):
+async def get_subtasks(task_id: int, db: Session = Depends(get_db)):
     subtasks = db.query(Subtask).filter(Subtask.task_id == task_id).all()
     return subtasks
 
