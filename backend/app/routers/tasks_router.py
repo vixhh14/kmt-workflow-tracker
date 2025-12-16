@@ -30,7 +30,7 @@ async def read_tasks(
     assigned_to: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    query = db.query(Task)
+    query = db.query(Task).filter(Task.is_deleted == False)
     
     # Filter by month and year if provided
     if month is not None and year is not None:
@@ -77,7 +77,7 @@ async def read_tasks(
 
 @router.post("/", response_model=dict)
 async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
-    from app.models.models_db import User
+    from app.models.models_db import User, Project as DBProject
     
     # Validate assigned_to is an operator
     if task.assigned_to:
@@ -91,11 +91,18 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
         if not assigner or assigner.role not in ['admin', 'supervisor', 'planning']:
             raise HTTPException(status_code=400, detail="Tasks can only be assigned by admin, supervisor, or planning")
 
+    # Validate Project
+    if task.project_id:
+        project_exists = db.query(DBProject).filter(DBProject.project_id == task.project_id).first()
+        if not project_exists:
+            raise HTTPException(status_code=400, detail=f"Project with ID {task.project_id} does not exist")
+
     new_task = Task(
         id=str(uuid.uuid4()),
         title=task.title,
         description=task.description,
         project=task.project,
+        project_id=task.project_id,
         part_item=task.part_item,
         nos_unit=task.nos_unit,
         status=task.status,
@@ -449,6 +456,8 @@ async def delete_task(task_id: str, db: Session = Depends(get_db)):
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
-    db.delete(db_task)
+    db_task.is_deleted = True
+    # Optional: Cancel pending subtasks or release holds if desired, 
+    # but for soft delete we usually just mark the parent.
     db.commit()
     return {"message": "Task deleted successfully"}

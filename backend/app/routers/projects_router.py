@@ -43,7 +43,7 @@ async def read_projects(db: Session = Depends(get_db)):
     """
     Get all projects.
     """
-    return db.query(Project).all()
+    return db.query(Project).filter(Project.is_deleted == False).all()
 
 @router.post("/", response_model=ProjectOut)
 async def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
@@ -61,7 +61,8 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
         work_order_number=project.work_order_number,
         client_name=project.client_name,
         project_code=project.project_code,
-        created_at=get_current_time_ist()
+        created_at=get_current_time_ist(),
+        is_deleted=False
     )
     
     db.add(new_project)
@@ -89,6 +90,6 @@ async def delete_project(project_id: str, db: Session = Depends(get_db)):
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
         
-    db.delete(project)
+    project.is_deleted = True
     db.commit()
     return {"message": "Project deleted successfully"}
