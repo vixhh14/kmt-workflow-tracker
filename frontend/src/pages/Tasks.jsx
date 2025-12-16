@@ -515,78 +515,17 @@ const Tasks = () => {
                                     value={formData.assigned_to}
                                     onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    disabled={loading || users.length === 0}
                                 >
-                                    <option value="">
-                                        {loading ? 'Loading operators...' : users.filter(u => u?.role === 'operator').length === 0 ? 'No operators available' : 'Select Operator'}
-                                    </option>
-                                    {(() => {
-                                        // Get selected machine and extract category/type
-                                        const selectedMachine = machines.find(m => m?.id === formData.machine_id);
-                                        let machineType = selectedMachine?.category_name || null;
-
-                                        // If no category, try to extract from name (e.g., "CNC Machine (CNC)" -> "CNC")
-                                        if (!machineType && selectedMachine?.name) {
-                                            const match = selectedMachine.name.match(/\(([^)]+)\)/);
-                                            machineType = match ? match[1] : null;
-                                        }
-
-                                        // Filter for operators only
-                                        let filteredUsers = Array.isArray(users) ? users.filter(u => u?.role === 'operator') : [];
-
-                                        // Only filter by machine type if we have one and want to restrict
-                                        if (machineType && formData.machine_id) {
-                                            const qualifiedUsers = filteredUsers.filter(user => {
-                                                if (!user?.machine_types) return false;
-                                                const userTypes = user.machine_types.split(',').map(t => t.trim());
-                                                return userTypes.includes(machineType);
-                                            });
-
-                                            // If no qualified users, show all operators with a warning
-                                            if (qualifiedUsers.length > 0) {
-                                                filteredUsers = qualifiedUsers;
-                                            }
-                                        }
-
-                                        if (filteredUsers.length === 0) {
-                                            return <option value="" disabled>No operators available</option>;
-                                        }
-
-                                        return filteredUsers.map((user) => (
-                                            <option key={user?.user_id || Math.random()} value={user?.user_id || ''}>
-                                                {user?.full_name || user?.username || 'Unknown User'}
-                                            </option>
-                                        ));
-                                    })()}
+                                    <option value="">Select User</option>
+                                    {users.filter(u => u?.role !== 'admin').map((user) => (
+                                        <option key={user?.user_id || Math.random()} value={user?.user_id || ''}>
+                                            {user?.full_name || user?.username || 'Unknown User'} ({user?.role})
+                                        </option>
+                                    ))}
                                 </select>
-                                {formData.machine_id && (() => {
-                                    const selectedMachine = machines.find(m => m?.id === formData.machine_id);
-                                    let machineType = selectedMachine?.category_name;
-                                    if (!machineType && selectedMachine?.name) {
-                                        const match = selectedMachine.name.match(/\(([^)]+)\)/);
-                                        machineType = match ? match[1] : null;
-                                    }
-
-                                    if (!machineType) return null;
-
-                                    const qualifiedCount = users.filter(user => {
-                                        if (user?.role !== 'operator') return false;
-                                        if (!user?.machine_types) return false;
-                                        const userTypes = user.machine_types.split(',').map(t => t.trim());
-                                        return userTypes.includes(machineType);
-                                    }).length;
-
-                                    const totalOperators = users.filter(u => u?.role === 'operator').length;
-
-                                    return (
-                                        <p className="text-xs text-gray-500 mt-1">
-                                            {qualifiedCount > 0
-                                                ? `✅ ${qualifiedCount} of ${totalOperators} operator(s) qualified for ${machineType}`
-                                                : `⚠️ No operators qualified for ${machineType}. Showing all ${totalOperators} operators.`
-                                            }
-                                        </p>
-                                    );
-                                })()}
+                                {users.filter(u => u?.role !== 'admin').length === 0 && !loading && (
+                                    <p className="text-xs text-red-600 mt-1">⚠️ No available users to assign.</p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Assigned By *</label>
@@ -660,7 +599,7 @@ const Tasks = () => {
                             </button>
                         </div>
                     </form>
-                </div>
+                </div >
             )}
 
             {/* Tasks Table */}
@@ -833,7 +772,7 @@ const Tasks = () => {
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 };
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getPlanningDashboardSummary } from '../../api/planning';
+import { getDashboardOverview } from '../../api/services';
 import { Folder, TrendingUp, Settings, Clock, CheckCircle, Users, Activity, RefreshCw } from 'lucide-react';
 
 const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
@@ -34,21 +35,30 @@ const PlanningDashboard = () => {
         fetchDashboard();
     }, []);
 
+
+
     const fetchDashboard = async () => {
         try {
             setLoading(true);
             setError(null);
 
             console.log('🔄 Fetching planning dashboard...');
-            const response = await getPlanningDashboardSummary();
-            console.log('✅ Planning dashboard loaded:', response.data);
+            const [overviewRes, response] = await Promise.all([
+                getDashboardOverview(),
+                getPlanningDashboardSummary()
+            ]);
+            console.log('✅ Planning dashboard loaded');
+
+            const tasks = overviewRes.data.tasks;
+            const machines = overviewRes.data.machines;
+            const projects = overviewRes.data.projects;
 
             setSummary({
-                total_projects: response.data?.total_projects || 0,
-                total_tasks_running: response.data?.total_tasks_running || 0,
-                machines_active: response.data?.machines_active || 0,
-                pending_tasks: response.data?.pending_tasks || 0,
-                completed_tasks: response.data?.completed_tasks || 0,
+                total_projects: projects.total,
+                total_tasks_running: tasks.in_progress, // Mapping 'running' to 'in_progress'
+                machines_active: machines.active,
+                pending_tasks: tasks.pending,
+                completed_tasks: tasks.completed,
                 project_summary: Array.isArray(response.data?.project_summary) ? response.data.project_summary : [],
                 operator_status: Array.isArray(response.data?.operator_status) ? response.data.operator_status : []
             });
@@ -196,8 +206,8 @@ const PlanningDashboard = () => {
                             <div
                                 key={index}
                                 className={`p-4 rounded-lg border-2 ${operator.status === 'Active'
-                                        ? 'bg-green-50 border-green-300'
-                                        : 'bg-gray-50 border-gray-300'
+                                    ? 'bg-green-50 border-green-300'
+                                    : 'bg-gray-50 border-gray-300'
                                     }`}
                             >
                                 <div className="flex items-center justify-between mb-2">

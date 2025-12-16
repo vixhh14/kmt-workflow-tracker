@@ -45,8 +45,10 @@ export const getTaskSummary = (params) => api.get('/analytics/task-summary', { p
 export const getOperatorPerformance = (month, year, operator_id = null) => {
     const params = { month, year };
     if (operator_id) params.operator_id = operator_id;
+    if (operator_id) params.operator_id = operator_id;
     return api.get('/analytics/operator-performance', { params });
 };
+export const getDashboardOverview = () => api.get('/analytics/overview');
 
 /* -------------------- OUTSOURCE -------------------- */
 export const getOutsource = () => api.get('/outsource');

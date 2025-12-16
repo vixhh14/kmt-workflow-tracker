@@ -3,6 +3,7 @@ import { getPendingTasks, getRunningTasks, getTaskStatus, getProjectsSummary, ge
 import { getUsers } from '../../api/services';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Folder, CheckCircle, Clock, TrendingUp, AlertCircle, RefreshCw, UserPlus, Play, Users, X } from 'lucide-react';
+import { getDashboardOverview } from '../../api/services';
 
 const COLORS = {
     'Yet to Start': '#6b7280',
@@ -75,6 +76,8 @@ const SupervisorDashboard = () => {
         fetchTaskStatsFiltered();
     }, [selectedProject]);
 
+
+
     const fetchDashboard = async () => {
         try {
             setLoading(true);
@@ -82,7 +85,8 @@ const SupervisorDashboard = () => {
 
             console.log('🔄 Fetching supervisor dashboard...');
 
-            const [summaryRes, pendingRes, runningRes, operatorsRes, projectsRes, statsRes, operatorStatusRes] = await Promise.all([
+            const [overviewRes, summaryRes, pendingRes, runningRes, operatorsRes, projectsRes, statsRes, operatorStatusRes] = await Promise.all([
+                getDashboardOverview(),
                 getProjectSummary(),
                 getPendingTasks(),
                 getRunningTasks(),
@@ -93,6 +97,8 @@ const SupervisorDashboard = () => {
             ]);
 
             console.log('✅ Supervisor dashboard loaded');
+
+            const tasks = overviewRes.data.tasks;
 
             setProjectSummary({
                 total_projects: summaryRes.data?.total_projects || 0,
@@ -105,7 +111,17 @@ const SupervisorDashboard = () => {
             setRunningTasks(Array.isArray(runningRes.data) ? runningRes.data : []);
             setOperators(Array.isArray(operatorsRes.data) ? operatorsRes.data : []);
             setProjectsDistribution(projectsRes.data || {});
-            setTaskStats(statsRes.data || {});
+
+            // Overwrite unified stats, keep project list
+            setTaskStats({
+                ...statsRes.data,
+                total_tasks: tasks.total,
+                pending: tasks.pending,
+                in_progress: tasks.in_progress,
+                completed: tasks.completed,
+                on_hold: tasks.on_hold
+            });
+
             setOperatorStatus(Array.isArray(operatorStatusRes.data) ? operatorStatusRes.data : []);
 
         } catch (err) {
