@@ -48,7 +48,7 @@ async def get_pending_tasks(db: Session = Depends(get_db)):
                 "priority": task.priority or "medium",
                 "status": task.status or "pending",
                 "machine_id": task.machine_id or "",
-                "machine_name": machine.name if machine else "",
+                "machine_name": machine.machine_name if machine else "",
                 "assigned_by": task.assigned_by or "",
                 "assigned_by_name": assigned_by_user.username if assigned_by_user else "",
                 "due_date": task.due_date or "",
@@ -91,7 +91,7 @@ async def get_running_tasks(db: Session = Depends(get_db)):
                 "operator_id": task.assigned_to or "",
                 "operator_name": operator.full_name if operator and operator.full_name else (operator.username if operator else "Unknown"),
                 "machine_id": task.machine_id or "",
-                "machine_name": machine.name if machine else "Unknown",
+                "machine_name": machine.machine_name if machine else "Unknown",
                 "started_at": make_aware(task.actual_start_time or task.started_at).isoformat() if (task.actual_start_time or task.started_at) else None,
                 "duration_seconds": duration_seconds,
                 "status": "in_progress"

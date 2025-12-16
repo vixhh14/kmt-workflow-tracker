@@ -115,7 +115,7 @@ async def update_machine(machine_id: str, machine_update: MachineUpdate, db: Ses
     
     return {
         "id": db_machine.id,
-        "name": db_machine.name,
+        "name": db_machine.machine_name,
         "status": db_machine.status,
         "hourly_rate": db_machine.hourly_rate,
         "last_maintenance": db_machine.last_maintenance,
@@ -183,49 +183,49 @@ async def seed_machines(db: Session = Depends(get_db)):
     
     # Machines data - Unit 2 (11 machines)
     UNIT2_MACHINES = [
-        {"name": "Gas Cutting", "category_id": 1},
-        {"name": "Tig Welding", "category_id": 2},
-        {"name": "CO2 Welding LD", "category_id": 2},
-        {"name": "CO2 Welding HD", "category_id": 2},
-        {"name": "PSG", "category_id": 3},
-        {"name": "Ace Superjobber", "category_id": 4},
-        {"name": "Slotting Machine", "category_id": 5},
-        {"name": "Surface Grinding", "category_id": 6},
-        {"name": "Thakur Drilling", "category_id": 7},
-        {"name": "Toolvasor Magnetic Drilling", "category_id": 7},
-        {"name": "EIFCO Radial Drilling", "category_id": 7},
+        {"machine_name": "Gas Cutting", "category_id": 1},
+        {"machine_name": "Tig Welding", "category_id": 2},
+        {"machine_name": "CO2 Welding LD", "category_id": 2},
+        {"machine_name": "CO2 Welding HD", "category_id": 2},
+        {"machine_name": "PSG", "category_id": 3},
+        {"machine_name": "Ace Superjobber", "category_id": 4},
+        {"machine_name": "Slotting Machine", "category_id": 5},
+        {"machine_name": "Surface Grinding", "category_id": 6},
+        {"machine_name": "Thakur Drilling", "category_id": 7},
+        {"machine_name": "Toolvasor Magnetic Drilling", "category_id": 7},
+        {"machine_name": "EIFCO Radial Drilling", "category_id": 7},
     ]
     
     # Machines data - Unit 1 (28 machines)
     UNIT1_MACHINES = [
-        {"name": "Hand Grinder", "category_id": 8},
-        {"name": "Bench Grinder", "category_id": 8},
-        {"name": "Tool and Cutter Grinder", "category_id": 8},
-        {"name": "Turnmaster", "category_id": 3},
-        {"name": "Leader", "category_id": 3},
-        {"name": "Bandsaw cutting Manual", "category_id": 1},
-        {"name": "Bandsaw cutting Auto", "category_id": 1},
-        {"name": "VMC Pilot", "category_id": 9},
-        {"name": "ESTEEM DRO", "category_id": 10},
-        {"name": "FW Horizontal", "category_id": 10},
-        {"name": "Arno", "category_id": 10},
-        {"name": "BFW No 2", "category_id": 10},
-        {"name": "Engraving Machine", "category_id": 11},
-        {"name": "Delapena Honing Machine", "category_id": 12},
-        {"name": "Bench Grinder 2", "category_id": 8},
-        {"name": "Buffing Machine", "category_id": 13},
-        {"name": "Tooth Rounding Machine", "category_id": 14},
-        {"name": "Lapping Machine", "category_id": 15},
-        {"name": "Hand Drilling 2", "category_id": 7},
-        {"name": "Hand Drilling 1", "category_id": 7},
-        {"name": "Hand Grinding 2", "category_id": 8},
-        {"name": "Hand Grinding 1", "category_id": 8},
-        {"name": "Hitachi Cutting Machine", "category_id": 1},
-        {"name": "HMT Rack Cutting", "category_id": 16},
-        {"name": "L Rack Cutting", "category_id": 16},
-        {"name": "Reinecker", "category_id": 3},
-        {"name": "Zimberman", "category_id": 4},
-        {"name": "EIFCO Stationary Drilling", "category_id": 7},
+        {"machine_name": "Hand Grinder", "category_id": 8},
+        {"machine_name": "Bench Grinder", "category_id": 8},
+        {"machine_name": "Tool and Cutter Grinder", "category_id": 8},
+        {"machine_name": "Turnmaster", "category_id": 3},
+        {"machine_name": "Leader", "category_id": 3},
+        {"machine_name": "Bandsaw cutting Manual", "category_id": 1},
+        {"machine_name": "Bandsaw cutting Auto", "category_id": 1},
+        {"machine_name": "VMC Pilot", "category_id": 9},
+        {"machine_name": "ESTEEM DRO", "category_id": 10},
+        {"machine_name": "FW Horizontal", "category_id": 10},
+        {"machine_name": "Arno", "category_id": 10},
+        {"machine_name": "BFW No 2", "category_id": 10},
+        {"machine_name": "Engraving Machine", "category_id": 11},
+        {"machine_name": "Delapena Honing Machine", "category_id": 12},
+        {"machine_name": "Bench Grinder 2", "category_id": 8},
+        {"machine_name": "Buffing Machine", "category_id": 13},
+        {"machine_name": "Tooth Rounding Machine", "category_id": 14},
+        {"machine_name": "Lapping Machine", "category_id": 15},
+        {"machine_name": "Hand Drilling 2", "category_id": 7},
+        {"machine_name": "Hand Drilling 1", "category_id": 7},
+        {"machine_name": "Hand Grinding 2", "category_id": 8},
+        {"machine_name": "Hand Grinding 1", "category_id": 8},
+        {"machine_name": "Hitachi Cutting Machine", "category_id": 1},
+        {"machine_name": "HMT Rack Cutting", "category_id": 16},
+        {"machine_name": "L Rack Cutting", "category_id": 16},
+        {"machine_name": "Reinecker", "category_id": 3},
+        {"machine_name": "Zimberman", "category_id": 4},
+        {"machine_name": "EIFCO Stationary Drilling", "category_id": 7},
     ]
     
     added_units = 0
@@ -237,7 +237,7 @@ async def seed_machines(db: Session = Depends(get_db)):
         for unit_data in UNITS:
             existing = db.query(Unit).filter(Unit.id == unit_data["id"]).first()
             if not existing:
-                unit = Unit(id=unit_data["id"], name=unit_data["name"], description=unit_data.get("description"), created_at=datetime.utcnow())
+                unit = Unit(id=unit_data["id"], name=unit_data["name"], description=unit_data.get("description"), created_at=get_current_time_ist().replace(tzinfo=None))
                 db.add(unit)
                 added_units += 1
         
@@ -245,7 +245,7 @@ async def seed_machines(db: Session = Depends(get_db)):
         for cat_data in CATEGORIES:
             existing = db.query(MachineCategory).filter(MachineCategory.id == cat_data["id"]).first()
             if not existing:
-                category = MachineCategory(id=cat_data["id"], name=cat_data["name"], created_at=datetime.utcnow())
+                category = MachineCategory(id=cat_data["id"], name=cat_data["name"], created_at=get_current_time_ist().replace(tzinfo=None))
                 db.add(category)
                 added_categories += 1
         
@@ -253,32 +253,34 @@ async def seed_machines(db: Session = Depends(get_db)):
         
         # Insert Unit 2 Machines
         for machine_data in UNIT2_MACHINES:
-            existing = db.query(Machine).filter(Machine.name == machine_data["name"]).first()
+            existing = db.query(Machine).filter(Machine.machine_name == machine_data["machine_name"]).first()
             if not existing:
                 machine = Machine(
                     id=str(uuid.uuid4()),
-                    name=machine_data["name"],
+                    machine_name=machine_data["machine_name"],
                     status="active",
                     hourly_rate=0.0,
                     category_id=machine_data["category_id"],
                     unit_id=2,
-                    updated_at=datetime.utcnow()
+                    updated_at=get_current_time_ist().replace(tzinfo=None),
+                    is_deleted=False
                 )
                 db.add(machine)
                 added_machines += 1
         
         # Insert Unit 1 Machines
         for machine_data in UNIT1_MACHINES:
-            existing = db.query(Machine).filter(Machine.name == machine_data["name"]).first()
+            existing = db.query(Machine).filter(Machine.machine_name == machine_data["machine_name"]).first()
             if not existing:
                 machine = Machine(
                     id=str(uuid.uuid4()),
-                    name=machine_data["name"],
+                    machine_name=machine_data["machine_name"],
                     status="active",
                     hourly_rate=0.0,
                     category_id=machine_data["category_id"],
                     unit_id=1,
-                    updated_at=datetime.utcnow()
+                    updated_at=get_current_time_ist().replace(tzinfo=None),
+                    is_deleted=False
                 )
                 db.add(machine)
                 added_machines += 1

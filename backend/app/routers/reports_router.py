@@ -55,13 +55,13 @@ def calculate_machine_runtime(db: Session, target_date: date) -> List[dict]:
 
     results = []
     # Sort by machine name for better readability
-    sorted_machines = sorted(machine_stats.items(), key=lambda x: x[1]["obj"].name)
+    sorted_machines = sorted(machine_stats.items(), key=lambda x: x[1]["obj"].machine_name)
     
     for m_id, stats in sorted_machines:
         machine = stats["obj"]
         results.append({
             "machine_id": machine.id,
-            "machine_name": machine.name,
+            "machine_name": machine.machine_name,
             "unit": units.get(machine.unit_id, ""),
             "category": categories.get(machine.category_id, ""),
             "date": target_date.isoformat(),
