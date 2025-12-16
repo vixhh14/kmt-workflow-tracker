@@ -3,6 +3,7 @@ import { getProjects, getProjectAnalytics, getAttendanceSummary } from '../../ap
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { TrendingUp, CheckCircle, Clock, Pause, UserCheck, UserX, Folder, RefreshCw, BarChart3 } from 'lucide-react';
 import ReportsSection from './ReportsSection';
+import { getDashboardOverview } from '../../api/services';
 
 const COLORS = {
     'Yet to Start': '#6b7280',
@@ -67,6 +68,8 @@ const AdminDashboard = () => {
         }
     }, [selectedProject]);
 
+
+
     const fetchDashboard = async () => {
         try {
             setLoading(true);
@@ -74,16 +77,33 @@ const AdminDashboard = () => {
 
             console.log('🔄 Fetching admin dashboard data...');
 
-            const [projectsRes, analyticsRes, attendanceRes] = await Promise.all([
+            const [projectsRes, overviewRes, attendanceRes] = await Promise.all([
                 getProjects(),
-                getProjectAnalytics('all'),
+                getDashboardOverview(),
                 getAttendanceSummary()
             ]);
 
             console.log('✅ Admin dashboard data loaded');
 
             setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : []);
-            setAnalytics(analyticsRes.data || {});
+
+            const tasks = overviewRes.data.tasks;
+            setAnalytics({
+                stats: {
+                    total: tasks.total,
+                    yet_to_start: tasks.pending,
+                    in_progress: tasks.in_progress,
+                    completed: tasks.completed,
+                    on_hold: tasks.on_hold
+                },
+                chart: {
+                    yet_to_start: tasks.pending,
+                    in_progress: tasks.in_progress,
+                    completed: tasks.completed,
+                    on_hold: tasks.on_hold
+                }
+            });
+
             setAttendanceSummary(attendanceRes.data || {});
 
         } catch (err) {
@@ -97,8 +117,28 @@ const AdminDashboard = () => {
     const fetchAnalytics = async () => {
         try {
             const project = selectedProject === 'all' ? null : selectedProject;
-            const res = await getProjectAnalytics(project);
-            setAnalytics(res.data || {});
+            if (project) {
+                const res = await getProjectAnalytics(project);
+                setAnalytics(res.data || {});
+            } else {
+                const res = await getDashboardOverview();
+                const tasks = res.data.tasks;
+                setAnalytics({
+                    stats: {
+                        total: tasks.total,
+                        yet_to_start: tasks.pending,
+                        in_progress: tasks.in_progress,
+                        completed: tasks.completed,
+                        on_hold: tasks.on_hold
+                    },
+                    chart: {
+                        yet_to_start: tasks.pending,
+                        in_progress: tasks.in_progress,
+                        completed: tasks.completed,
+                        on_hold: tasks.on_hold
+                    }
+                });
+            }
         } catch (err) {
             console.error('Failed to fetch analytics:', err);
         }
