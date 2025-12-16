@@ -112,7 +112,13 @@ const Tasks = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            await createTask(formData);
+            // Normalize date to ISO string
+            const payload = {
+                ...formData,
+                due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null, // Ensures ISO format
+            };
+
+            await createTask(payload);
             setFormData({
                 title: '',
                 description: '',
