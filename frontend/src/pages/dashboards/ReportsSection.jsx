@@ -4,7 +4,8 @@ import {
     getUserDailyReport,
     getMonthlyPerformance,
     downloadMachineReport,
-    downloadUserReport
+    downloadUserReport,
+    downloadMonthlyPerformance
 } from '../../api/admin';
 import {
     ComposedChart,
@@ -90,7 +91,7 @@ const ReportsSection = () => {
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `machine_report_${machineDate}.csv`);
+            link.setAttribute('download', `machine_summary_daily_${machineDate}.csv`);
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -105,7 +106,7 @@ const ReportsSection = () => {
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `user_report_${userDate}.csv`);
+            link.setAttribute('download', `user_activity_daily_${userDate}.csv`);
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -114,11 +115,27 @@ const ReportsSection = () => {
         }
     };
 
+    const handleDownloadMonthly = async () => {
+        try {
+            const response = await downloadMonthlyPerformance(year);
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `monthly_performance_${year}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (error) {
+            console.error("Failed to download monthly performance", error);
+        }
+    };
+
     // Helper: Find current year + range
     const currentYear = new Date().getFullYear();
     const years = [currentYear, currentYear - 1, currentYear - 2];
 
     const formatDuration = (seconds) => {
+        if (!seconds) return '0h 0m';
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
         return `${h}h ${m}m`;
@@ -135,13 +152,22 @@ const ReportsSection = () => {
                         <BarChart2 className="text-blue-600 mr-2" size={24} />
                         <h3 className="text-lg font-semibold text-gray-900">Monthly Performance</h3>
                     </div>
-                    <select
-                        value={year}
-                        onChange={(e) => setYear(parseInt(e.target.value))}
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    >
-                        {years.map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
+                    <div className="flex items-center space-x-2">
+                        <select
+                            value={year}
+                            onChange={(e) => setYear(parseInt(e.target.value))}
+                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        >
+                            {years.map(y => <option key={y} value={y}>{y}</option>)}
+                        </select>
+                        <button
+                            onClick={handleDownloadMonthly}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded transition"
+                            title="Export CSV"
+                        >
+                            <Download size={20} />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="h-80 w-full">
@@ -205,7 +231,7 @@ const ReportsSection = () => {
                                         <tr key={row.machine_id}>
                                             <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.machine_name}</td>
                                             <td className="px-4 py-3 text-sm text-gray-600">{formatDuration(row.runtime_seconds)}</td>
-                                            <td className="px-4 py-3 text-sm text-gray-600">{row.tasks_completed}</td>
+                                            <td className="px-4 py-3 text-sm text-gray-600">{row.tasks_run_count}</td>
                                             <td className="px-4 py-3 text-sm">
                                                 <span className={`px-2 py-1 text-xs rounded-full ${row.is_running_now ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                                                     }`}>
@@ -264,7 +290,7 @@ const ReportsSection = () => {
                                         <tr key={row.user_id}>
                                             <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.full_name || row.username}</td>
                                             <td className="px-4 py-3 text-sm text-gray-600">{formatDuration(row.total_work_seconds)}</td>
-                                            <td className="px-4 py-3 text-sm text-gray-600">{row.tasks_completed}</td>
+                                            <td className="px-4 py-3 text-sm text-gray-600">{row.tasks_worked_count}</td>
                                             <td className="px-4 py-3 text-sm">
                                                 <span className={`px-2 py-1 text-xs rounded-full ${row.attendance_status === 'Present' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                                                     }`}>
