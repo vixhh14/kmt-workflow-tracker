@@ -115,9 +115,21 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
         expected_completion_time=task.expected_completion_time,
         created_at=get_current_time_ist(),
     )
-    db.add(new_task)
-    db.commit()
-    db.refresh(new_task)
+    
+    try:
+        db.add(new_task)
+        db.commit()
+        db.refresh(new_task)
+    except Exception as e:
+        db.rollback()
+        import traceback
+        print(f"❌ Error creating task: {str(e)}")
+        traceback.print_exc()
+        # Handle specific DB errors if possible or return 400
+        if "invalid input syntax" in str(e):
+             raise HTTPException(status_code=400, detail=f"Database input error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create task in DB: {str(e)}")
+
     return {
         "id": new_task.id,
         "title": new_task.title,
@@ -136,7 +148,7 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
 
 # Get task time logs for a specific task
 @router.get("/{task_id}/time-logs", response_model=List[dict])
-async def get_task_time_logs(task_id: int, db: Session = Depends(get_db)):
+async def get_task_time_logs(task_id: str, db: Session = Depends(get_db)):
     """Get all time tracking logs for a specific task"""
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
@@ -158,7 +170,7 @@ async def get_task_time_logs(task_id: int, db: Session = Depends(get_db)):
 # Task workflow endpoints
 @router.post("/{task_id}/start")
 async def start_task(
-    task_id: int, 
+    task_id: str, 
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -227,7 +239,7 @@ async def start_task(
 
 @router.post("/{task_id}/hold")
 async def hold_task(
-    task_id: int, 
+    task_id: str, 
     request: TaskActionRequest, 
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
@@ -294,7 +306,7 @@ async def hold_task(
 
 @router.post("/{task_id}/resume")
 async def resume_task(
-    task_id: int, 
+    task_id: str, 
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -302,7 +314,7 @@ async def resume_task(
 
 @router.post("/{task_id}/complete")
 async def complete_task(
-    task_id: int, 
+    task_id: str, 
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -382,7 +394,7 @@ async def complete_task(
 
 @router.post("/{task_id}/reschedule-request")
 async def request_reschedule(
-    task_id: int, 
+    task_id: str, 
     request: RescheduleRequestModel, 
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
@@ -403,7 +415,7 @@ async def request_reschedule(
     return {"message": "Reschedule request submitted"}
 
 @router.post("/{task_id}/deny")
-async def deny_task(task_id: int, request: TaskActionRequest, db: Session = Depends(get_db)):
+async def deny_task(task_id: str, request: TaskActionRequest, db: Session = Depends(get_db)):
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -422,7 +434,7 @@ async def deny_task(task_id: int, request: TaskActionRequest, db: Session = Depe
     return {"message": "Task denied", "reason": request.reason}
 
 @router.put("/{task_id}", response_model=dict)
-async def update_task(task_id: int, task_update: TaskUpdate, db: Session = Depends(get_db)):
+async def update_task(task_id: str, task_update: TaskUpdate, db: Session = Depends(get_db)):
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -453,7 +465,7 @@ async def update_task(task_id: int, task_update: TaskUpdate, db: Session = Depen
     }
 
 @router.delete("/{task_id}")
-async def delete_task(task_id: int, db: Session = Depends(get_db)):
+async def delete_task(task_id: str, db: Session = Depends(get_db)):
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
