@@ -26,7 +26,9 @@ def list_users(db: Session = Depends(get_db)):
             full_name=u.full_name,
             role=u.role,
             email=u.email,
-            updated_at=u.updated_at
+            updated_at=u.updated_at,
+            id=u.user_id,
+            name=u.username
         ) for u in users
     ]
 

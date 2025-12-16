@@ -5,6 +5,7 @@ from datetime import datetime
 class TaskBase(BaseModel):
     title: str
     project: Optional[str] = None
+    project_id: Optional[int] = None
     description: Optional[str] = None
     part_item: Optional[str] = None
     nos_unit: Optional[str] = None
@@ -22,6 +23,7 @@ class TaskCreate(TaskBase):
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
     project: Optional[str] = None
+    project_id: Optional[int] = None
     description: Optional[str] = None
     part_item: Optional[str] = None
     nos_unit: Optional[str] = None
@@ -34,7 +36,7 @@ class TaskUpdate(BaseModel):
     expected_completion_time: Optional[str] = None
 
 class Task(TaskBase):
-    id: str
+    id: int  # Changed from str to int
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

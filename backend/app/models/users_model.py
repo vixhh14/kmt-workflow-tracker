@@ -26,3 +26,5 @@ class UserOut(UserBase):
     user_id: str
     machine_types: Optional[str] = None
     updated_at: Optional[datetime] = None
+    id: Optional[str] = None
+    name: Optional[str] = None

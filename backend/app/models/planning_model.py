@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import datetime
 
 class PlanningTaskBase(BaseModel):
-    task_id: str
+    task_id: int
     project_name: str
     task_sequence: int
     assigned_supervisor: Optional[str] = None
