@@ -36,7 +36,7 @@ class TaskUpdate(BaseModel):
     expected_completion_time: Optional[str] = None
 
 class Task(TaskBase):
-    id: int  # Changed from str to int
+    id: str  # Changed to str to support UUIDs
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
