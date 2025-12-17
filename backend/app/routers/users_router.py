@@ -42,16 +42,20 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.username == user.username).first():
         raise HTTPException(status_code=400, detail="Username already registered")
 
-    password_hash = hashlib.sha256(user.password.encode()).hexdigest()
+    from app.core.auth_utils import hash_password
+
+    # Use bcrypt hashing consistent with auth system
+    hashed_password = hash_password(user.password)
     
     new_user = User(
         user_id=str(uuid4()),
         username=user.username,
         email=user.email or "",
-        password_hash=password_hash,
+        password_hash=hashed_password,
         role=user.role,
         full_name=user.full_name or "",
         machine_types=user.machine_types or "",
+        approval_status="approved", # Admin-created users are auto-approved
         updated_at=get_current_time_ist()
     )
     

@@ -98,6 +98,10 @@ async def approve_user(
     user.unit_id = request.unit_id
     user.machine_types = request.machine_types
     
+    # Update role if provided
+    if request.role:
+        user.role = request.role
+    
     # Update or create approval record
     approval = db.query(UserApproval).filter(UserApproval.user_id == user.user_id).first()
     if approval:
