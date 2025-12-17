@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getPlanningDashboardSummary } from '../../api/planning';
-import { getDashboardOverview } from '../../api/services';
+import { getDashboardOverview, getProjectOverviewStats } from '../../api/services';
 import { Folder, TrendingUp, Settings, Clock, CheckCircle, Users, Activity, RefreshCw } from 'lucide-react';
 
 const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
@@ -43,18 +43,19 @@ const PlanningDashboard = () => {
             setError(null);
 
             console.log('🔄 Fetching planning dashboard...');
-            const [overviewRes, response] = await Promise.all([
+            const [overviewRes, projectStatsRes, response] = await Promise.all([
                 getDashboardOverview(),
+                getProjectOverviewStats(),
                 getPlanningDashboardSummary()
             ]);
             console.log('✅ Planning dashboard loaded');
 
             const tasks = overviewRes.data.tasks;
             const machines = overviewRes.data.machines;
-            const projects = overviewRes.data.projects;
+            const projectStats = projectStatsRes.data;
 
             setSummary({
-                total_projects: projects.total,
+                total_projects: projectStats.total,
                 total_tasks_running: tasks.in_progress, // Mapping 'running' to 'in_progress'
                 machines_active: machines.active,
                 pending_tasks: tasks.pending,

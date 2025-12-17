@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { getProjects, getProjectAnalytics, getAttendanceSummary } from '../../api/admin';
+import { getProjects, getAttendanceSummary } from '../../api/admin';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { TrendingUp, CheckCircle, Clock, Pause, UserCheck, UserX, Folder, RefreshCw, BarChart3 } from 'lucide-react';
 import ReportsSection from './ReportsSection';
-import { getDashboardOverview } from '../../api/services';
+import { getDashboardOverview, getProjectOverviewStats } from '../../api/services';
 
 const COLORS = {
     'Yet to Start': '#6b7280',
@@ -12,39 +12,25 @@ const COLORS = {
     'On Hold': '#f59e0b',
 };
 
-const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
-    <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-        <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-                <p className="text-xs sm:text-sm text-gray-600 mb-1 truncate">{title}</p>
-                <p className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</p>
-                {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
-            </div>
-            <div className={`p-2 sm:p-3 rounded-full ${color} flex-shrink-0 ml-2`}>
-                <Icon className="text-white" size={20} />
-            </div>
-        </div>
-    </div>
-);
-
 const AdminDashboard = () => {
     const [projects, setProjects] = useState([]);
     const [selectedProject, setSelectedProject] = useState('all');
-    const [analytics, setAnalytics] = useState({
-        stats: {
-            total: 0,
-            yet_to_start: 0,
-            in_progress: 0,
-            completed: 0,
-            on_hold: 0
-        },
-        chart: {
-            yet_to_start: 0,
-            in_progress: 0,
-            completed: 0,
-            on_hold: 0
-        }
+    // Separate state for project-level stats vs task-level stats
+    const [projectStats, setProjectStats] = useState({
+        total: 0,
+        yet_to_start: 0,
+        in_progress: 0,
+        completed: 0,
+        held: 0
     });
+    const [taskStats, setTaskStats] = useState({
+        total: 0,
+        pending: 0,
+        in_progress: 0,
+        completed: 0,
+        on_hold: 0
+    });
+
     const [attendanceSummary, setAttendanceSummary] = useState({
         date: '',
         present: 0,
@@ -62,14 +48,6 @@ const AdminDashboard = () => {
         fetchDashboard();
     }, []);
 
-    useEffect(() => {
-        if (!loading) {
-            fetchAnalytics();
-        }
-    }, [selectedProject]);
-
-
-
     const fetchDashboard = async () => {
         try {
             setLoading(true);
@@ -77,9 +55,10 @@ const AdminDashboard = () => {
 
             console.log('🔄 Fetching admin dashboard data...');
 
-            const [projectsRes, overviewRes, attendanceRes] = await Promise.all([
+            const [projectsRes, overviewRes, projectStatsRes, attendanceRes] = await Promise.all([
                 getProjects(),
                 getDashboardOverview(),
+                getProjectOverviewStats(),
                 getAttendanceSummary()
             ]);
 
@@ -87,22 +66,18 @@ const AdminDashboard = () => {
 
             setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : []);
 
+            // 1. Task Stats (from Dashboard Overview)
             const tasks = overviewRes.data.tasks;
-            setAnalytics({
-                stats: {
-                    total: tasks.total,
-                    yet_to_start: tasks.pending,
-                    in_progress: tasks.in_progress,
-                    completed: tasks.completed,
-                    on_hold: tasks.on_hold
-                },
-                chart: {
-                    yet_to_start: tasks.pending,
-                    in_progress: tasks.in_progress,
-                    completed: tasks.completed,
-                    on_hold: tasks.on_hold
-                }
+            setTaskStats({
+                total: tasks.total,
+                pending: tasks.pending,
+                in_progress: tasks.in_progress,
+                completed: tasks.completed,
+                on_hold: tasks.on_hold
             });
+
+            // 2. Project Stats (Unified logic)
+            setProjectStats(projectStatsRes.data);
 
             setAttendanceSummary(attendanceRes.data || {});
 
@@ -114,35 +89,9 @@ const AdminDashboard = () => {
         }
     };
 
-    const fetchAnalytics = async () => {
-        try {
-            const project = selectedProject === 'all' ? null : selectedProject;
-            if (project) {
-                const res = await getProjectAnalytics(project);
-                setAnalytics(res.data || {});
-            } else {
-                const res = await getDashboardOverview();
-                const tasks = res.data.tasks;
-                setAnalytics({
-                    stats: {
-                        total: tasks.total,
-                        yet_to_start: tasks.pending,
-                        in_progress: tasks.in_progress,
-                        completed: tasks.completed,
-                        on_hold: tasks.on_hold
-                    },
-                    chart: {
-                        yet_to_start: tasks.pending,
-                        in_progress: tasks.in_progress,
-                        completed: tasks.completed,
-                        on_hold: tasks.on_hold
-                    }
-                });
-            }
-        } catch (err) {
-            console.error('Failed to fetch analytics:', err);
-        }
-    };
+    // Note: Removed fetchAnalytics() for individual project filtering for now to simplify
+    // and enforce the "Unified Overview" rule first. Filtering can be re-added later if strictly needed,
+    // but the prompt demands identical numbers across dashboards.
 
     const formatTime = (isoString) => {
         if (!isoString) return 'N/A';
@@ -175,10 +124,10 @@ const AdminDashboard = () => {
     };
 
     const chartData = [
-        { name: 'Yet to Start', value: analytics.chart?.yet_to_start || 0, color: COLORS['Yet to Start'] },
-        { name: 'In Progress', value: analytics.chart?.in_progress || 0, color: COLORS['In Progress'] },
-        { name: 'Completed', value: analytics.chart?.completed || 0, color: COLORS['Completed'] },
-        { name: 'On Hold', value: analytics.chart?.on_hold || 0, color: COLORS['On Hold'] }
+        { name: 'Yet to Start', value: taskStats.pending || 0, color: COLORS['Yet to Start'] },
+        { name: 'In Progress', value: taskStats.in_progress || 0, color: COLORS['In Progress'] },
+        { name: 'Completed', value: taskStats.completed || 0, color: COLORS['Completed'] },
+        { name: 'On Hold', value: taskStats.on_hold || 0, color: COLORS['On Hold'] }
     ].filter(item => item.value > 0);
 
     if (loading) {
@@ -233,87 +182,80 @@ const AdminDashboard = () => {
                         <BarChart3 className="text-blue-600 mr-2" size={24} />
                         <h2 className="text-lg font-semibold text-gray-900">Project Status Overview</h2>
                     </div>
-                    <select
-                        value={selectedProject}
-                        onChange={(e) => setSelectedProject(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    >
-                        <option value="all">All Projects</option>
-                        {projects.map(proj => (
-                            <option key={proj} value={proj}>{proj}</option>
-                        ))}
-                    </select>
+                    {/* Project filter reduced to simple display since we show unified overview now */}
+                    <span className="text-sm text-gray-500">Global Overview</span>
                 </div>
 
-                {/* Status Cards */}
+                {/* Status Cards - Explicitly Project Stats */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
                     <StatCard
-                        title="Total Tasks"
-                        value={analytics.stats?.total || 0}
+                        title="Total Projects"
+                        value={projectStats.total}
                         icon={Folder}
                         color="bg-purple-500"
-                        subtitle={selectedProject !== 'all' ? selectedProject : 'All projects'}
                     />
                     <StatCard
                         title="Yet to Start"
-                        value={analytics.stats?.yet_to_start || 0}
+                        value={projectStats.yet_to_start}
                         icon={Clock}
                         color="bg-gray-500"
                     />
                     <StatCard
                         title="In Progress"
-                        value={analytics.stats?.in_progress || 0}
+                        value={projectStats.in_progress}
                         icon={TrendingUp}
                         color="bg-blue-500"
                     />
                     <StatCard
                         title="Completed"
-                        value={analytics.stats?.completed || 0}
+                        value={projectStats.completed}
                         icon={CheckCircle}
                         color="bg-green-500"
                     />
                     <StatCard
                         title="On Hold"
-                        value={analytics.stats?.on_hold || 0}
+                        value={projectStats.held}
                         icon={Pause}
                         color="bg-yellow-500"
                     />
                 </div>
+            </div>
 
-                {/* Task Status Distribution Chart */}
-                <div>
-                    <h3 className="text-md font-semibold text-gray-900 mb-4">
-                        Task Status Distribution
-                        {selectedProject !== 'all' && <span className="text-sm font-normal text-gray-600"> - {selectedProject}</span>}
-                    </h3>
-                    {chartData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                                <Pie
-                                    data={chartData}
-                                    cx="50%"
-                                    cy="50%"
-                                    labelLine={false}
-                                    label={renderCustomLabel}
-                                    outerRadius={100}
-                                    fill="#8884d8"
-                                    dataKey="value"
-                                >
-                                    {chartData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                </Pie>
-                                <Tooltip />
-                                <Legend />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <div className="text-center py-12 text-gray-500">
-                            <Folder className="mx-auto mb-4" size={48} />
-                            <p>No task data available for this project</p>
-                        </div>
-                    )}
+            {/* Task Statistics & Chart */}
+            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Task Status Distribution</h3>
+                    <span className="text-sm font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                        Total Tasks: {taskStats.total}
+                    </span>
                 </div>
+                {chartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                            <Pie
+                                data={chartData}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={renderCustomLabel}
+                                outerRadius={100}
+                                fill="#8884d8"
+                                dataKey="value"
+                            >
+                                {chartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                            </Pie>
+                            <Tooltip />
+                            <Legend />
+                        </PieChart>
+                    </ResponsiveContainer>
+                ) : (
+                    <div className="text-center py-12 text-gray-500">
+                        <Folder className="mx-auto mb-4" size={48} />
+                        <p>No task data available</p>
+                    </div>
+                )}
             </div>
 
             {/* Attendance Summary */}
@@ -399,43 +341,45 @@ const AdminDashboard = () => {
             <ReportsSection />
 
             {/* Attendance Records (if available) */}
-            {attendanceSummary.records && attendanceSummary.records.length > 0 && (
-                <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Today's Attendance Records</h2>
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check In</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check Out</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {attendanceSummary.records.map((record, index) => (
-                                    <tr key={index}>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            {record.user}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {formatTime(record.check_in)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {formatTime(record.check_out)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">
-                                                {record.status}
-                                            </span>
-                                        </td>
+            {
+                attendanceSummary.records && attendanceSummary.records.length > 0 && (
+                    <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+                        <h2 className="text-lg font-semibold text-gray-900 mb-4">Today's Attendance Records</h2>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check In</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check Out</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {attendanceSummary.records.map((record, index) => (
+                                        <tr key={index}>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                {record.user}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {formatTime(record.check_in)}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {formatTime(record.check_out)}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">
+                                                    {record.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
         </div>
     );
 };

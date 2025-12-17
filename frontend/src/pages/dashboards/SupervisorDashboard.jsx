@@ -3,7 +3,7 @@ import { getPendingTasks, getRunningTasks, getTaskStatus, getProjectsSummary, ge
 import { getUsers } from '../../api/services';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Folder, CheckCircle, Clock, TrendingUp, AlertCircle, RefreshCw, UserPlus, Play, Users, X } from 'lucide-react';
-import { getDashboardOverview } from '../../api/services';
+import { getDashboardOverview, getProjectOverviewStats } from '../../api/services';
 
 const COLORS = {
     'Yet to Start': '#6b7280',
@@ -85,7 +85,7 @@ const SupervisorDashboard = () => {
 
             console.log('🔄 Fetching supervisor dashboard...');
 
-            const [overviewRes, summaryRes, pendingRes, runningRes, operatorsRes, projectsRes, statsRes, operatorStatusRes] = await Promise.all([
+            const [overviewRes, summaryRes, pendingRes, runningRes, operatorsRes, projectsRes, statsRes, operatorStatusRes, projectStatsRes] = await Promise.all([
                 getDashboardOverview(),
                 getProjectSummary(),
                 getPendingTasks(),
@@ -93,18 +93,20 @@ const SupervisorDashboard = () => {
                 getOperators(),
                 getProjectsSummary(),
                 getTaskStats(),
-                getTaskStatus()
+                getTaskStatus(),
+                getProjectOverviewStats()
             ]);
 
             console.log('✅ Supervisor dashboard loaded');
 
             const tasks = overviewRes.data.tasks;
+            const projectStats = projectStatsRes.data;
 
             setProjectSummary({
-                total_projects: summaryRes.data?.total_projects || 0,
-                completed_projects: summaryRes.data?.completed_projects || 0,
-                pending_projects: summaryRes.data?.pending_projects || 0,
-                active_projects: summaryRes.data?.active_projects || 0
+                total_projects: projectStats.total,
+                completed_projects: projectStats.completed,
+                pending_projects: projectStats.yet_to_start,
+                active_projects: projectStats.in_progress + projectStats.held
             });
 
             setPendingTasks(Array.isArray(pendingRes.data) ? pendingRes.data : []);
