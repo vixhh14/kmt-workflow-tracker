@@ -112,7 +112,7 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
         assigned_to=task.assigned_to,
         machine_id=task.machine_id,
         due_date=task.due_date,
-        expected_completion_time=task.expected_completion_time,
+        expected_completion_time=str(task.expected_completion_time) if task.expected_completion_time is not None else None,
         created_at=get_current_time_ist(),
     )
     

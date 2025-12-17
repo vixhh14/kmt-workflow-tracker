@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Union
 from datetime import datetime
 
 class TaskBase(BaseModel):
@@ -15,7 +15,7 @@ class TaskBase(BaseModel):
     machine_id: Optional[str] = None
     assigned_by: Optional[str] = None  # user_id who assigned
     due_date: Optional[str] = None
-    expected_completion_time: Optional[str] = None
+    expected_completion_time: Optional[Union[str, int]] = None
 
 class TaskCreate(TaskBase):
     pass
@@ -33,7 +33,7 @@ class TaskUpdate(BaseModel):
     machine_id: Optional[str] = None
     assigned_by: Optional[str] = None
     due_date: Optional[str] = None
-    expected_completion_time: Optional[str] = None
+    expected_completion_time: Optional[Union[str, int]] = None
 
 class TaskOut(TaskBase):
     id: str  # UUID as string
