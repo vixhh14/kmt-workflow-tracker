@@ -3,7 +3,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from pydantic import BaseModel
-from app.models.tasks_model import TaskCreate, TaskUpdate
+from app.schemas.task_schema import TaskCreate, TaskUpdate, TaskOut
 from app.models.models_db import Task, TaskTimeLog, TaskHold, RescheduleRequest, MachineRuntimeLog, UserWorkLog
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -76,12 +76,11 @@ async def read_tasks(
         for t in tasks
     ]
 
-@router.post("/", response_model=dict)
+@router.post("/", response_model=TaskOut)
 async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
     from app.models.models_db import User, Project as DBProject
     
-    # Validate assigned_to is an operator
-    # Validate assigned_to exists (Removed strict 'operator' role check as per user request to allow any assignment)
+    # Validate assigned_to exists
     if task.assigned_to:
         assignee = db.query(User).filter(User.user_id == task.assigned_to).first()
         if not assignee:
@@ -126,26 +125,11 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
         import traceback
         print(f"❌ Error creating task: {str(e)}")
         traceback.print_exc()
-        # Handle specific DB errors if possible or return 400
         if "invalid input syntax" in str(e):
              raise HTTPException(status_code=400, detail=f"Database input error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create task in DB: {str(e)}")
 
-    return {
-        "id": new_task.id,
-        "title": new_task.title,
-        "description": new_task.description,
-        "project": new_task.project,
-        "part_item": new_task.part_item,
-        "nos_unit": new_task.nos_unit,
-        "status": new_task.status,
-        "priority": new_task.priority,
-        "assigned_by": new_task.assigned_by,
-        "assigned_to": new_task.assigned_to,
-        "machine_id": new_task.machine_id,
-        "due_date": new_task.due_date,
-        "expected_completion_time": new_task.expected_completion_time,
-    }
+    return new_task
 
 # Get task time logs for a specific task
 @router.get("/{task_id}/time-logs", response_model=List[dict])
