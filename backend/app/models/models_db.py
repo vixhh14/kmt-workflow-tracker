@@ -94,7 +94,9 @@ class Project(Base):
     is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
 
-class Task(BaseModel):
+import uuid
+
+class Task(Base):
     __tablename__ = "tasks"
 
     # Tasks use UUID (Safe for existing data)

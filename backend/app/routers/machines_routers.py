@@ -3,7 +3,7 @@ from typing import List
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from datetime import datetime
-from app.models.machines_model import MachineCreate, MachineUpdate
+from app.schemas.machine_schema import MachineCreate, MachineUpdate, MachineOut
 from app.models.models_db import Machine, Unit, MachineCategory
 from app.core.database import get_db
 import uuid
