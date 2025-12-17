@@ -55,8 +55,8 @@ const PlanningDashboard = () => {
             const projectStats = projectStatsRes.data;
 
             setSummary({
-                total_projects: projectStats.total,
-                total_tasks_running: tasks.in_progress, // Mapping 'running' to 'in_progress'
+                total_projects: projectStats.total, // Source: Authoritative Project Overview Service
+                total_tasks_running: tasks.in_progress, // Source: Unified Dashboard Overview (Tasks)
                 machines_active: machines.active,
                 pending_tasks: tasks.pending,
                 completed_tasks: tasks.completed,
