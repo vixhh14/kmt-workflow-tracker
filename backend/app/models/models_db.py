@@ -127,7 +127,7 @@ class Task(Base):
     actual_start_time = Column(DateTime(timezone=True), nullable=True)
     actual_end_time = Column(DateTime(timezone=True), nullable=True)
     total_held_seconds = Column(BigInteger, default=0)
-    expected_completion_time = Column(String, nullable=True)
+    expected_completion_time = Column(Integer, nullable=True)
 
     # Relationships
     machine = relationship("Machine")
