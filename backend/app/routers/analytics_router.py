@@ -97,13 +97,24 @@ async def get_operator_performance(
         "graph_data": graph_data
     }
 
+from app.services.project_overview_service import get_project_overview_stats
+
+@router.get("/project-overview")
+async def project_overview(db: Session = Depends(get_db)):
+    """
+    Get unified project overview statistics.
+    Single source of truth for all dashboards.
+    """
+    return get_project_overview_stats(db)
+
 @router.get("/task-summary")
 async def get_task_summary(db: Session = Depends(get_db)):
     """
-    Get summary of tasks by status for the admin dashboard.
+    Legacy endpoint - kept for backward compatibility if needed, 
+    but prefer /project-overview for project stats.
     """
-    # Total Projects (Unique projects)
-    total_projects = db.query(func.count(func.distinct(Task.project))).scalar()
+    # Reuse the logic but format it as expected by old frontend components if any
+    project_stats = get_project_overview_stats(db)
     
     # Task Status Counts
     status_counts = db.query(
@@ -111,55 +122,8 @@ async def get_task_summary(db: Session = Depends(get_db)):
     ).group_by(Task.status).all()
     
     status_map = {status: count for status, count in status_counts}
-    
-    # Project Status Counts (Approximate based on tasks)
-    # "Status of Projects": TOTAL, COMPLETED, IN PROGRESS, YET TO START, HELD
-    # This is tricky because a project has multiple tasks. 
-    # Usually "Project Status" is derived from its tasks.
-    # If ALL tasks are completed -> Completed
-    # If ANY task is in progress -> In Progress
-    # If ALL tasks are pending -> Yet to Start
-    # If ANY task is on hold (and none in progress?) -> Held
-    
-    # For now, let's just return task counts as requested for the "Status of Projects" block 
-    # if the user meant "Tasks" but labeled it "Projects".
-    # BUT the prompt says "Status of Projects block: TOTAL, COMPLETED, IN PROGRESS, YET TO START, HELD".
-    # And "Remove Total Tasks...".
-    # So we need PROJECT level stats.
-    
-    # Let's aggregate projects.
-    projects = db.query(Task.project, Task.status).all()
-    project_status_map = {} # project_name -> list of statuses
-    
-    for proj, status in projects:
-        if not proj: continue
-        if proj not in project_status_map:
-            project_status_map[proj] = []
-        project_status_map[proj].append(status)
-        
-    project_stats = {
-        "total": len(project_status_map),
-        "completed": 0,
-        "in_progress": 0,
-        "yet_to_start": 0,
-        "held": 0
-    }
-    
-    for proj, statuses in project_status_map.items():
-        if all(s == 'completed' for s in statuses):
-            project_stats["completed"] += 1
-        elif all(s == 'pending' for s in statuses):
-            project_stats["yet_to_start"] += 1
-        elif any(s == 'in_progress' for s in statuses):
-            project_stats["in_progress"] += 1
-        elif any(s == 'on_hold' for s in statuses):
-            project_stats["held"] += 1
-        else:
-            # Default to in_progress or yet_to_start?
-            # If mix of completed and pending -> In Progress
-            project_stats["in_progress"] += 1
 
     return {
         "project_stats": project_stats,
-        "task_stats": status_map # Keep this just in case
+        "task_stats": status_map
     }
