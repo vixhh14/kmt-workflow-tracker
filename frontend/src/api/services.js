@@ -49,6 +49,7 @@ export const getOperatorPerformance = (month, year, operator_id = null) => {
     return api.get('/analytics/operator-performance', { params });
 };
 export const getDashboardOverview = () => api.get('/analytics/overview');
+export const getProjectOverviewStats = () => api.get('/analytics/project-overview');
 
 /* -------------------- OUTSOURCE -------------------- */
 export const getOutsource = () => api.get('/outsource');
