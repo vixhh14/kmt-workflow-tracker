@@ -293,8 +293,8 @@ const SupervisorDashboard = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
                     <StatCard
-                        title="Total Tasks"
-                        value={taskStats.total_tasks || 0}
+                        title="Total Projects"
+                        value={projectSummary.total_projects || 0}
                         icon={Folder}
                         color="bg-purple-500"
                     />

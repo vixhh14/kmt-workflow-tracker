@@ -12,6 +12,21 @@ const COLORS = {
     'On Hold': '#f59e0b',
 };
 
+const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
+    <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+        <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600 mb-1 truncate">{title}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</p>
+                {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+            </div>
+            <div className={`p-2 sm:p-3 rounded-full ${color} flex-shrink-0 ml-2`}>
+                <Icon className="text-white" size={20} />
+            </div>
+        </div>
+    </div>
+);
+
 const AdminDashboard = () => {
     const [projects, setProjects] = useState([]);
     const [selectedProject, setSelectedProject] = useState('all');
