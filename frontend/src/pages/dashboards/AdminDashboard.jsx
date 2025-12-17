@@ -190,18 +190,17 @@ const AdminDashboard = () => {
                 </button>
             </div>
 
-            {/* Unified Project Status Overview */}
+            {/* Unified Operations Overview */}
             <div className="bg-white rounded-lg shadow p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
                     <div className="flex items-center">
                         <BarChart3 className="text-blue-600 mr-2" size={24} />
-                        <h2 className="text-lg font-semibold text-gray-900">Project Status Overview</h2>
+                        <h2 className="text-lg font-semibold text-gray-900">Operations Overview</h2>
                     </div>
-                    {/* Project filter reduced to simple display since we show unified overview now */}
                     <span className="text-sm text-gray-500">Global Overview</span>
                 </div>
 
-                {/* Status Cards - Explicitly Project Stats */}
+                {/* Status Cards - Aligned with Supervisor (Total Projects + Task Stats) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
                     <StatCard
                         title="Total Projects"
@@ -210,26 +209,26 @@ const AdminDashboard = () => {
                         color="bg-purple-500"
                     />
                     <StatCard
-                        title="Yet to Start"
-                        value={projectStats.yet_to_start}
+                        title="Pending Tasks"
+                        value={taskStats.pending}
                         icon={Clock}
                         color="bg-gray-500"
                     />
                     <StatCard
-                        title="In Progress"
-                        value={projectStats.in_progress}
+                        title="In Progress Tasks"
+                        value={taskStats.in_progress}
                         icon={TrendingUp}
                         color="bg-blue-500"
                     />
                     <StatCard
-                        title="Completed"
-                        value={projectStats.completed}
+                        title="Completed Tasks"
+                        value={taskStats.completed}
                         icon={CheckCircle}
                         color="bg-green-500"
                     />
                     <StatCard
-                        title="On Hold"
-                        value={projectStats.held}
+                        title="On Hold Tasks"
+                        value={taskStats.on_hold}
                         icon={Pause}
                         color="bg-yellow-500"
                     />
