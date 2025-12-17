@@ -73,7 +73,7 @@ export const deleteSubtask = (subtaskId) => api.delete(`/subtasks/${subtaskId}`)
 /* -------------------- ADMIN -------------------- */
 
 export const getPendingUsers = () => api.get('/admin/pending-users');
-export const approveUser = (username, unitId) => api.post(`/admin/users/${username}/approve`, { unit_id: unitId });
+export const approveUser = (username, unitId, role = null) => api.post(`/admin/users/${username}/approve`, { unit_id: unitId, role: role });
 export const rejectUser = (username) => api.post(`/admin/users/${username}/reject`);
 
 /* -------------------- UNITS -------------------- */

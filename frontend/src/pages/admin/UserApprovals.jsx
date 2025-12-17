@@ -8,12 +8,23 @@ const UserApprovals = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
+    const [selectedRoles, setSelectedRoles] = useState({});
     const [selectedUnits, setSelectedUnits] = useState({});
-    const [processing, setProcessing] = useState({}); // Track processing state per user
+    const [processing, setProcessing] = useState({});
 
     useEffect(() => {
         fetchData();
     }, []);
+
+    useEffect(() => {
+        if (users.length > 0) {
+            const initialRoles = {};
+            users.forEach(u => {
+                initialRoles[u.username] = u.role || 'operator';
+            });
+            setSelectedRoles(initialRoles);
+        }
+    }, [users]);
 
     const fetchData = async () => {
         try {
@@ -25,33 +36,17 @@ const UserApprovals = () => {
                 getUnits()
             ]);
 
-            // Safely handle response data with null checks
             setUsers(Array.isArray(usersRes?.data) ? usersRes.data : []);
             setUnits(Array.isArray(unitsRes?.data) ? unitsRes.data : []);
         } catch (err) {
             console.error('Error fetching approval data:', err);
-
-            // Provide more specific error messages
-            if (err.response?.status === 401) {
-                setError('Session expired. Please log in again.');
-            } else if (err.response?.status === 403) {
-                setError('You do not have permission to view this page.');
-            } else if (err.response?.status === 404) {
-                setError('API endpoint not found. Please contact support.');
-            } else if (!err.response) {
-                setError('Cannot connect to server. Please check your internet connection.');
-            } else {
-                setError(err.response?.data?.detail || 'Failed to load pending users or units.');
-            }
-
-            // Set empty arrays to prevent rendering errors
+            setError(err.response?.data?.detail || 'Failed to load pending users or units.');
             setUsers([]);
             setUnits([]);
         } finally {
             setLoading(false);
         }
     };
-
 
     const handleUnitChange = (username, unitId) => {
         setSelectedUnits(prev => ({
@@ -60,10 +55,25 @@ const UserApprovals = () => {
         }));
     };
 
+
+    const handleRoleChange = (username, role) => {
+        setSelectedRoles(prev => ({
+            ...prev,
+            [username]: role
+        }));
+    };
+
     const handleApprove = async (username) => {
         const unitId = selectedUnits[username];
+        const role = selectedRoles[username];
+
         if (!unitId) {
             setError(`Please select a unit for ${username} before approving.`);
+            return;
+        }
+
+        if (!role) {
+            setError(`Please select a role for ${username} before approving.`);
             return;
         }
 
@@ -72,14 +82,19 @@ const UserApprovals = () => {
         setSuccessMsg('');
 
         try {
-            await approveUser(username, unitId);
-            setSuccessMsg(`User ${username} approved successfully.`);
+            await approveUser(username, unitId, role);
+            setSuccessMsg(`User ${username} approved successfully as ${role}.`);
             // Remove user from list
             setUsers(prev => prev.filter(u => u.username !== username));
             // Clear selection
-            const newSelected = { ...selectedUnits };
-            delete newSelected[username];
-            setSelectedUnits(newSelected);
+            const newUnits = { ...selectedUnits };
+            delete newUnits[username];
+            setSelectedUnits(newUnits);
+
+            const newRoles = { ...selectedRoles };
+            delete newRoles[username];
+            setSelectedRoles(newRoles);
+
         } catch (err) {
             console.error('Approval error:', err);
             setError(err.response?.data?.detail || `Failed to approve ${username}`);
@@ -87,6 +102,35 @@ const UserApprovals = () => {
             setProcessing(prev => ({ ...prev, [username]: null }));
         }
     };
+
+    // ... handleReject ...
+
+    // ... render ...
+
+    <td className="px-6 py-4">
+        <div className="flex flex-col space-y-2">
+            <select
+                value={selectedRoles[user.username] || user.role || 'operator'}
+                onChange={(e) => handleRoleChange(user.username, e.target.value)}
+                className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1"
+            >
+                <option value="operator">Operator</option>
+                <option value="supervisor">Supervisor</option>
+                <option value="planning">Planning</option>
+                <option value="admin">Admin</option>
+            </select>
+
+            {user.machine_types && (
+                <div className="flex flex-wrap gap-1">
+                    {user.machine_types.split(',').map((skill, idx) => (
+                        <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                            {skill.trim()}
+                        </span>
+                    ))}
+                </div>
+            )}
+        </div>
+    </td>
 
     const handleReject = async (username) => {
         if (!window.confirm(`Are you sure you want to reject ${username}?`)) return;
@@ -175,16 +219,28 @@ const UserApprovals = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="text-sm text-gray-900 capitalize">{user.role}</div>
-                                            {user.machine_types && (
-                                                <div className="flex flex-wrap gap-1 mt-1">
-                                                    {user.machine_types.split(',').map((skill, idx) => (
-                                                        <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                                                            {skill.trim()}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            )}
+                                            <div className="flex flex-col space-y-2">
+                                                <select
+                                                    value={selectedRoles[user.username] || user.role || 'operator'}
+                                                    onChange={(e) => handleRoleChange(user.username, e.target.value)}
+                                                    className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1"
+                                                >
+                                                    <option value="operator">Operator</option>
+                                                    <option value="supervisor">Supervisor</option>
+                                                    <option value="planning">Planning</option>
+                                                    <option value="admin">Admin</option>
+                                                </select>
+
+                                                {user.machine_types && (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {user.machine_types.split(',').map((skill, idx) => (
+                                                            <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                                                {skill.trim()}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center space-x-2">
