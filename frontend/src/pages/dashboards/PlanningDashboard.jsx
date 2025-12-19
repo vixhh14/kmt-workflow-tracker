@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getPlanningDashboardSummary } from '../../api/planning';
 import { getDashboardOverview, getProjectOverviewStats } from '../../api/services';
-import { Folder, TrendingUp, Settings, Clock, CheckCircle, Users, Activity, RefreshCw } from 'lucide-react';
+import { Folder, TrendingUp, Settings, Clock, CheckCircle, Users, Activity, RefreshCw, Pause, UserPlus } from 'lucide-react';
+import QuickAssign from '../../components/QuickAssign';
 
 const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
     <div className="bg-white rounded-lg shadow p-4 sm:p-6">
@@ -55,11 +56,12 @@ const PlanningDashboard = () => {
             const projectStats = projectStatsRes.data;
 
             setSummary({
-                total_projects: projectStats.total, // Source: Authoritative Project Overview Service
-                total_tasks_running: tasks.in_progress, // Source: Unified Dashboard Overview (Tasks)
+                total_projects: projectStats.total,
+                total_tasks_running: tasks.in_progress,
                 machines_active: machines.active,
                 pending_tasks: tasks.pending,
                 completed_tasks: tasks.completed,
+                on_hold_tasks: tasks.on_hold,
                 project_summary: Array.isArray(response.data?.project_summary) ? response.data.project_summary : [],
                 operator_status: Array.isArray(response.data?.operator_status) ? response.data.operator_status : []
             });
@@ -131,25 +133,19 @@ const PlanningDashboard = () => {
                     title="Total Projects"
                     value={summary.total_projects}
                     icon={Folder}
-                    color="bg-blue-500"
-                />
-                <StatCard
-                    title="Running Tasks"
-                    value={summary.total_tasks_running}
-                    icon={TrendingUp}
                     color="bg-purple-500"
-                />
-                <StatCard
-                    title="Machines Active"
-                    value={summary.machines_active}
-                    icon={Settings}
-                    color="bg-green-500"
                 />
                 <StatCard
                     title="Pending Tasks"
                     value={summary.pending_tasks}
                     icon={Clock}
-                    color="bg-yellow-500"
+                    color="bg-gray-500"
+                />
+                <StatCard
+                    title="Running Tasks"
+                    value={summary.total_tasks_running}
+                    icon={TrendingUp}
+                    color="bg-blue-500"
                 />
                 <StatCard
                     title="Completed Tasks"
@@ -157,7 +153,15 @@ const PlanningDashboard = () => {
                     icon={CheckCircle}
                     color="bg-green-500"
                 />
+                <StatCard
+                    title="On Hold Tasks"
+                    value={summary.on_hold_tasks}
+                    icon={Pause}
+                    color="bg-yellow-500"
+                />
             </div>
+
+            <QuickAssign onAssignSuccess={fetchDashboard} />
 
             {/* Project Summary */}
             <div className="bg-white rounded-lg shadow p-4 sm:p-6">

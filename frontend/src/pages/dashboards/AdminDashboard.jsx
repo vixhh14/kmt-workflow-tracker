@@ -4,8 +4,8 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recha
 import { TrendingUp, CheckCircle, Clock, Pause, UserCheck, UserX, Folder, RefreshCw, BarChart3 } from 'lucide-react';
 import ReportsSection from './ReportsSection';
 import { getDashboardOverview, getProjectOverviewStats } from '../../api/services';
-import { getRunningTasks } from '../../api/supervisor';
-import { Play } from 'lucide-react';
+import { Play, RefreshCw, BarChart3 } from 'lucide-react';
+import QuickAssign from '../../components/QuickAssign';
 
 const COLORS = {
     'Yet to Start': '#6b7280',
@@ -320,6 +320,9 @@ const AdminDashboard = () => {
                     )}
                 </div>
             </div>
+
+            {/* Quick Assign - Pending Tasks (Now for Admin too) */}
+            <QuickAssign onAssignSuccess={fetchDashboard} />
 
             {/* Task Statistics & Chart */}
             <div className="bg-white rounded-lg shadow p-4 sm:p-6">

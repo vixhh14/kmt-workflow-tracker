@@ -55,6 +55,20 @@ export const downloadMonthlyPerformance = (year) => {
     });
 };
 
+// --- NEW DETAILED REPORTs ---
+
+export const getMachineDetailedReport = (machineId, date) => {
+    return api.get('/reports/machine-detailed', { params: { machine_id: machineId, target_date: date } });
+};
+
+export const getUserDetailedReport = (userId, date) => {
+    return api.get('/reports/user-detailed', { params: { user_id: userId, target_date: date } });
+};
+
+export const getActiveWorkMonitoring = () => {
+    return api.get('/reports/active-monitoring');
+};
+
 // --- LEGACY ---
 
 // Legacy endpoints (for backward compatibility)

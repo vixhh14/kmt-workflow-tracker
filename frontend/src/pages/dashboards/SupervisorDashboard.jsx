@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getPendingTasks, getRunningTasks, getTaskStatus, getProjectsSummary, getTaskStats, assignTask, getProjectSummary, getPriorityStatus, getOperators } from '../../api/supervisor';
+import { getRunningTasks, getTaskStatus, getProjectsSummary, getTaskStats, getProjectSummary, getPriorityStatus } from '../../api/supervisor';
+import QuickAssign from '../../components/QuickAssign';
 import { getUsers } from '../../api/services';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Folder, CheckCircle, Clock, TrendingUp, AlertCircle, RefreshCw, UserPlus, Play, Users, X } from 'lucide-react';
@@ -40,7 +41,6 @@ const SupervisorDashboard = () => {
         pending_projects: 0,
         active_projects: 0
     });
-    const [pendingTasks, setPendingTasks] = useState([]);
     const [runningTasks, setRunningTasks] = useState([]);
     const [operatorStatus, setOperatorStatus] = useState([]);
     const [projectsDistribution, setProjectsDistribution] = useState({});
@@ -53,12 +53,8 @@ const SupervisorDashboard = () => {
         available_projects: [],
         selected_project: 'all'
     });
-    const [operators, setOperators] = useState([]);
     const [selectedOperator, setSelectedOperator] = useState('all');
     const [selectedProject, setSelectedProject] = useState('all');
-    const [showAssignModal, setShowAssignModal] = useState(false);
-    const [selectedTask, setSelectedTask] = useState(null);
-    const [assigningOperator, setAssigningOperator] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -85,12 +81,10 @@ const SupervisorDashboard = () => {
 
             console.log('🔄 Fetching supervisor dashboard...');
 
-            const [overviewRes, summaryRes, pendingRes, runningRes, operatorsRes, projectsRes, statsRes, operatorStatusRes, projectStatsRes] = await Promise.all([
+            const [overviewRes, summaryRes, runningRes, projectsRes, statsRes, operatorStatusRes, projectStatsRes] = await Promise.all([
                 getDashboardOverview(),
                 getProjectSummary(),
-                getPendingTasks(),
                 getRunningTasks(),
-                getOperators(),
                 getProjectsSummary(),
                 getTaskStats(),
                 getTaskStatus(),
@@ -109,9 +103,7 @@ const SupervisorDashboard = () => {
                 active_projects: projectStats.in_progress + projectStats.held
             });
 
-            setPendingTasks(Array.isArray(pendingRes.data) ? pendingRes.data : []);
             setRunningTasks(Array.isArray(runningRes.data) ? runningRes.data : []);
-            setOperators(Array.isArray(operatorsRes.data) ? operatorsRes.data : []);
             setProjectsDistribution(projectsRes.data || {});
 
             // Overwrite unified stats, keep project list
@@ -325,52 +317,7 @@ const SupervisorDashboard = () => {
                 </div>
             </div>
 
-            {/* Quick Assign - Pending Tasks */}
-            <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center">
-                        <UserPlus className="text-blue-600 mr-2" size={24} />
-                        <h2 className="text-lg font-semibold text-gray-900">Quick Assign – Pending Tasks</h2>
-                    </div>
-                    <span className="text-sm text-gray-600">{pendingTasks.length} task(s)</span>
-                </div>
-                {pendingTasks.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {pendingTasks.map(task => (
-                            <div key={task.id} className="border rounded-lg p-4 hover:shadow-lg transition">
-                                <div className="flex items-start justify-between mb-2">
-                                    <h3 className="font-medium text-gray-900 flex-1">{task.title || 'Untitled Task'}</h3>
-                                    {task.priority && (
-                                        <span className={`px-2 py-1 text-xs font-medium rounded ${getPriorityColor(task.priority)}`}>
-                                            {task.priority.toUpperCase()}
-                                        </span>
-                                    )}
-                                </div>
-                                {task.project && (
-                                    <p className="text-sm text-gray-600 mb-2">📁 {task.project}</p>
-                                )}
-                                {task.machine_name && (
-                                    <p className="text-sm text-gray-600 mb-2">⚙️ {task.machine_name}</p>
-                                )}
-                                {task.due_date && (
-                                    <p className="text-sm text-gray-600 mb-3">📅 Due: {task.due_date}</p>
-                                )}
-                                <button
-                                    onClick={() => handleAssignClick(task)}
-                                    className="w-full bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium"
-                                >
-                                    Assign to Operator
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-center py-12 text-gray-500">
-                        <CheckCircle className="mx-auto mb-4" size={48} />
-                        <p>No pending tasks to assign</p>
-                    </div>
-                )}
-            </div>
+            <QuickAssign onAssignSuccess={fetchDashboard} />
 
             {/* Running Tasks */}
             <div className="bg-white rounded-lg shadow p-4 sm:p-6">
@@ -407,8 +354,8 @@ const SupervisorDashboard = () => {
                                                 <p className="flex justify-between text-gray-600"><span>Started:</span> <span className="font-medium text-gray-900 ml-2">{formatTime(task.started_at)}</span></p>
                                                 <p className="flex justify-between text-gray-600"><span>Expected:</span> <span className="font-medium text-gray-900 ml-2">{task.expected_completion_time || 0}m</span></p>
                                                 <p className="flex justify-between text-gray-600"><span>Net Dur:</span> <span className={`font-bold ml-2 ${task.expected_completion_time && (task.duration_seconds / 60) > task.expected_completion_time
-                                                        ? 'text-red-600'
-                                                        : 'text-green-600'
+                                                    ? 'text-red-600'
+                                                    : 'text-green-600'
                                                     }`}>{formatDuration(task.duration_seconds)}</span></p>
                                             </div>
                                             <div className="text-xs space-y-1">
@@ -501,58 +448,6 @@ const SupervisorDashboard = () => {
                 </div>
             </div>
 
-            {/* Assign Task Modal */}
-            {showAssignModal && selectedTask && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-gray-900">Assign Task</h3>
-                            <button
-                                onClick={() => setShowAssignModal(false)}
-                                className="text-gray-500 hover:text-gray-700"
-                            >
-                                <X size={24} />
-                            </button>
-                        </div>
-                        <div className="mb-4">
-                            <p className="text-sm text-gray-600 mb-2">Task: <span className="font-medium">{selectedTask.title}</span></p>
-                            {selectedTask.project && (
-                                <p className="text-sm text-gray-600 mb-2">Project: <span className="font-medium">{selectedTask.project}</span></p>
-                            )}
-                        </div>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Select Operator</label>
-                            <select
-                                value={assigningOperator}
-                                onChange={(e) => setAssigningOperator(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="">-- Select Operator --</option>
-                                {operators.map(op => (
-                                    <option key={op.user_id} value={op.user_id}>
-                                        {op.full_name || op.username}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => setShowAssignModal(false)}
-                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleAssignSubmit}
-                                disabled={!assigningOperator}
-                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                Assign
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

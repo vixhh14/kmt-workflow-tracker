@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getTasks, createTask, deleteTask, getMachines, getUsers, updateTask, getProjects } from '../api/services';
-import { Plus, Trash2, CheckSquare, Search, Filter, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, CheckSquare, Search, Filter, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Clock } from 'lucide-react';
 import Subtask from '../components/Subtask';
+import { minutesToHHMM, hhmmToMinutes, validateHHMM } from '../utils/timeFormat';
 
 const Tasks = () => {
     const [tasks, setTasks] = useState([]);
@@ -112,10 +113,22 @@ const Tasks = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
+            if (!validateHHMM(formData.expected_completion_time)) {
+                alert('Invalid duration format. Please use HH:MM (e.g. 02:30)');
+                return;
+            }
+
+            const durationMinutes = hhmmToMinutes(formData.expected_completion_time);
+            if (durationMinutes <= 0) {
+                alert('Expected duration must be greater than 0');
+                return;
+            }
+
             // Normalize date to ISO string
             const payload = {
                 ...formData,
                 due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null, // Ensures ISO format
+                expected_completion_time: durationMinutes
             };
 
             await createTask(payload);
@@ -562,17 +575,16 @@ const Tasks = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Expected Duration (Minutes) *</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Expected Duration (HH:MM) *</label>
                                 <input
-                                    type="number"
-                                    min="1"
+                                    type="text"
                                     required
-                                    placeholder="e.g. 120"
+                                    placeholder="e.g. 02:30"
                                     value={formData.expected_completion_time}
                                     onChange={(e) => setFormData({ ...formData, expected_completion_time: e.target.value })}
                                     className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
-                                <p className="text-xs text-gray-400 mt-1">Enter total minutes (e.g. 2 hours = 120)</p>
+                                <p className="text-xs text-gray-400 mt-1">Enter hours and minutes (e.g. 02:30 = 150 mins). Total: {hhmmToMinutes(formData.expected_completion_time)}m</p>
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
@@ -718,13 +730,13 @@ const Tasks = () => {
                                                                     <div className="space-y-1 text-xs">
                                                                         <p className="flex justify-between">
                                                                             <span className="text-gray-500">Expected:</span>
-                                                                            <span className="font-medium text-gray-900">{task.expected_completion_time || '0'} mins</span>
+                                                                            <span className="font-medium text-gray-900">{minutesToHHMM(task.expected_completion_time)} ({task.expected_completion_time || '0'}m)</span>
                                                                         </p>
                                                                         <p className="flex justify-between">
                                                                             <span className="text-gray-500">Actual (Net):</span>
                                                                             <span className={`font-bold ${task.expected_completion_time && (task.total_duration_seconds / 60) > task.expected_completion_time
-                                                                                    ? 'text-red-600'
-                                                                                    : 'text-green-600'
+                                                                                ? 'text-red-600'
+                                                                                : 'text-green-600'
                                                                                 }`}>
                                                                                 {Math.floor(task.total_duration_seconds / 60)} mins
                                                                             </span>
