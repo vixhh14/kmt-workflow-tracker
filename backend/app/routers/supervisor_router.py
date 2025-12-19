@@ -17,6 +17,10 @@ router = APIRouter(
 class AssignTaskRequest(BaseModel):
     task_id: str
     operator_id: str
+    machine_id: Optional[str] = None
+    priority: Optional[str] = None
+    expected_completion_time: Optional[int] = None
+    due_date: Optional[str] = None
 
 @router.get("/pending-tasks")
 async def get_pending_tasks(db: Session = Depends(get_db)):
@@ -251,6 +255,15 @@ async def assign_task(request: AssignTaskRequest, db: Session = Depends(get_db))
         
         task.assigned_to = request.operator_id
         task.status = 'pending'
+        
+        if request.machine_id:
+            task.machine_id = request.machine_id
+        if request.priority:
+            task.priority = request.priority
+        if request.expected_completion_time is not None:
+            task.expected_completion_time = request.expected_completion_time
+        if request.due_date:
+            task.due_date = request.due_date
         
         db.commit()
         db.refresh(task)

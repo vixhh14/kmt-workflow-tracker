@@ -5,7 +5,7 @@ from typing import List, Optional
 from datetime import datetime, date, timedelta
 from app.core.database import get_db
 from app.core.time_utils import get_current_time_ist, get_today_date_ist, IST
-from app.models.models_db import Task, TaskTimeLog, Machine, User, Attendance, MachineRuntimeLog, UserWorkLog, Unit, MachineCategory, Project
+from app.models.models_db import Task, TaskTimeLog, Machine, User, Attendance, MachineRuntimeLog, UserWorkLog, Unit, MachineCategory, Project, TaskHold
 from app.utils.csv_utils import generate_csv_stream, format_duration_hms
 from fastapi.responses import StreamingResponse
 import io
@@ -136,6 +136,93 @@ def calculate_user_activity(db: Session, target_date: date) -> List[dict]:
         })
 
         
+    return results
+
+def calculate_detailed_machine_activity(db: Session, machine_id: str, target_date: date) -> List[dict]:
+    """
+    Get granular activity sessions for a specific machine on a given date.
+    """
+    logs = db.query(MachineRuntimeLog).filter(
+        MachineRuntimeLog.machine_id == machine_id,
+        MachineRuntimeLog.date == target_date
+    ).order_by(MachineRuntimeLog.start_time.asc()).all()
+    
+    results = []
+    now = get_current_time_ist()
+    for log in logs:
+        task = db.query(Task).filter(Task.id == log.task_id).first()
+        
+        # Determine operator for this interval
+        user_log = db.query(UserWorkLog).filter(
+            UserWorkLog.task_id == log.task_id,
+            UserWorkLog.machine_id == machine_id,
+            UserWorkLog.start_time <= log.start_time
+        ).order_by(UserWorkLog.start_time.desc()).first()
+        
+        operator_name = "Unknown"
+        if user_log:
+            user = db.query(User).filter(User.user_id == user_log.user_id).first()
+            operator_name = user.full_name or user.username if user else "Unknown"
+        elif task:
+            user = db.query(User).filter(User.user_id == task.assigned_to).first()
+            operator_name = user.full_name or user.username if user else "Unknown"
+
+        duration = log.duration_seconds
+        if log.end_time is None and log.date == get_today_date_ist():
+            duration = int((now - log.start_time).total_seconds())
+
+        results.append({
+            "task_id": log.task_id,
+            "task_title": task.title if task else "Deleted Task",
+            "operator": operator_name,
+            "start_time": log.start_time.isoformat(),
+            "end_time": log.end_time.isoformat() if log.end_time else None,
+            "runtime_seconds": max(0, duration),
+            "held_time_seconds": task.total_held_seconds if task else 0,
+            "status": "Running" if log.end_time is None else "Finished"
+        })
+    return results
+
+def calculate_detailed_user_activity(db: Session, user_id: str, target_date: date) -> List[dict]:
+    """
+    Get granular activity sessions for a specific user on a given date with hold intervals.
+    """
+    logs = db.query(UserWorkLog).filter(
+        UserWorkLog.user_id == user_id,
+        UserWorkLog.date == target_date
+    ).order_by(UserWorkLog.start_time.asc()).all()
+    
+    results = []
+    now = get_current_time_ist()
+    for log in logs:
+        task = db.query(Task).filter(Task.id == log.task_id).first()
+        machine = db.query(Machine).filter(Machine.id == log.machine_id).first() if log.machine_id else None
+        
+        holds = db.query(TaskHold).filter(TaskHold.task_id == log.task_id).all()
+        hold_history = [
+            {
+                "start": h.hold_started_at.isoformat(),
+                "end": h.hold_ended_at.isoformat() if h.hold_ended_at else None,
+                "reason": h.hold_reason,
+                "duration_seconds": int((h.hold_ended_at - h.hold_started_at).total_seconds()) if h.hold_ended_at else 0
+            }
+            for h in holds
+        ]
+        
+        duration = log.duration_seconds
+        if log.end_time is None and log.date == get_today_date_ist():
+            duration = int((now - log.start_time).total_seconds())
+
+        results.append({
+            "task_id": log.task_id,
+            "task_title": task.title if task else "Deleted Task",
+            "machine_name": machine.machine_name if machine else "Manual/Handwork",
+            "start_time": log.start_time.isoformat(),
+            "end_time": log.end_time.isoformat() if log.end_time else None,
+            "duration_seconds": max(0, duration),
+            "holds": hold_history,
+            "status": "Running" if log.end_time is None else "Finished"
+        })
     return results
 
 def calculate_monthly_performance(db: Session, year: int) -> dict:
@@ -410,3 +497,34 @@ async def export_projects_summary_csv(year_month: Optional[str] = None, db: Sess
         'Content-Disposition': f'attachment; filename="{filename}"'
     }
     return StreamingResponse(iter([stream.getvalue()]), media_type="text/csv", headers=response_headers)
+@router.get("/machine-detailed")
+async def get_machine_detailed_report(
+    machine_id: str,
+    target_date: date = Query(default_factory=get_today_date_ist),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns granular activity sessions for a machine on a specific date.
+    """
+    return calculate_detailed_machine_activity(db, machine_id, target_date)
+
+@router.get("/user-detailed")
+async def get_user_detailed_report(
+    user_id: str,
+    target_date: date = Query(default_factory=get_today_date_ist),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns granular activity sessions for a user on a specific date.
+    """
+    return calculate_detailed_user_activity(db, user_id, target_date)
+
+@router.get("/active-monitoring")
+async def get_active_work_monitoring(db: Session = Depends(get_db)):
+    """
+    Live view of all currently running tasks across the shop floor.
+    """
+    from app.routers.supervisor_router import get_running_tasks
+    # Reuse the powerful supervisor logic
+    res = await get_running_tasks(db)
+    return res

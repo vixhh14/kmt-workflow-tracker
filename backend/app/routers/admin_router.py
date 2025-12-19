@@ -27,7 +27,8 @@ class ChangePasswordRequest(BaseModel):
 
 class ApproveUserRequest(BaseModel):
     unit_id: str
-    machine_types: Optional[str] = ""  # Made optional - comma separated list of machines/types
+    machine_types: Optional[str] = "" 
+    role: Optional[str] = "operator"
 
 
 class UserResponse(BaseModel):
