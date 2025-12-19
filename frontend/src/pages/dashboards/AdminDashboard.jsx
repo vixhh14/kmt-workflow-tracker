@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { getProjects, getAttendanceSummary } from '../../api/admin';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { TrendingUp, CheckCircle, Clock, Pause, UserCheck, UserX, Folder, RefreshCw, BarChart3 } from 'lucide-react';
+import { TrendingUp, CheckCircle, Clock, Pause, UserCheck, UserX, Folder, RefreshCw, BarChart3, Play } from 'lucide-react';
 import ReportsSection from './ReportsSection';
 import { getDashboardOverview, getProjectOverviewStats } from '../../api/services';
-import { Play, RefreshCw, BarChart3 } from 'lucide-react';
 import QuickAssign from '../../components/QuickAssign';
 
 const COLORS = {
