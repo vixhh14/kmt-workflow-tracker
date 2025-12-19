@@ -122,12 +122,13 @@ def calculate_user_activity(db: Session, target_date: date) -> List[dict]:
     
     for u_id, stats in sorted_users:
         work_time = stats["work_time"]
+        u_obj = stats["obj"]
         
         results.append({
-            "user_id": user.user_id,
-            "username": user.username,
-            "full_name": user.full_name,
-            "role": user.role,
+            "user_id": u_obj.user_id,
+            "username": u_obj.username,
+            "full_name": u_obj.full_name,
+            "role": u_obj.role,
             "date": target_date.isoformat(),
             "tasks_worked_count": stats["completed_tasks"],
             "total_work_seconds": work_time,
@@ -199,15 +200,15 @@ def calculate_detailed_user_activity(db: Session, user_id: str, target_date: dat
         machine = db.query(Machine).filter(Machine.id == log.machine_id).first() if log.machine_id else None
         
         holds = db.query(TaskHold).filter(TaskHold.task_id == log.task_id).all()
-        hold_history = [
-            {
+        hold_history = []
+        for h in holds:
+            h_end = h.hold_ended_at or (now if h.hold_started_at < now else h.hold_started_at)
+            hold_history.append({
                 "start": h.hold_started_at.isoformat(),
                 "end": h.hold_ended_at.isoformat() if h.hold_ended_at else None,
                 "reason": h.hold_reason,
-                "duration_seconds": int((h.hold_ended_at - h.hold_started_at).total_seconds()) if h.hold_ended_at else 0
-            }
-            for h in holds
-        ]
+                "duration_seconds": int((h_end - h.hold_started_at).total_seconds())
+            })
         
         duration = log.duration_seconds
         if log.end_time is None and log.date == get_today_date_ist():
