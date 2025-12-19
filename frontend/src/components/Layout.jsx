@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users as UsersIcon, Monitor, CheckSquare, Briefcase, Menu, LogOut, X, UserCheck, Lock, User, TrendingUp, Folder } from 'lucide-react';
+import { LayoutDashboard, Users as UsersIcon, Monitor, CheckSquare, Briefcase, Menu, LogOut, X, UserCheck, Lock, User, TrendingUp, Folder, BarChart3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Layout = ({ children }) => {
