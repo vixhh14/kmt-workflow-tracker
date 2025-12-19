@@ -144,7 +144,14 @@ def calculate_monthly_performance(db: Session, year: int) -> dict:
         if t.completed_at:
             m = t.completed_at.month
             data_by_month[m]["total_tasks"] += 1
-            data_by_month[m]["total_duration"] += (t.total_duration_seconds or 0)
+            
+            d = t.total_duration_seconds or 0
+            if d == 0 and t.actual_start_time and t.actual_end_time:
+                elapsed = (t.actual_end_time - t.actual_start_time).total_seconds()
+                held = t.total_held_seconds or 0
+                d = max(0, int(elapsed - held))
+            
+            data_by_month[m]["total_duration"] += d
             
     chart_data = []
     months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -365,8 +372,15 @@ async def export_projects_summary_csv(year_month: Optional[str] = None, db: Sess
                 "count": 0,
                 "duration": 0
             }
+            
+        d = t.total_duration_seconds or 0
+        if d == 0 and t.actual_start_time and t.actual_end_time:
+            elapsed = (t.actual_end_time - t.actual_start_time).total_seconds()
+            held = t.total_held_seconds or 0
+            d = max(0, int(elapsed - held))
+            
         project_stats[pid]["count"] += 1
-        project_stats[pid]["duration"] += (t.total_duration_seconds or 0)
+        project_stats[pid]["duration"] += d
         
     headers = [
         "Project ID", "Project Name", "Work Order Number", "Client Name",

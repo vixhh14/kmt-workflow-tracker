@@ -59,7 +59,16 @@ async def get_operator_performance(
     # Or just return 0 for now if not easily available, or check if we can query RescheduleRequest.
     
     # Calculate total duration
-    total_duration_seconds = sum(t.total_duration_seconds for t in completed_tasks)
+    total_duration_seconds = 0
+    for t in completed_tasks:
+        d = t.total_duration_seconds or 0
+        # If duration is 0 but we have start/end, recalculate (safely handles legacy or corrupted data)
+        if d == 0 and t.actual_start_time and t.actual_end_time:
+            elapsed = (t.actual_end_time - t.actual_start_time).total_seconds()
+            held = t.total_held_seconds or 0
+            d = max(0, int(elapsed - held))
+        total_duration_seconds += d
+        
     avg_time_per_task = total_duration_seconds / completed_count if completed_count > 0 else 0
 
     # Completion Percentage Formula: ((completed / total) * 100) - 2

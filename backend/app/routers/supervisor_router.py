@@ -82,7 +82,9 @@ async def get_running_tasks(db: Session = Depends(get_db)):
                 start_time = task.actual_start_time or task.started_at
                 start_aware = make_aware(start_time)
                 now = utc_now()
-                duration_seconds = int((now - start_aware).total_seconds())
+                total_elapsed = int((now - start_aware).total_seconds())
+                held_seconds = task.total_held_seconds or 0
+                duration_seconds = max(0, total_elapsed - held_seconds)
             
             task_list.append({
                 "id": task.id,
