@@ -4,8 +4,9 @@ from sqlalchemy import and_
 from datetime import datetime, timezone
 from typing import List
 from app.core.database import get_db
-from app.models.models_db import Task, TaskTimeLog, TaskHold, User, Machine
-from app.utils.datetime_utils import utc_now, make_aware, safe_datetime_diff
+from app.utils.datetime_utils import make_aware, safe_datetime_diff
+from app.core.time_utils import get_current_time_ist, get_today_date_ist
+from app.models.models_db import Task, TaskTimeLog, TaskHold, User, Machine, MachineRuntimeLog, UserWorkLog
 from uuid import uuid4
 
 router = APIRouter(
@@ -36,6 +37,18 @@ async def get_operator_tasks(
             machine = machine_map.get(task.machine_id)
             machine_name = machine.machine_name if machine else "Unknown"
             
+            # Fetch hold history for this task
+            hold_history = db.query(TaskHold).filter(TaskHold.task_id == task.id).order_by(TaskHold.hold_started_at.asc()).all()
+            holds = [
+                {
+                    "start": h.hold_started_at.isoformat() if h.hold_started_at else None,
+                    "end": h.hold_ended_at.isoformat() if h.hold_ended_at else None,
+                    "duration_seconds": safe_datetime_diff(h.hold_ended_at, h.hold_started_at) if h.hold_ended_at else 0,
+                    "reason": h.hold_reason or ""
+                }
+                for h in hold_history
+            ]
+            
             # Safely convert datetimes to ISO format
             task_data = {
                 "id": task.id,
@@ -61,7 +74,8 @@ async def get_operator_tasks(
                 "total_held_seconds": task.total_held_seconds or 0,
                 "hold_reason": task.hold_reason or "",
                 "denial_reason": task.denial_reason or "",
-                "expected_completion_time": task.expected_completion_time or ""
+                "expected_completion_time": task.expected_completion_time or "",
+                "holds": holds
             }
             task_list.append(task_data)
         
@@ -110,14 +124,39 @@ async def start_task(task_id: str, db: Session = Depends(get_db)):
         if task.status == 'completed':
             raise HTTPException(status_code=400, detail="Task is already completed")
         
-        now = utc_now()
+        now = get_current_time_ist()
         task.status = 'in_progress'
         
-        if not task.started_at:
-            task.started_at = now
+        # started_at is for the CURRENT session
+        task.started_at = now
         
-        task.actual_start_time = now
+        # actual_start_time is for the WHOLE task (only set once)
+        if not task.actual_start_time:
+            task.actual_start_time = now
         
+        # --- LOGGING START ---
+        today = get_today_date_ist()
+        # 1. Machine Runtime Log
+        if task.machine_id:
+            machine_log = MachineRuntimeLog(
+                machine_id=task.machine_id,
+                task_id=task_id,
+                start_time=now,
+                date=today
+            )
+            db.add(machine_log)
+            
+        # 2. User Work Log
+        user_log = UserWorkLog(
+            user_id=task.assigned_to,
+            task_id=task_id,
+            machine_id=task.machine_id,
+            start_time=now,
+            date=today
+        )
+        db.add(user_log)
+        # --- LOGGING END ---
+
         time_log = TaskTimeLog(
             id=str(uuid4()),
             task_id=task_id,
@@ -144,6 +183,12 @@ async def start_task(task_id: str, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to start task: {str(e)}")
 
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to start task: {str(e)}")
+
 
 @router.put("/tasks/{task_id}/complete")
 async def complete_task(task_id: str, db: Session = Depends(get_db)):
@@ -159,7 +204,7 @@ async def complete_task(task_id: str, db: Session = Depends(get_db)):
         if task.status == 'pending':
             raise HTTPException(status_code=400, detail="Cannot complete a task that hasn't been started")
         
-        now = utc_now()
+        now = get_current_time_ist()
         task.status = 'completed'
         task.completed_at = now
         task.actual_end_time = now
@@ -176,6 +221,23 @@ async def complete_task(task_id: str, db: Session = Depends(get_db)):
         else:
             task.total_duration_seconds = 0
         
+        # Close any open logs
+        open_machine_logs = db.query(MachineRuntimeLog).filter(
+            MachineRuntimeLog.task_id == task_id,
+            MachineRuntimeLog.end_time == None
+        ).all()
+        for m_log in open_machine_logs:
+            m_log.end_time = now
+            m_log.duration_seconds = safe_datetime_diff(now, m_log.start_time)
+            
+        open_user_logs = db.query(UserWorkLog).filter(
+            UserWorkLog.task_id == task_id,
+            UserWorkLog.end_time == None
+        ).all()
+        for u_log in open_user_logs:
+            u_log.end_time = now
+            u_log.duration_seconds = safe_datetime_diff(now, u_log.start_time)
+
         time_log = TaskTimeLog(
             id=str(uuid4()),
             task_id=task_id,
@@ -215,7 +277,7 @@ async def hold_task(task_id: str, reason: str = "", db: Session = Depends(get_db
         if task.status != 'in_progress':
             raise HTTPException(status_code=400, detail="Only in-progress tasks can be put on hold")
         
-        now = utc_now()
+        now = get_current_time_ist()
         task.status = 'on_hold'
         task.hold_reason = reason or "On hold"
         
@@ -227,6 +289,23 @@ async def hold_task(task_id: str, reason: str = "", db: Session = Depends(get_db
         )
         db.add(task_hold)
         
+        # Close any open logs
+        open_machine_logs = db.query(MachineRuntimeLog).filter(
+            MachineRuntimeLog.task_id == task_id,
+            MachineRuntimeLog.end_time == None
+        ).all()
+        for m_log in open_machine_logs:
+            m_log.end_time = now
+            m_log.duration_seconds = safe_datetime_diff(now, m_log.start_time)
+            
+        open_user_logs = db.query(UserWorkLog).filter(
+            UserWorkLog.task_id == task_id,
+            UserWorkLog.end_time == None
+        ).all()
+        for u_log in open_user_logs:
+            u_log.end_time = now
+            u_log.duration_seconds = safe_datetime_diff(now, u_log.start_time)
+
         time_log = TaskTimeLog(
             id=str(uuid4()),
             task_id=task_id,
@@ -265,7 +344,7 @@ async def resume_task(task_id: str, db: Session = Depends(get_db)):
         if task.status != 'on_hold':
             raise HTTPException(status_code=400, detail="Only on-hold tasks can be resumed")
         
-        now = utc_now()
+        now = get_current_time_ist()
         
         latest_hold = db.query(TaskHold).filter(
             and_(
@@ -281,8 +360,31 @@ async def resume_task(task_id: str, db: Session = Depends(get_db)):
             task.total_held_seconds = int(current_held + hold_duration)
         
         task.status = 'in_progress'
-        task.actual_start_time = now
+        # DO NOT overwrite actual_start_time here, as it should be the first start time.
+        # But we set started_at for the current session.
+        task.started_at = now
         
+        # --- LOGGING START ---
+        today = get_today_date_ist()
+        if task.machine_id:
+            machine_log = MachineRuntimeLog(
+                machine_id=task.machine_id,
+                task_id=task_id,
+                start_time=now,
+                date=today
+            )
+            db.add(machine_log)
+            
+        user_log = UserWorkLog(
+            user_id=task.assigned_to,
+            task_id=task_id,
+            machine_id=task.machine_id,
+            start_time=now,
+            date=today
+        )
+        db.add(user_log)
+        # --- LOGGING END ---
+
         time_log = TaskTimeLog(
             id=str(uuid4()),
             task_id=task_id,

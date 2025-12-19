@@ -48,8 +48,21 @@ async def read_tasks(
         query = query.filter(Task.assigned_to == assigned_to)
     
     tasks = query.all()
-    return [
-        {
+    results = []
+    for t in tasks:
+        # Fetch holds
+        hold_history = db.query(TaskHold).filter(TaskHold.task_id == t.id).order_by(TaskHold.hold_started_at.asc()).all()
+        holds = [
+            {
+                "start": h.hold_started_at.isoformat() if h.hold_started_at else None,
+                "end": h.hold_ended_at.isoformat() if h.hold_ended_at else None,
+                "duration_seconds": int((h.hold_ended_at - h.hold_started_at).total_seconds()) if h.hold_ended_at and h.hold_started_at else 0,
+                "reason": h.hold_reason or ""
+            }
+            for h in hold_history
+        ]
+        
+        results.append({
             "id": t.id,
             "title": t.title,
             "description": t.description,
@@ -72,9 +85,9 @@ async def read_tasks(
             "actual_start_time": t.actual_start_time.isoformat() if t.actual_start_time else None,
             "actual_end_time": t.actual_end_time.isoformat() if t.actual_end_time else None,
             "total_held_seconds": t.total_held_seconds,
-        }
-        for t in tasks
-    ]
+            "holds": holds
+        })
+    return results
 
 @router.post("/", response_model=TaskOut)
 async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
