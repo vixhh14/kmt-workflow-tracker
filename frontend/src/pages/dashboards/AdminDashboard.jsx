@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getProjects, getAttendanceSummary } from '../../api/admin';
+import { getRunningTasks } from '../../api/supervisor';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { TrendingUp, CheckCircle, Clock, Pause, UserCheck, UserX, Folder, RefreshCw, BarChart3, Play } from 'lucide-react';
 import ReportsSection from './ReportsSection';
