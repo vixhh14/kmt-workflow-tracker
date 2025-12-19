@@ -342,27 +342,51 @@ const OperatorDashboard = () => {
                                         <p className="mt-2 text-sm text-gray-700">{task.description}</p>
                                     )}
 
-                                    <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-500">
-                                        {task.started_at && (
-                                            <span>Started: {formatDate(task.started_at)}</span>
-                                        )}
-                                        {task.completed_at && (
-                                            <span>Completed: {formatDate(task.completed_at)}</span>
-                                        )}
-                                        {task.total_duration_seconds > 0 && (
-                                            <span>Duration: {formatDuration(task.total_duration_seconds)}</span>
-                                        )}
-                                        {task.total_held_seconds > 0 && (
-                                            <span>Held: {formatDuration(task.total_held_seconds)}</span>
-                                        )}
-                                    </div>
-
-                                    {task.hold_reason && task.status === 'on_hold' && (
-                                        <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
-                                            <span className="font-medium text-yellow-900">Hold Reason:</span>
-                                            <span className="text-yellow-800 ml-2">{task.hold_reason}</span>
+                                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-xs border-t pt-3">
+                                        <div className="space-y-1">
+                                            <p className="text-gray-500 font-medium uppercase tracking-wider">Timing Details</p>
+                                            {task.actual_start_time && (
+                                                <p><span className="text-gray-600">Started at:</span> <span className="text-gray-900 font-medium">{formatDate(task.actual_start_time)}</span></p>
+                                            )}
+                                            {task.actual_end_time && (
+                                                <p><span className="text-gray-600">Completed at:</span> <span className="text-gray-900 font-medium">{formatDate(task.actual_end_time)}</span></p>
+                                            )}
+                                            {task.expected_completion_time && (
+                                                <p><span className="text-gray-600">Expected Duration:</span> <span className="text-gray-900 font-medium">{task.expected_completion_time} mins</span></p>
+                                            )}
+                                            {(task.total_duration_seconds > 0 || task.status === 'completed') && (
+                                                <p>
+                                                    <span className="text-gray-600">Actual Duration:</span>
+                                                    <span className={`ml-1 font-bold ${task.expected_completion_time && (task.total_duration_seconds / 60) > task.expected_completion_time
+                                                            ? 'text-red-600'
+                                                            : 'text-green-600'
+                                                        }`}>
+                                                        {formatDuration(task.total_duration_seconds)}
+                                                    </span>
+                                                </p>
+                                            )}
                                         </div>
-                                    )}
+
+                                        <div className="space-y-1">
+                                            <p className="text-gray-500 font-medium uppercase tracking-wider">Held Time</p>
+                                            <p><span className="text-gray-600">Total Held:</span> <span className="text-gray-900 font-medium">{formatDuration(task.total_held_seconds || 0)}</span></p>
+
+                                            {task.holds && task.holds.length > 0 && (
+                                                <div className="mt-2 space-y-1 bg-gray-50 p-2 rounded border border-gray-100 max-h-32 overflow-y-auto">
+                                                    <p className="text-[10px] text-gray-400 font-bold uppercase">Hold Intervals:</p>
+                                                    {task.holds.map((hold, idx) => (
+                                                        <div key={idx} className="flex justify-between items-start text-[10px] py-1 border-b border-gray-100 last:border-0">
+                                                            <div>
+                                                                <p className="text-gray-700">{formatDate(hold.start).split(', ')[1]} → {hold.end ? formatDate(hold.end).split(', ')[1] : 'Present'}</p>
+                                                                {hold.reason && <p className="text-gray-500 italic">"{hold.reason}"</p>}
+                                                            </div>
+                                                            <span className="font-medium text-gray-900 pl-2">{formatDuration(hold.duration_seconds)}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* Action Buttons */}

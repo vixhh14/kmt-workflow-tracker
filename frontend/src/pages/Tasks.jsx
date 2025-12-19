@@ -684,7 +684,86 @@ const Tasks = () => {
                                     {expandedTaskId === task.id && (
                                         <tr>
                                             <td colSpan="8" className="px-3 sm:px-6 py-4 bg-gray-50 border-t border-gray-200">
-                                                <Subtask taskId={task.id} />
+                                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                                    {/* Subtasks Section */}
+                                                    <div>
+                                                        <Subtask taskId={task.id} />
+                                                    </div>
+
+                                                    {/* Timing Analytics Section */}
+                                                    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                                                        <h4 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide flex items-center">
+                                                            <Clock size={16} className="mr-2 text-blue-600" />
+                                                            Timing Analytics
+                                                        </h4>
+
+                                                        <div className="space-y-4">
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div className="bg-blue-50 p-3 rounded-lg">
+                                                                    <p className="text-[10px] text-blue-600 font-bold uppercase mb-1">Task Lifecycle</p>
+                                                                    <div className="space-y-1 text-xs">
+                                                                        <p className="flex justify-between">
+                                                                            <span className="text-gray-500">Started:</span>
+                                                                            <span className="font-medium text-gray-900">{task.actual_start_time ? new Date(task.actual_start_time).toLocaleString('en-IN') : 'N/A'}</span>
+                                                                        </p>
+                                                                        <p className="flex justify-between">
+                                                                            <span className="text-gray-500">Completed:</span>
+                                                                            <span className="font-medium text-gray-900">{task.actual_end_time ? new Date(task.actual_end_time).toLocaleString('en-IN') : 'N/A'}</span>
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="bg-purple-50 p-3 rounded-lg">
+                                                                    <p className="text-[10px] text-purple-600 font-bold uppercase mb-1">Duration Analysis</p>
+                                                                    <div className="space-y-1 text-xs">
+                                                                        <p className="flex justify-between">
+                                                                            <span className="text-gray-500">Expected:</span>
+                                                                            <span className="font-medium text-gray-900">{task.expected_completion_time || '0'} mins</span>
+                                                                        </p>
+                                                                        <p className="flex justify-between">
+                                                                            <span className="text-gray-500">Actual (Net):</span>
+                                                                            <span className={`font-bold ${task.expected_completion_time && (task.total_duration_seconds / 60) > task.expected_completion_time
+                                                                                    ? 'text-red-600'
+                                                                                    : 'text-green-600'
+                                                                                }`}>
+                                                                                {Math.floor(task.total_duration_seconds / 60)} mins
+                                                                            </span>
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="border-t pt-3">
+                                                                <p className="text-[10px] text-gray-400 font-bold uppercase mb-2 flex justify-between items-center">
+                                                                    <span>Hold History</span>
+                                                                    <span className="text-amber-600">Total Held: {Math.floor((task.total_held_seconds || 0) / 60)} mins</span>
+                                                                </p>
+
+                                                                {task.holds && task.holds.length > 0 ? (
+                                                                    <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                                                                        {task.holds.map((hold, idx) => (
+                                                                            <div key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded text-[11px] border-l-2 border-amber-400">
+                                                                                <div>
+                                                                                    <div className="flex items-center text-gray-700 font-medium">
+                                                                                        <span>{new Date(hold.start).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                                        <span className="mx-1">→</span>
+                                                                                        <span>{hold.end ? new Date(hold.end).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Present'}</span>
+                                                                                    </div>
+                                                                                    {hold.reason && <p className="text-[10px] text-gray-500 italic mt-0.5">Reason: {hold.reason}</p>}
+                                                                                </div>
+                                                                                <span className="font-bold text-gray-900 bg-white px-1.5 py-0.5 rounded border border-gray-100">
+                                                                                    {Math.ceil(hold.duration_seconds / 60)}m
+                                                                                </span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <p className="text-xs text-gray-400 italic py-2">No hold intervals recorded for this task.</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </td>
                                         </tr>
                                     )}
