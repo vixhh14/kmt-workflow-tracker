@@ -92,6 +92,7 @@ async def get_monthly_performance(
             "status": t.status,
             "actual_start_time": t.actual_start_time.isoformat() if t.actual_start_time else None,
             "actual_end_time": t.actual_end_time.isoformat() if t.actual_end_time else None,
+            "expected_completion_time": t.expected_completion_time,
             "total_duration_seconds": t.total_duration_seconds,
             "total_held_seconds": t.total_held_seconds,
             "holds": hold_data
