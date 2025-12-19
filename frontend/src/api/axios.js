@@ -9,7 +9,7 @@ const getBaseUrl = () => {
 
   // Use environment variable if set
   if (envUrl) {
-    return envUrl.replace(/\/$/, ''); // Remove trailing slash
+    return envUrl.trim().replace(/\/$/, ''); // Trim spaces and remove trailing slash
   }
 
   // Fallback for development
