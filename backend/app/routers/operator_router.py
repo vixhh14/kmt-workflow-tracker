@@ -205,6 +205,22 @@ async def complete_task(task_id: str, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail="Cannot complete a task that hasn't been started")
         
         now = get_current_time_ist()
+        
+        # If task is on hold, close the hold first
+        if task.status == 'on_hold':
+            latest_hold = db.query(TaskHold).filter(
+                and_(
+                    TaskHold.task_id == task_id,
+                    TaskHold.hold_ended_at == None
+                )
+            ).order_by(TaskHold.hold_started_at.desc()).first()
+            
+            if latest_hold:
+                latest_hold.hold_ended_at = now
+                hold_duration = safe_datetime_diff(now, latest_hold.hold_started_at)
+                current_held = task.total_held_seconds or 0
+                task.total_held_seconds = int(current_held + hold_duration)
+        
         task.status = 'completed'
         task.completed_at = now
         task.actual_end_time = now

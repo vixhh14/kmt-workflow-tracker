@@ -42,7 +42,7 @@ def calculate_machine_runtime(db: Session, target_date: date) -> List[dict]:
         if log.machine_id not in machine_stats:
             continue
             
-        duration = log.duration_seconds
+        duration = log.duration_seconds or 0
         
         # If log is currently open (running now)
         if log.end_time is None and log.date == get_today_date_ist():
@@ -98,7 +98,7 @@ def calculate_user_activity(db: Session, target_date: date) -> List[dict]:
         if log.user_id not in user_stats:
             continue
             
-        duration = log.duration_seconds
+        duration = log.duration_seconds or 0
         if log.end_time is None and log.date == get_today_date_ist():
             current_run = (now - log.start_time).total_seconds()
             duration = int(max(0, current_run))
@@ -168,7 +168,7 @@ def calculate_detailed_machine_activity(db: Session, machine_id: str, target_dat
             user = db.query(User).filter(User.user_id == task.assigned_to).first()
             operator_name = user.full_name or user.username if user else "Unknown"
 
-        duration = log.duration_seconds
+        duration = log.duration_seconds or 0
         if log.end_time is None and log.date == get_today_date_ist():
             duration = int((now - log.start_time).total_seconds())
 
@@ -210,7 +210,7 @@ def calculate_detailed_user_activity(db: Session, user_id: str, target_date: dat
                 "duration_seconds": int((h_end - h.hold_started_at).total_seconds())
             })
         
-        duration = log.duration_seconds
+        duration = log.duration_seconds or 0
         if log.end_time is None and log.date == get_today_date_ist():
             duration = int((now - log.start_time).total_seconds())
 

@@ -1,8 +1,13 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+    @field_validator('username')
+    @classmethod
+    def trim_username(cls, v: str) -> str:
+        return v.strip()
 
 class LoginResponse(BaseModel):
     access_token: str
