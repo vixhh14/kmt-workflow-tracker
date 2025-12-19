@@ -387,17 +387,50 @@ const SupervisorDashboard = () => {
                             <div key={task.id} className="border rounded-lg p-4 bg-green-50 border-green-200">
                                 <div className="flex items-start justify-between">
                                     <div className="flex-1">
-                                        <h3 className="font-medium text-gray-900">{task.title || 'Untitled'}</h3>
-                                        <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-600">
-                                            <span>👤 {task.operator_name}</span>
-                                            <span>⚙️ {task.machine_name}</span>
-                                            <span>🕐 Started: {formatTime(task.started_at)}</span>
-                                            <span className="font-medium text-green-700">⏱️ {formatDuration(task.duration_seconds)}</span>
+                                        <div className="flex justify-between items-start">
+                                            <h3 className="font-bold text-gray-900">{task.title || 'Untitled'}</h3>
+                                            <div className="text-right">
+                                                <span className="px-3 py-1 text-[10px] font-bold bg-green-600 text-white rounded-full uppercase tracking-wider">
+                                                    IN PROGRESS
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
+                                            <div className="text-xs space-y-1">
+                                                <p className="text-gray-500 font-medium uppercase tracking-[0.05em]">Assignment</p>
+                                                <p className="flex items-center text-gray-700">👤 <span className="ml-1 font-semibold">{task.operator_name}</span></p>
+                                                <p className="flex items-center text-gray-700">⚙️ <span className="ml-1">{task.machine_name}</span></p>
+                                                <p className="flex items-center text-gray-700">📁 <span className="ml-1 truncate">{task.project}</span></p>
+                                            </div>
+                                            <div className="text-xs space-y-1">
+                                                <p className="text-gray-500 font-medium uppercase tracking-[0.05em]">Timing Analytics</p>
+                                                <p className="flex justify-between text-gray-600"><span>Started:</span> <span className="font-medium text-gray-900 ml-2">{formatTime(task.started_at)}</span></p>
+                                                <p className="flex justify-between text-gray-600"><span>Expected:</span> <span className="font-medium text-gray-900 ml-2">{task.expected_completion_time || 0}m</span></p>
+                                                <p className="flex justify-between text-gray-600"><span>Net Dur:</span> <span className={`font-bold ml-2 ${task.expected_completion_time && (task.duration_seconds / 60) > task.expected_completion_time
+                                                        ? 'text-red-600'
+                                                        : 'text-green-600'
+                                                    }`}>{formatDuration(task.duration_seconds)}</span></p>
+                                            </div>
+                                            <div className="text-xs space-y-1">
+                                                <p className="text-gray-500 font-medium uppercase tracking-[0.05em] flex justify-between">
+                                                    <span>Held Time</span>
+                                                    <span className="text-amber-600 font-bold">{formatDuration(task.total_held_seconds)}</span>
+                                                </p>
+                                                {task.holds && task.holds.length > 0 ? (
+                                                    <div className="mt-1 space-y-1 bg-white p-1.5 rounded border border-green-100 max-h-16 overflow-y-auto">
+                                                        {task.holds.map((hold, idx) => (
+                                                            <div key={idx} className="flex justify-between text-[10px] items-center border-b border-gray-50 last:border-0 pb-0.5">
+                                                                <span className="text-gray-500">{new Date(hold.start).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                <span className="font-medium text-gray-700">{formatDuration(hold.duration_seconds)}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-gray-400 italic text-[10px] pt-1 text-center">No active or previous holds</p>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                    <span className="px-3 py-1 text-xs font-medium bg-green-600 text-white rounded-full">
-                                        IN PROGRESS
-                                    </span>
                                 </div>
                             </div>
                         ))}

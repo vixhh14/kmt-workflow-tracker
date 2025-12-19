@@ -233,9 +233,9 @@ const ReportsSection = () => {
                                             <td className="px-4 py-3 text-sm text-gray-600">{formatDuration(row.runtime_seconds)}</td>
                                             <td className="px-4 py-3 text-sm text-gray-600">{row.tasks_run_count}</td>
                                             <td className="px-4 py-3 text-sm">
-                                                <span className={`px-2 py-1 text-xs rounded-full ${row.is_running_now ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                                                <span className={`px-2 py-1 text-xs rounded-full ${row.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                                                     }`}>
-                                                    {row.is_running_now ? 'Running' : 'Idle'}
+                                                    {row.status}
                                                 </span>
                                             </td>
                                         </tr>
@@ -292,9 +292,9 @@ const ReportsSection = () => {
                                             <td className="px-4 py-3 text-sm text-gray-600">{formatDuration(row.total_work_seconds)}</td>
                                             <td className="px-4 py-3 text-sm text-gray-600">{row.tasks_worked_count}</td>
                                             <td className="px-4 py-3 text-sm">
-                                                <span className={`px-2 py-1 text-xs rounded-full ${row.attendance_status === 'Present' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                <span className={`px-2 py-1 text-xs rounded-full ${row.status === 'Present' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                                                     }`}>
-                                                    {row.attendance_status}
+                                                    {row.status}
                                                 </span>
                                             </td>
                                         </tr>

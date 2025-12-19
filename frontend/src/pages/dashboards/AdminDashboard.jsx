@@ -4,6 +4,8 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recha
 import { TrendingUp, CheckCircle, Clock, Pause, UserCheck, UserX, Folder, RefreshCw, BarChart3 } from 'lucide-react';
 import ReportsSection from './ReportsSection';
 import { getDashboardOverview, getProjectOverviewStats } from '../../api/services';
+import { getRunningTasks } from '../../api/supervisor';
+import { Play } from 'lucide-react';
 
 const COLORS = {
     'Yet to Start': '#6b7280',
@@ -56,6 +58,7 @@ const AdminDashboard = () => {
         total_users: 0,
         records: []
     });
+    const [runningTasks, setRunningTasks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -70,11 +73,12 @@ const AdminDashboard = () => {
 
             console.log('🔄 Fetching admin dashboard data...');
 
-            const [projectsRes, overviewRes, projectStatsRes, attendanceRes] = await Promise.all([
+            const [projectsRes, overviewRes, projectStatsRes, attendanceRes, runningTasksRes] = await Promise.all([
                 getProjects(),
                 getDashboardOverview(),
                 getProjectOverviewStats(),
-                getAttendanceSummary()
+                getAttendanceSummary(),
+                getRunningTasks()
             ]);
 
             console.log('✅ Admin dashboard data loaded');
@@ -95,6 +99,7 @@ const AdminDashboard = () => {
             setProjectStats(projectStatsRes.data);
 
             setAttendanceSummary(attendanceRes.data || {});
+            setRunningTasks(runningTasksRes.data || []);
 
         } catch (err) {
             console.error('❌ Failed to fetch admin dashboard data:', err);
@@ -144,6 +149,13 @@ const AdminDashboard = () => {
         { name: 'Completed', value: taskStats.completed || 0, color: COLORS['Completed'] },
         { name: 'On Hold', value: taskStats.on_hold || 0, color: COLORS['On Hold'] }
     ].filter(item => item.value > 0);
+
+    const formatDuration = (seconds) => {
+        if (!seconds || seconds <= 0) return '0m';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    };
 
     if (loading) {
         return (
@@ -232,6 +244,80 @@ const AdminDashboard = () => {
                         icon={Pause}
                         color="bg-yellow-500"
                     />
+                </div>
+
+                {/* Running Tasks Highlights - New Admin Timing Section */}
+                <div className="mt-8">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center">
+                            <Play className="text-green-600 mr-2" size={20} />
+                            <h3 className="text-md font-bold text-gray-800 uppercase tracking-tight">Active Work Monitoring</h3>
+                        </div>
+                        <span className="text-xs font-semibold bg-green-100 text-green-800 px-2 py-1 rounded-full uppercase">
+                            {runningTasks.length} Live
+                        </span>
+                    </div>
+
+                    {runningTasks.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {runningTasks.map(task => (
+                                <div key={task.id} className="bg-gray-50 border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                            <h4 className="font-bold text-gray-900 leading-tight">{task.title}</h4>
+                                            <p className="text-[11px] text-gray-500 mt-0.5 font-medium uppercase truncate">Project: {task.project}</p>
+                                        </div>
+                                        <div className="bg-white px-2 py-1 rounded border border-gray-100 flex items-center shadow-xs">
+                                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2"></div>
+                                            <span className="text-[10px] font-bold text-green-700">LIVE</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3 mb-3">
+                                        <div className="bg-white p-2 rounded-lg border border-gray-100">
+                                            <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Assignment</p>
+                                            <p className="text-xs font-semibold text-gray-800 truncate">👤 {task.operator_name}</p>
+                                            <p className="text-xs text-gray-600 mt-1 truncate">⚙️ {task.machine_name}</p>
+                                        </div>
+                                        <div className="bg-white p-2 rounded-lg border border-gray-100">
+                                            <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Time Trace</p>
+                                            <p className="text-xs font-bold text-blue-600">⏱️ {formatDuration(task.duration_seconds)}</p>
+                                            <p className="text-[10px] text-gray-500 mt-1">Start: {formatTime(task.started_at)}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white p-2 rounded-lg border border-gray-100">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <p className="text-[10px] text-gray-400 font-bold uppercase">Hold Analytics</p>
+                                            <span className="text-[10px] font-bold text-amber-600">Total: {formatDuration(task.total_held_seconds)}</span>
+                                        </div>
+                                        {task.holds && task.holds.length > 0 ? (
+                                            <div className="space-y-1 max-h-20 overflow-y-auto pr-1">
+                                                {task.holds.map((hold, idx) => (
+                                                    <React.Fragment key={idx}>
+                                                        <div className="flex justify-between items-center text-[10px] py-1 border-b border-gray-50 last:border-0">
+                                                            <span className="text-gray-600 font-medium">
+                                                                {new Date(hold.start).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} → {hold.end ? new Date(hold.end).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Now'}
+                                                            </span>
+                                                            <span className="bg-gray-50 px-1 rounded font-bold">{formatDuration(hold.duration_seconds)}</span>
+                                                        </div>
+                                                        {hold.reason && <p className="text-[9px] text-gray-500 italic px-1 pb-1"> Reason: {hold.reason}</p>}
+                                                    </React.Fragment>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-[10px] text-gray-400 italic text-center py-1">No interruptions recorded</p>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl py-10 text-center">
+                            <Clock className="mx-auto text-gray-300 mb-2" size={32} />
+                            <p className="text-gray-500 font-medium italic">No active production tasks to monitor</p>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -355,45 +441,43 @@ const AdminDashboard = () => {
             <ReportsSection />
 
             {/* Attendance Records (if available) */}
-            {
-                attendanceSummary.records && attendanceSummary.records.length > 0 && (
-                    <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                        <h2 className="text-lg font-semibold text-gray-900 mb-4">Today's Attendance Records</h2>
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check In</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check Out</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+            {attendanceSummary.records && attendanceSummary.records.length > 0 && (
+                <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Today's Attendance Records</h2>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check In</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check Out</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {attendanceSummary.records.map((record, index) => (
+                                    <tr key={index}>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            {record.user}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {formatTime(record.check_in)}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {formatTime(record.check_out)}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">
+                                                {record.status}
+                                            </span>
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {attendanceSummary.records.map((record, index) => (
-                                        <tr key={index}>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                {record.user}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {formatTime(record.check_in)}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {formatTime(record.check_out)}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">
-                                                    {record.status}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
-                )
-            }
+                </div>
+            )}
         </div>
     );
 };

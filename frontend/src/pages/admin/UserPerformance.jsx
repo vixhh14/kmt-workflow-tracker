@@ -9,6 +9,7 @@ const UserPerformance = () => {
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [performanceData, setPerformanceData] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [expandedTaskId, setExpandedTaskId] = useState(null);
 
     useEffect(() => {
         fetchUsers();
@@ -207,50 +208,105 @@ const UserPerformance = () => {
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start Time</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End Time</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expected</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hold Time</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Duration</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Net Duration</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
                                     {performanceData.tasks.length === 0 ? (
                                         <tr>
-                                            <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                                            <td colSpan="7" className="px-6 py-4 text-center text-gray-500">
                                                 No tasks found for this period.
                                             </td>
                                         </tr>
                                     ) : (
                                         performanceData.tasks.map((task) => (
-                                            <tr key={task.task_id} className="hover:bg-gray-50">
-                                                <td className="px-6 py-4">
-                                                    <div className="text-sm font-medium text-gray-900">{task.title}</div>
-                                                    <div className="text-xs text-gray-500">ID: {task.task_id.substring(0, 8)}</div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                                        ${task.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                                            task.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                                                task.status === 'on_hold' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
-                                                        {task.status.replace('_', ' ')}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-sm text-gray-500">
-                                                    {formatTimestamp(task.actual_start_time)}
-                                                </td>
-                                                <td className="px-6 py-4 text-sm text-gray-500">
-                                                    {formatTimestamp(task.actual_end_time)}
-                                                </td>
-                                                <td className="px-6 py-4 text-sm text-gray-500">
-                                                    {formatDuration(task.total_held_seconds)}
-                                                    {task.holds && task.holds.length > 0 && (
-                                                        <div className="text-xs text-gray-400 mt-1">
-                                                            {task.holds.length} hold(s)
+                                            <React.Fragment key={task.task_id}>
+                                                <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedTaskId(expandedTaskId === task.task_id ? null : task.task_id)}>
+                                                    <td className="px-6 py-4">
+                                                        <div className="text-sm font-medium text-gray-900">{task.title}</div>
+                                                        <div className="text-xs text-gray-500">ID: {task.task_id.substring(0, 8)}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                                            ${task.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                                                task.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                                                                    task.status === 'on_hold' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                            {task.status.replace('_', ' ')}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-gray-500">
+                                                        {formatTimestamp(task.actual_start_time)}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-gray-500">
+                                                        {formatTimestamp(task.actual_end_time)}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-gray-500">
+                                                        {task.expected_completion_time ? `${task.expected_completion_time}m` : '-'}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-gray-500">
+                                                        <div className="flex items-center">
+                                                            <span>{formatDuration(task.total_held_seconds)}</span>
+                                                            {task.holds && task.holds.length > 0 && (
+                                                                <span className="ml-1 text-[10px] bg-amber-100 text-amber-800 px-1 rounded">
+                                                                    {task.holds.length} logs
+                                                                </span>
+                                                            )}
                                                         </div>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                                                    {formatDuration(task.total_duration_seconds)}
-                                                </td>
-                                            </tr>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                                                        <div className={`flex items-center ${task.expected_completion_time && (task.total_duration_seconds / 60) > task.expected_completion_time
+                                                            ? 'text-red-600'
+                                                            : task.status === 'completed' ? 'text-green-600' : 'text-gray-900'
+                                                            }`}>
+                                                            {formatDuration(task.total_duration_seconds)}
+                                                            {expandedTaskId === task.task_id ? <Clock size={14} className="ml-1" /> : <AlertCircle size={14} className="ml-1 text-gray-300" />}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                {expandedTaskId === task.task_id && (
+                                                    <tr className="bg-gray-50">
+                                                        <td colSpan="7" className="px-6 py-4">
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                                <div>
+                                                                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Timing Breakdown</h4>
+                                                                    <div className="space-y-1 text-sm bg-white p-3 rounded border border-gray-100">
+                                                                        <p className="flex justify-between"><span className="text-gray-500">Actual Start:</span> <span>{task.actual_start_time ? new Date(task.actual_start_time).toLocaleString('en-IN') : 'N/A'}</span></p>
+                                                                        <p className="flex justify-between"><span className="text-gray-500">Actual End:</span> <span>{task.actual_end_time ? new Date(task.actual_end_time).toLocaleString('en-IN') : 'N/A'}</span></p>
+                                                                        <p className="flex justify-between"><span className="text-gray-500">Expected Mins:</span> <span>{task.expected_completion_time || 0} mins</span></p>
+                                                                        <p className="flex justify-between"><span className="text-gray-500">Total Held:</span> <span>{formatDuration(task.total_held_seconds || 0)}</span></p>
+                                                                        <p className="flex justify-between font-bold border-t pt-1 mt-1">
+                                                                            <span className="text-gray-700">Net Duration:</span>
+                                                                            <span className={task.expected_completion_time && (task.total_duration_seconds / 60) > task.expected_completion_time ? 'text-red-600' : 'text-green-600'}>
+                                                                                {formatDuration(task.total_duration_seconds)}
+                                                                            </span>
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Hold History</h4>
+                                                                    {task.holds && task.holds.length > 0 ? (
+                                                                        <div className="space-y-2">
+                                                                            {task.holds.map((hold, idx) => (
+                                                                                <div key={idx} className="bg-white p-2 rounded border-l-4 border-amber-400 text-xs shadow-sm">
+                                                                                    <div className="flex justify-between font-medium">
+                                                                                        <span>{new Date(hold.start).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} → {hold.end ? new Date(hold.end).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Present'}</span>
+                                                                                        <span className="text-gray-900">{formatDuration(hold.duration_seconds || 0)}</span>
+                                                                                    </div>
+                                                                                    {hold.reason && <p className="text-gray-500 italic mt-1 font-medium">"{hold.reason}"</p>}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <p className="text-sm text-gray-400 italic">No hold logs for this task.</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
                                         ))
                                     )}
                                 </tbody>
