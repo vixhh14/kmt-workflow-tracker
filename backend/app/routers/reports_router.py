@@ -31,7 +31,7 @@ def calculate_machine_runtime(db: Session, target_date: date) -> List[dict]:
     units = {u.id: u.name for u in db.query(Unit).all()}
     categories = {c.id: c.name for c in db.query(MachineCategory).all()}
     
-    machine_stats = {m.id: {"runtime": 0, "tasks": set(), "is_running": False, "obj": m} for m in machines}
+    machine_stats = {m.id: {"runtime": 0, "completed_tasks": 0, "is_running_now": False, "obj": m} for m in machines}
     
     # Fetch logs for the date
     logs = db.query(MachineRuntimeLog).filter(MachineRuntimeLog.date == target_date).all()
@@ -45,13 +45,22 @@ def calculate_machine_runtime(db: Session, target_date: date) -> List[dict]:
         duration = log.duration_seconds
         
         # If log is currently open (running now)
-        if log.end_time is None:
+        if log.end_time is None and log.date == get_today_date_ist():
             current_run = (now - log.start_time).total_seconds()
-            duration = int(current_run)
-            machine_stats[log.machine_id]["is_running"] = True
+            duration = int(max(0, current_run))
+            machine_stats[log.machine_id]["is_running_now"] = True
             
         machine_stats[log.machine_id]["runtime"] += duration
-        machine_stats[log.machine_id]["tasks"].add(log.task_id)
+
+    # 2. Get Completed Tasks for this date
+    completed_tasks = db.query(Task).filter(
+        Task.status == 'completed',
+        func.date(Task.actual_end_time) == target_date
+    ).all()
+    
+    for t in completed_tasks:
+        if t.machine_id in machine_stats:
+            machine_stats[t.machine_id]["completed_tasks"] += 1
 
     results = []
     # Sort by machine name for better readability
@@ -59,16 +68,17 @@ def calculate_machine_runtime(db: Session, target_date: date) -> List[dict]:
     
     for m_id, stats in sorted_machines:
         machine = stats["obj"]
+        runtime = stats["runtime"]
         results.append({
             "machine_id": machine.id,
             "machine_name": machine.machine_name,
             "unit": units.get(machine.unit_id, ""),
             "category": categories.get(machine.category_id, ""),
             "date": target_date.isoformat(),
-            "runtime_seconds": stats["runtime"],
-            "tasks_run_count": len(stats["tasks"]),
-            "is_running_now": stats["is_running"],
-            "status": machine.status
+            "runtime_seconds": runtime,
+            "tasks_run_count": stats["completed_tasks"],
+            "is_running_now": stats["is_running_now"],
+            "status": "Active" if runtime > 0 else "Idle"
         })
         
     return results
@@ -78,14 +88,8 @@ def calculate_user_activity(db: Session, target_date: date) -> List[dict]:
     Calculate user activity for a specific date (IST).
     """
     users = db.query(User).filter(User.role.in_(['operator', 'supervisor'])).all()
-    user_stats = {
-        u.user_id: {
-            "duration": 0, 
-            "tasks": set(), 
-            "obj": u,
-            "machines": set()
-        } for u in users
-    }
+    # user_id -> {work_time, completed_tasks, machines}
+    user_stats = {u.user_id: {"work_time": 0, "completed_tasks": 0, "obj": u, "machines": set()} for u in users}
     
     logs = db.query(UserWorkLog).filter(UserWorkLog.date == target_date).all()
     now = get_current_time_ist()
@@ -95,39 +99,42 @@ def calculate_user_activity(db: Session, target_date: date) -> List[dict]:
             continue
             
         duration = log.duration_seconds
-        if log.end_time is None:
+        if log.end_time is None and log.date == get_today_date_ist():
             current_run = (now - log.start_time).total_seconds()
-            duration = int(current_run)
+            duration = int(max(0, current_run))
             
-        user_stats[log.user_id]["duration"] += duration
-        user_stats[log.user_id]["tasks"].add(log.task_id)
+        user_stats[log.user_id]["work_time"] += duration
         if log.machine_id:
             user_stats[log.user_id]["machines"].add(log.machine_id)
+            
+    # 2. Get Completed Tasks for this date
+    completed_tasks = db.query(Task).filter(
+        Task.status == 'completed',
+        func.date(Task.actual_end_time) == target_date
+    ).all()
+    
+    for t in completed_tasks:
+        if t.assigned_to in user_stats:
+            user_stats[t.assigned_to]["completed_tasks"] += 1
             
     results = []
     sorted_users = sorted(user_stats.items(), key=lambda x: x[1]["obj"].username)
     
     for u_id, stats in sorted_users:
-        user = stats["obj"]
+        work_time = stats["work_time"]
         
-        attendance = db.query(Attendance).filter(
-            Attendance.user_id == u_id,
-            Attendance.date == target_date
-        ).first()
-
         results.append({
             "user_id": user.user_id,
             "username": user.username,
             "full_name": user.full_name,
             "role": user.role,
             "date": target_date.isoformat(),
-            "attendance_status": attendance.status if attendance else "Absent",
-            "check_in": attendance.check_in.isoformat() if attendance and attendance.check_in else None,
-            "check_out": attendance.check_out.isoformat() if attendance and attendance.check_out else None,
-            "tasks_worked_count": len(stats["tasks"]),
-            "total_work_seconds": stats["duration"],
-            "machines_used": list(stats["machines"])
+            "tasks_worked_count": stats["completed_tasks"],
+            "total_work_seconds": work_time,
+            "machines_used": list(stats["machines"]),
+            "status": "Present" if work_time > 0 else "Absent"
         })
+
         
     return results
 
@@ -236,22 +243,17 @@ async def export_machines_csv(date_str: Optional[str] = None, db: Session = Depe
             
     data = calculate_machine_runtime(db, target_date)
     
-    headers = [
-        "Machine ID", "Machine Name", "Unit", "Category", "Date",
-        "Total Running Time (HH:MM:SS)", "Total Running Time (Seconds)", "Tasks Run Count"
-    ]
+    # Requirement: Date,Machine Name,Runtime (minutes),Tasks Completed,Status
+    headers = ["Date", "Machine Name", "Runtime (minutes)", "Tasks Completed", "Status"]
     
     rows = []
     for row in data:
         rows.append([
-            row['machine_id'],
-            row['machine_name'],
-            row.get('unit', ''),
-            row.get('category', ''),
             row['date'],
-            format_duration_hms(row['runtime_seconds']),
-            row['runtime_seconds'],
-            row['tasks_run_count']
+            row['machine_name'],
+            int(row['runtime_seconds'] / 60), # Raw minutes
+            row['tasks_run_count'],
+            row['status']
         ])
     
     filename = f"machine_summary_daily_{target_date}.csv"
@@ -277,22 +279,17 @@ async def export_users_csv(date_str: Optional[str] = None, db: Session = Depends
             
     data = calculate_user_activity(db, target_date)
     
-    headers = [
-        "User ID", "Username", "Role", "Date",
-        "Total Work Time (HH:MM:SS)", "Total Work Time (Seconds)", "Tasks Worked Count", "Machines Used"
-    ]
+    # Requirement: Date,User Name,Work Time (minutes),Tasks Completed,Status
+    headers = ["Date", "User Name", "Work Time (minutes)", "Tasks Completed", "Status"]
     
     rows = []
     for row in data:
         rows.append([
-            row['user_id'],
-            row['username'],
-            row['role'],
             row['date'],
-            format_duration_hms(row['total_work_seconds']),
-            row['total_work_seconds'],
+            row['full_name'] or row['username'],
+            int(row['total_work_seconds'] / 60), # Raw minutes
             row['tasks_worked_count'],
-            ";".join(str(m) for m in row['machines_used']) # Semicolon separated
+            row['status']
         ])
         
     filename = f"user_activity_daily_{target_date}.csv"

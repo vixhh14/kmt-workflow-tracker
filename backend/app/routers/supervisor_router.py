@@ -4,8 +4,8 @@ from sqlalchemy import func, or_
 from typing import List, Optional
 from pydantic import BaseModel
 from app.core.database import get_db
-from app.models.models_db import Task, User, Machine
-from app.utils.datetime_utils import utc_now, make_aware
+from app.models.models_db import Task, User, Machine, TaskHold
+from app.utils.datetime_utils import utc_now, make_aware, safe_datetime_diff
 from datetime import datetime, timezone
 
 router = APIRouter(
@@ -86,6 +86,18 @@ async def get_running_tasks(db: Session = Depends(get_db)):
                 held_seconds = task.total_held_seconds or 0
                 duration_seconds = max(0, total_elapsed - held_seconds)
             
+            # Fetch holds for this task
+            hold_history = db.query(TaskHold).filter(TaskHold.task_id == task.id).order_by(TaskHold.hold_started_at.asc()).all()
+            holds = [
+                {
+                    "start": h.hold_started_at.isoformat() if h.hold_started_at else None,
+                    "end": h.hold_ended_at.isoformat() if h.hold_ended_at else None,
+                    "duration_seconds": safe_datetime_diff(h.hold_ended_at, h.hold_started_at) if h.hold_ended_at else 0,
+                    "reason": h.hold_reason or ""
+                }
+                for h in hold_history
+            ]
+
             task_list.append({
                 "id": task.id,
                 "title": task.title or "",
@@ -95,7 +107,11 @@ async def get_running_tasks(db: Session = Depends(get_db)):
                 "machine_id": task.machine_id or "",
                 "machine_name": machine.machine_name if machine else "Unknown",
                 "started_at": make_aware(task.actual_start_time or task.started_at).isoformat() if (task.actual_start_time or task.started_at) else None,
+                "actual_start_time": make_aware(task.actual_start_time).isoformat() if task.actual_start_time else None,
+                "expected_completion_time": task.expected_completion_time,
                 "duration_seconds": duration_seconds,
+                "total_held_seconds": task.total_held_seconds or 0,
+                "holds": holds,
                 "status": "in_progress"
             })
         
