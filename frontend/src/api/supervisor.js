@@ -32,10 +32,10 @@ export const getTaskStats = (project = null) => {
 };
 
 // Assign task to operator
-export const assignTask = (taskId, operatorId) => {
+export const assignTask = (taskId, assignmentData) => {
     return api.post('/supervisor/assign-task', {
         task_id: taskId,
-        operator_id: operatorId
+        ...assignmentData
     });
 };
 

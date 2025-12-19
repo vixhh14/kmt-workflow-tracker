@@ -46,7 +46,8 @@ const Layout = ({ children }) => {
             ...(user?.role === 'admin'
                 ? [
                     { path: '/admin/approvals', label: 'User Approvals', icon: UserCheck },
-                    { path: '/admin/monthly-performance', label: 'Monthly Performance', icon: TrendingUp }
+                    { path: '/admin/monthly-performance', label: 'Analytics', icon: TrendingUp },
+                    { path: '/admin/reports', label: 'Reports', icon: BarChart3 }
                 ]
                 : []),
             // Change Password - accessible by all users
