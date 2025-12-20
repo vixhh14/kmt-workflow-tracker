@@ -143,9 +143,9 @@ const Machines = () => {
         return machines.filter(machine => {
             // Search filter
             const matchesSearch = searchQuery === '' ||
-                machine.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                machine.category_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                machine.unit_name?.toLowerCase().includes(searchQuery.toLowerCase());
+                (machine.machine_name || machine.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (machine.category_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (machine.unit_name || '').toLowerCase().includes(searchQuery.toLowerCase());
 
             // Status filter
             const matchesStatus = statusFilter === 'all' || machine.status === statusFilter;
@@ -384,7 +384,7 @@ const Machines = () => {
                                     <Monitor className="text-blue-600" size={24} />
                                 </div>
                                 <div>
-                                    <h3 className="font-semibold text-gray-900">{machine.name}</h3>
+                                    <h3 className="font-semibold text-gray-900">{machine.machine_name || machine.name || 'Unnamed Machine'}</h3>
                                     <div className="flex flex-wrap gap-1 mt-1">
                                         {machine.unit_name && (
                                             <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs">
