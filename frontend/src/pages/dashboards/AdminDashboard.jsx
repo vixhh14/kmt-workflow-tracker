@@ -4,7 +4,7 @@ import { getRunningTasks } from '../../api/supervisor';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { TrendingUp, CheckCircle, Clock, Pause, UserCheck, UserX, Folder, RefreshCw, BarChart3, Play } from 'lucide-react';
 import ReportsSection from './ReportsSection';
-import { getDashboardOverview, getProjectOverviewStats } from '../../api/services';
+import { getDashboardOverview, getProjectOverviewStats, getAdminUnifiedDashboard } from '../../api/services';
 import QuickAssign from '../../components/QuickAssign';
 
 const COLORS = {
@@ -73,33 +73,45 @@ const AdminDashboard = () => {
 
             console.log('🔄 Fetching admin dashboard data...');
 
-            const [projectsRes, overviewRes, projectStatsRes, attendanceRes, runningTasksRes] = await Promise.all([
-                getProjects(),
-                getDashboardOverview(),
-                getProjectOverviewStats(),
+            const [unifiedRes, attendanceRes, runningTasksRes] = await Promise.all([
+                getAdminUnifiedDashboard(),
                 getAttendanceSummary(),
                 getRunningTasks()
             ]);
 
             console.log('✅ Admin dashboard data loaded');
 
-            setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : []);
+            const unified = unifiedRes?.data || {};
+            const overview = unified.overview || {};
+            const tasks = overview.tasks || { total: 0, pending: 0, in_progress: 0, completed: 0, on_hold: 0 };
+            const projectsData = unified.projects || [];
+            const projectStats = overview.projects || { total: 0, yet_to_start: 0, in_progress: 0, completed: 0, held: 0 };
+
+            setProjects(Array.isArray(projectsData) ? projectsData : []);
 
             // 1. Task Stats (from Dashboard Overview)
-            const tasks = overviewRes.data.tasks;
             setTaskStats({
-                total: tasks.total,
-                pending: tasks.pending,
-                in_progress: tasks.in_progress,
-                completed: tasks.completed,
-                on_hold: tasks.on_hold
+                total: tasks.total || 0,
+                pending: tasks.pending || 0,
+                in_progress: tasks.in_progress || 0,
+                completed: tasks.completed || 0,
+                on_hold: tasks.on_hold || 0
             });
 
             // 2. Project Stats (Unified logic)
-            setProjectStats(projectStatsRes.data);
+            setProjectStats(projectStats);
 
-            setAttendanceSummary(attendanceRes.data || {});
-            setRunningTasks(runningTasksRes.data || []);
+            setAttendanceSummary(attendanceRes?.data || {
+                date: '',
+                present: 0,
+                absent: 0,
+                late: 0,
+                present_users: [],
+                absent_users: [],
+                total_users: 0,
+                records: []
+            });
+            setRunningTasks(Array.isArray(runningTasksRes?.data) ? runningTasksRes.data : []);
 
         } catch (err) {
             console.error('❌ Failed to fetch admin dashboard data:', err);

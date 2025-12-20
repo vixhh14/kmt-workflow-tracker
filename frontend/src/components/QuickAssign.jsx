@@ -35,12 +35,16 @@ const QuickAssign = ({ onAssignSuccess }) => {
                 getMachines(),
                 getUnits()
             ]);
-            setPendingTasks(tasksRes.data || []);
-            setOperators(operatorsRes.data || []);
-            setMachines(machinesRes.data || []);
-            setUnits(unitsRes.data || []);
+            setPendingTasks(Array.isArray(tasksRes?.data) ? tasksRes.data : []);
+            setOperators(Array.isArray(operatorsRes?.data) ? operatorsRes.data : []);
+            setMachines(Array.isArray(machinesRes?.data) ? machinesRes.data : []);
+            setUnits(Array.isArray(unitsRes?.data) ? unitsRes.data : []);
         } catch (err) {
             console.error('Failed to fetch Quick Assign data:', err);
+            setPendingTasks([]);
+            setOperators([]);
+            setMachines([]);
+            setUnits([]);
         } finally {
             setLoading(false);
         }

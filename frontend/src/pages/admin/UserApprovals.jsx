@@ -107,31 +107,6 @@ const UserApprovals = () => {
 
     // ... render ...
 
-    <td className="px-6 py-4">
-        <div className="flex flex-col space-y-2">
-            <select
-                value={selectedRoles[user.username] || user.role || 'operator'}
-                onChange={(e) => handleRoleChange(user.username, e.target.value)}
-                className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1"
-            >
-                <option value="operator">Operator</option>
-                <option value="supervisor">Supervisor</option>
-                <option value="planning">Planning</option>
-                <option value="admin">Admin</option>
-            </select>
-
-            {user.machine_types && (
-                <div className="flex flex-wrap gap-1">
-                    {user.machine_types.split(',').map((skill, idx) => (
-                        <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                            {skill.trim()}
-                        </span>
-                    ))}
-                </div>
-            )}
-        </div>
-    </td>
-
     const handleReject = async (username) => {
         if (!window.confirm(`Are you sure you want to reject ${username}?`)) return;
 
