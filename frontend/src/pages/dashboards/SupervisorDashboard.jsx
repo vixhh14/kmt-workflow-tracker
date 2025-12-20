@@ -59,6 +59,7 @@ const SupervisorDashboard = () => {
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [assigningOperator, setAssigningOperator] = useState('');
     const [operators, setOperators] = useState([]);
+    const [machines, setMachines] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -122,6 +123,7 @@ const SupervisorDashboard = () => {
 
             setOperatorStatus(Array.isArray(operatorStatusRes?.data) ? operatorStatusRes.data : []);
             setOperators(Array.isArray(unified.operators) ? unified.operators : []);
+            setMachines(Array.isArray(unified.machines) ? unified.machines : []);
 
         } catch (err) {
             console.error('❌ Failed to fetch supervisor dashboard:', err);
@@ -435,9 +437,9 @@ const SupervisorDashboard = () => {
                         <h2 className="text-lg font-semibold text-gray-900">Machine Status</h2>
                         <span className="text-xs text-gray-500">Live Status</span>
                     </div>
-                    {(unified.machines || []).length > 0 ? (
+                    {Array.isArray(machines) && machines.length > 0 ? (
                         <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-                            {unified.machines.map(machine => (
+                            {machines.map(machine => (
                                 <div key={machine.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
                                     <div className="flex items-center">
                                         <div className={`w-3 h-3 rounded-full mr-3 ${machine.status === 'active' ? 'bg-green-500 animate-pulse' : machine.status === 'maintenance' ? 'bg-amber-500' : 'bg-gray-400'}`}></div>
