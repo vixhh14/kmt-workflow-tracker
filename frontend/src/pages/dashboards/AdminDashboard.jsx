@@ -221,25 +221,25 @@ const AdminDashboard = () => {
                         color="bg-purple-500"
                     />
                     <StatCard
-                        title="Pending Tasks"
+                        title="Pending"
                         value={taskStats.pending}
                         icon={Clock}
                         color="bg-gray-500"
                     />
                     <StatCard
-                        title="In Progress Tasks"
+                        title="In Progress"
                         value={taskStats.in_progress}
                         icon={TrendingUp}
                         color="bg-blue-500"
                     />
                     <StatCard
-                        title="Completed Tasks"
+                        title="Completed"
                         value={taskStats.completed}
                         icon={CheckCircle}
                         color="bg-green-500"
                     />
                     <StatCard
-                        title="On Hold Tasks"
+                        title="On Hold"
                         value={taskStats.on_hold}
                         icon={Pause}
                         color="bg-yellow-500"

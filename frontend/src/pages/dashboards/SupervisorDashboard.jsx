@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getRunningTasks, getTaskStatus, getProjectsSummary, getTaskStats, getProjectSummary, getPriorityStatus } from '../../api/supervisor';
+import { getRunningTasks, getTaskStatus, getProjectsSummary, getTaskStats, getProjectSummary, getPriorityStatus, getOperators } from '../../api/supervisor';
 import QuickAssign from '../../components/QuickAssign';
 import { getUsers } from '../../api/services';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -55,6 +55,10 @@ const SupervisorDashboard = () => {
     });
     const [selectedOperator, setSelectedOperator] = useState('all');
     const [selectedProject, setSelectedProject] = useState('all');
+    const [selectedTask, setSelectedTask] = useState(null);
+    const [showAssignModal, setShowAssignModal] = useState(false);
+    const [assigningOperator, setAssigningOperator] = useState('');
+    const [operators, setOperators] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -81,14 +85,15 @@ const SupervisorDashboard = () => {
 
             console.log('🔄 Fetching supervisor dashboard...');
 
-            const [overviewRes, summaryRes, runningRes, projectsRes, statsRes, operatorStatusRes, projectStatsRes] = await Promise.all([
+            const [overviewRes, summaryRes, runningRes, projectsRes, statsRes, operatorStatusRes, projectStatsRes, operatorsRes] = await Promise.all([
                 getDashboardOverview(),
                 getProjectSummary(),
                 getRunningTasks(),
                 getProjectsSummary(),
                 getTaskStats(),
                 getTaskStatus(),
-                getProjectOverviewStats()
+                getProjectOverviewStats(),
+                getOperators()
             ]);
 
             console.log('✅ Supervisor dashboard loaded');
@@ -117,6 +122,7 @@ const SupervisorDashboard = () => {
             });
 
             setOperatorStatus(Array.isArray(operatorStatusRes.data) ? operatorStatusRes.data : []);
+            setOperators(Array.isArray(operatorsRes.data) ? operatorsRes.data : []);
 
         } catch (err) {
             console.error('❌ Failed to fetch supervisor dashboard:', err);
@@ -311,7 +317,7 @@ const SupervisorDashboard = () => {
                     <StatCard
                         title="On Hold"
                         value={taskStats.on_hold || 0}
-                        icon={AlertCircle}
+                        icon={Pause}
                         color="bg-yellow-500"
                     />
                 </div>
