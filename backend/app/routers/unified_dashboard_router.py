@@ -28,7 +28,7 @@ async def get_admin_dashboard(db: Session = Depends(get_db)):
         
         # 3. Machines
         machines = db.query(Machine).filter(or_(Machine.is_deleted == False, Machine.is_deleted == None)).all()
-        machine_list = [{"id": m.id, "name": m.machine_name} for m in machines]
+        machine_list = [{"id": m.id, "machine_name": m.machine_name} for m in machines]
         
         # 4. Users (all)
         users = db.query(User).all()
