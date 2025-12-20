@@ -99,6 +99,13 @@ const Reports = () => {
         return new Date(isoString).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     };
 
+    const formatMinutesToHHMM = (minutes) => {
+        if (!minutes || isNaN(minutes)) return '00:00';
+        const h = Math.floor(minutes / 60);
+        const m = minutes % 60;
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+    };
+
     const handleDownload = async () => {
         try {
             let response;
@@ -162,8 +169,8 @@ const Reports = () => {
                             setReportData([]);
                         }}
                         className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id
-                                ? 'border-blue-600 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            ? 'border-blue-600 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                             }`}
                     >
                         <tab.icon size={16} />
@@ -266,7 +273,8 @@ const Reports = () => {
                                         <th className="px-6 py-4 text-left font-semibold text-gray-700">Operator</th>
                                         <th className="px-6 py-4 text-left font-semibold text-gray-700">Start Time</th>
                                         <th className="px-6 py-4 text-left font-semibold text-gray-700">End Time</th>
-                                        <th className="px-6 py-4 text-left font-semibold text-gray-700">Runtime</th>
+                                        <th className="px-6 py-4 text-left font-semibold text-gray-700">Expected</th>
+                                        <th className="px-6 py-4 text-left font-semibold text-gray-700">Actual</th>
                                         <th className="px-6 py-4 text-left font-semibold text-gray-700">Status</th>
                                     </tr>
                                 )}
@@ -276,7 +284,8 @@ const Reports = () => {
                                         <th className="px-6 py-4 text-left font-semibold text-gray-700">Machine</th>
                                         <th className="px-6 py-4 text-left font-semibold text-gray-700">Start Time</th>
                                         <th className="px-6 py-4 text-left font-semibold text-gray-700">End Time</th>
-                                        <th className="px-6 py-4 text-left font-semibold text-gray-700">Duration</th>
+                                        <th className="px-6 py-4 text-left font-semibold text-gray-700">Expected</th>
+                                        <th className="px-6 py-4 text-left font-semibold text-gray-700">Actual</th>
                                         <th className="px-6 py-4 text-left font-semibold text-gray-700">Holds</th>
                                     </tr>
                                 )}
@@ -323,9 +332,12 @@ const Reports = () => {
                                             <tr className="hover:bg-gray-50">
                                                 <td className="px-6 py-4 font-medium text-gray-900">{row.task_title}</td>
                                                 <td className="px-6 py-4 text-gray-600">{row.operator}</td>
-                                                <td className="px-6 py-4 text-gray-600 font-mono">{formatTime(row.start_time)}</td>
-                                                <td className="px-6 py-4 text-gray-600 font-mono">{formatTime(row.end_time)}</td>
-                                                <td className="px-6 py-4 text-gray-600 font-mono">{formatDuration(row.runtime_seconds)}</td>
+                                                <td className="px-6 py-4 text-gray-600 font-mono text-xs">{formatTime(row.start_time)}</td>
+                                                <td className="px-6 py-4 text-gray-600 font-mono text-xs">{formatTime(row.end_time)}</td>
+                                                <td className="px-6 py-4 text-gray-500 font-mono">{formatMinutesToHHMM(row.expected_duration_minutes)}</td>
+                                                <td className={`px-6 py-4 font-mono font-bold ${row.expected_duration_minutes && (row.runtime_seconds / 60) > row.expected_duration_minutes ? 'text-red-600' : 'text-green-600'}`}>
+                                                    {formatDuration(row.runtime_seconds)}
+                                                </td>
                                                 <td className="px-6 py-4">
                                                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${row.status === 'Running' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
                                                         {row.status}
@@ -337,9 +349,12 @@ const Reports = () => {
                                             <tr className="hover:bg-gray-50">
                                                 <td className="px-6 py-4 font-medium text-gray-900">{row.task_title}</td>
                                                 <td className="px-6 py-4 text-gray-600">{row.machine_name}</td>
-                                                <td className="px-6 py-4 text-gray-600 font-mono">{formatTime(row.start_time)}</td>
-                                                <td className="px-6 py-4 text-gray-600 font-mono">{formatTime(row.end_time)}</td>
-                                                <td className="px-6 py-4 text-gray-600 font-mono">{formatDuration(row.duration_seconds)}</td>
+                                                <td className="px-6 py-4 text-gray-600 font-mono text-xs">{formatTime(row.start_time)}</td>
+                                                <td className="px-6 py-4 text-gray-600 font-mono text-xs">{formatTime(row.end_time)}</td>
+                                                <td className="px-6 py-4 text-gray-500 font-mono">{formatMinutesToHHMM(row.expected_duration_minutes)}</td>
+                                                <td className={`px-6 py-4 font-mono font-bold ${row.expected_duration_minutes && (row.duration_seconds / 60) > row.expected_duration_minutes ? 'text-red-600' : 'text-green-600'}`}>
+                                                    {formatDuration(row.duration_seconds)}
+                                                </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex flex-col gap-1">
                                                         <span className="text-xs text-gray-500">{row.holds?.length || 0} holds</span>

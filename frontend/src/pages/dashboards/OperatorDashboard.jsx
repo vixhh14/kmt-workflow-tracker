@@ -151,6 +151,13 @@ const OperatorDashboard = () => {
         return `${minutes}m`;
     };
 
+    const formatMinutesToHHMM = (minutes) => {
+        if (!minutes || isNaN(minutes)) return '00:00';
+        const h = Math.floor(minutes / 60);
+        const m = minutes % 60;
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+    };
+
     const formatDate = (dateString) => {
         if (!dateString) return 'Not set';
         try {
@@ -345,30 +352,23 @@ const OperatorDashboard = () => {
                                     <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-xs border-t pt-3">
                                         <div className="space-y-1">
                                             <p className="text-gray-500 font-medium uppercase tracking-wider">Timing Details</p>
+                                            {task.expected_completion_time && (
+                                                <p><span className="text-gray-600">Expected:</span> <span className="text-blue-600 font-bold">{formatMinutesToHHMM(task.expected_completion_time)} (HH:MM)</span></p>
+                                            )}
+                                            <p><span className="text-gray-600">Actual Runtime:</span> <span className={`font-bold ${task.expected_completion_time && (task.total_duration_seconds / 60) > task.expected_completion_time ? 'text-red-600' : 'text-green-600'}`}>{formatDuration(task.total_duration_seconds)}</span></p>
+                                            {task.total_held_seconds > 0 && (
+                                                <p><span className="text-gray-600">Time Held:</span> <span className="text-amber-600 font-bold">{formatDuration(task.total_held_seconds)}</span></p>
+                                            )}
                                             {task.actual_start_time && (
                                                 <p><span className="text-gray-600">Started at:</span> <span className="text-gray-900 font-medium">{formatDate(task.actual_start_time)}</span></p>
                                             )}
                                             {task.actual_end_time && (
                                                 <p><span className="text-gray-600">Completed at:</span> <span className="text-gray-900 font-medium">{formatDate(task.actual_end_time)}</span></p>
                                             )}
-                                            {task.expected_completion_time && (
-                                                <p><span className="text-gray-600">Expected Duration:</span> <span className="text-gray-900 font-medium">{task.expected_completion_time} mins</span></p>
-                                            )}
-                                            {(task.total_duration_seconds > 0 || task.status === 'completed') && (
-                                                <p>
-                                                    <span className="text-gray-600">Actual Duration:</span>
-                                                    <span className={`ml-1 font-bold ${task.expected_completion_time && (task.total_duration_seconds / 60) > task.expected_completion_time
-                                                            ? 'text-red-600'
-                                                            : 'text-green-600'
-                                                        }`}>
-                                                        {formatDuration(task.total_duration_seconds)}
-                                                    </span>
-                                                </p>
-                                            )}
                                         </div>
 
                                         <div className="space-y-1">
-                                            <p className="text-gray-500 font-medium uppercase tracking-wider">Held Time</p>
+                                            <p className="text-gray-500 font-medium uppercase tracking-wider">Hold History</p>
                                             <p><span className="text-gray-600">Total Held:</span> <span className="text-gray-900 font-medium">{formatDuration(task.total_held_seconds || 0)}</span></p>
 
                                             {task.holds && task.holds.length > 0 && (
