@@ -108,3 +108,6 @@ export const downloadUserReport = (dateStr) => {
         responseType: 'blob'
     });
 };
+/* -------------------- UNIFIED DASHBOARDS -------------------- */
+export const getAdminUnifiedDashboard = () => api.get('/dashboard/admin');
+export const getSupervisorUnifiedDashboard = () => api.get('/dashboard/supervisor');

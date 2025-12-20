@@ -24,9 +24,10 @@ const UserPerformance = () => {
     const fetchUsers = async () => {
         try {
             const response = await getUsers();
-            setUsers(response.data);
+            setUsers(Array.isArray(response?.data) ? response.data : []);
         } catch (error) {
             console.error('Failed to fetch users:', error);
+            setUsers([]);
         }
     };
 
@@ -44,9 +45,19 @@ const UserPerformance = () => {
             if (!response.ok) throw new Error('Failed to fetch performance data');
 
             const data = await response.json();
-            setPerformanceData(data);
+            setPerformanceData(data || {
+                summary: {
+                    total_tasks: 0,
+                    completed_tasks: 0,
+                    completion_percentage: 0,
+                    avg_completion_time_seconds: 0,
+                    total_held_seconds: 0
+                },
+                tasks: []
+            });
         } catch (error) {
             console.error('Failed to fetch performance data:', error);
+            setPerformanceData(null);
         } finally {
             setLoading(false);
         }

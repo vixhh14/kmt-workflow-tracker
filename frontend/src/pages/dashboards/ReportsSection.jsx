@@ -52,9 +52,10 @@ const ReportsSection = () => {
         try {
             setLoadingMonthly(true);
             const res = await getMonthlyPerformance(year);
-            setMonthlyData(res.data.chart_data || []);
+            setMonthlyData(res?.data?.chart_data || []);
         } catch (error) {
             console.error("Failed to fetch monthly performance", error);
+            setMonthlyData([]);
         } finally {
             setLoadingMonthly(false);
         }
@@ -64,9 +65,10 @@ const ReportsSection = () => {
         try {
             setLoadingMachine(true);
             const res = await getMachineDailyReport(machineDate);
-            setMachineData(res.data.report || []);
+            setMachineData(res?.data?.report || []);
         } catch (error) {
             console.error("Failed to fetch machine report", error);
+            setMachineData([]);
         } finally {
             setLoadingMachine(false);
         }
@@ -76,9 +78,10 @@ const ReportsSection = () => {
         try {
             setLoadingUser(true);
             const res = await getUserDailyReport(userDate);
-            setUserData(res.data.report || []);
+            setUserData(res?.data?.report || []);
         } catch (error) {
             console.error("Failed to fetch user report", error);
+            setUserData([]);
         } finally {
             setLoadingUser(false);
         }

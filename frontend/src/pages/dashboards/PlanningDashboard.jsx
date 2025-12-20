@@ -51,19 +51,19 @@ const PlanningDashboard = () => {
             ]);
             console.log('✅ Planning dashboard loaded');
 
-            const tasks = overviewRes.data.tasks;
-            const machines = overviewRes.data.machines;
-            const projectStats = projectStatsRes.data;
+            const tasks = overviewRes?.data?.tasks || { in_progress: 0, pending: 0, completed: 0, on_hold: 0 };
+            const machines = overviewRes?.data?.machines || { active: 0 };
+            const projectStats = projectStatsRes?.data || { total: 0 };
 
             setSummary({
-                total_projects: projectStats.total,
-                total_tasks_running: tasks.in_progress,
-                machines_active: machines.active,
-                pending_tasks: tasks.pending,
-                completed_tasks: tasks.completed,
-                on_hold_tasks: tasks.on_hold,
-                project_summary: Array.isArray(response.data?.project_summary) ? response.data.project_summary : [],
-                operator_status: Array.isArray(response.data?.operator_status) ? response.data.operator_status : []
+                total_projects: projectStats.total || 0,
+                total_tasks_running: tasks.in_progress || 0,
+                machines_active: machines.active || 0,
+                pending_tasks: tasks.pending || 0,
+                completed_tasks: tasks.completed || 0,
+                on_hold_tasks: tasks.on_hold || 0,
+                project_summary: Array.isArray(response?.data?.project_summary) ? response.data.project_summary : [],
+                operator_status: Array.isArray(response?.data?.operator_status) ? response.data.operator_status : []
             });
         } catch (err) {
             console.error('❌ Failed to fetch planning dashboard:', err);

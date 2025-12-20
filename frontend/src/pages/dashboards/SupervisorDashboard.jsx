@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { getRunningTasks, getTaskStatus, getProjectsSummary, getTaskStats, getProjectSummary, getPriorityStatus, getOperators } from '../../api/supervisor';
 import QuickAssign from '../../components/QuickAssign';
-import { getUsers } from '../../api/services';
+import { getUsers, getDashboardOverview, getProjectOverviewStats, getSupervisorUnifiedDashboard } from '../../api/services';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Folder, CheckCircle, Clock, TrendingUp, AlertCircle, RefreshCw, UserPlus, Play, Users, X } from 'lucide-react';
-import { getDashboardOverview, getProjectOverviewStats } from '../../api/services';
+
 
 const COLORS = {
     'Yet to Start': '#6b7280',
@@ -83,46 +83,45 @@ const SupervisorDashboard = () => {
             setLoading(true);
             setError(null);
 
-            console.log('🔄 Fetching supervisor dashboard...');
+            console.log('🔄 Fetching supervisor dashboard data...');
 
-            const [overviewRes, summaryRes, runningRes, projectsRes, statsRes, operatorStatusRes, projectStatsRes, operatorsRes] = await Promise.all([
-                getDashboardOverview(),
-                getProjectSummary(),
+            const [unifiedRes, runningRes, operatorStatusRes, statsRes] = await Promise.all([
+                getSupervisorUnifiedDashboard(),
                 getRunningTasks(),
-                getProjectsSummary(),
-                getTaskStats(),
                 getTaskStatus(),
-                getProjectOverviewStats(),
-                getOperators()
+                getTaskStats()
             ]);
 
             console.log('✅ Supervisor dashboard loaded');
 
-            const tasks = overviewRes.data.tasks;
-            const projectStats = projectStatsRes.data;
+            const unified = unifiedRes?.data || {};
+            const overview = unified.overview || {};
+            const tasks = overview.tasks || { total: 0, pending: 0, in_progress: 0, completed: 0, on_hold: 0 };
+            const projectStats = overview.projects || { total: 0, completed: 0, yet_to_start: 0, in_progress: 0, held: 0 };
 
             setProjectSummary({
-                total_projects: projectStats.total,
-                completed_projects: projectStats.completed,
-                pending_projects: projectStats.yet_to_start,
-                active_projects: projectStats.in_progress + projectStats.held
+                total_projects: projectStats.total || 0,
+                completed_projects: projectStats.completed || 0,
+                pending_projects: projectStats.yet_to_start || 0,
+                active_projects: (projectStats.in_progress || 0) + (projectStats.held || 0)
             });
 
-            setRunningTasks(Array.isArray(runningRes.data) ? runningRes.data : []);
-            setProjectsDistribution(projectsRes.data || {});
+            setRunningTasks(Array.isArray(runningRes?.data) ? runningRes.data : []);
+            setProjectsDistribution(projectStats || {}); // Using projectStats for distribution
 
             // Overwrite unified stats, keep project list
             setTaskStats({
-                ...statsRes.data,
-                total_tasks: tasks.total,
-                pending: tasks.pending,
-                in_progress: tasks.in_progress,
-                completed: tasks.completed,
-                on_hold: tasks.on_hold
+                ...(statsRes?.data || {}),
+                total_tasks: tasks.total || 0,
+                pending: tasks.pending || 0,
+                in_progress: tasks.in_progress || 0,
+                completed: tasks.completed || 0,
+                on_hold: tasks.on_hold || 0,
+                available_projects: statsRes?.data?.available_projects || []
             });
 
-            setOperatorStatus(Array.isArray(operatorStatusRes.data) ? operatorStatusRes.data : []);
-            setOperators(Array.isArray(operatorsRes.data) ? operatorsRes.data : []);
+            setOperatorStatus(Array.isArray(operatorStatusRes?.data) ? operatorStatusRes.data : []);
+            setOperators(Array.isArray(unified.operators) ? unified.operators : []);
 
         } catch (err) {
             console.error('❌ Failed to fetch supervisor dashboard:', err);
@@ -135,7 +134,7 @@ const SupervisorDashboard = () => {
     const fetchRunningTasksOnly = async () => {
         try {
             const res = await getRunningTasks();
-            setRunningTasks(Array.isArray(res.data) ? res.data : []);
+            setRunningTasks(Array.isArray(res?.data) ? res.data : []);
         } catch (err) {
             console.error('Failed to fetch running tasks:', err);
         }
@@ -145,7 +144,7 @@ const SupervisorDashboard = () => {
         try {
             const operatorId = selectedOperator === 'all' ? null : selectedOperator;
             const res = await getTaskStatus(operatorId);
-            setOperatorStatus(Array.isArray(res.data) ? res.data : []);
+            setOperatorStatus(Array.isArray(res?.data) ? res.data : []);
         } catch (err) {
             console.error('Failed to fetch operator status:', err);
         }
@@ -155,7 +154,15 @@ const SupervisorDashboard = () => {
         try {
             const project = selectedProject === 'all' ? null : selectedProject;
             const res = await getTaskStats(project);
-            setTaskStats(res.data || {});
+            setTaskStats(res?.data || {
+                total_tasks: 0,
+                pending: 0,
+                in_progress: 0,
+                completed: 0,
+                on_hold: 0,
+                available_projects: [],
+                selected_project: project || 'all'
+            });
         } catch (err) {
             console.error('Failed to fetch task stats:', err);
         }

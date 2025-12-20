@@ -12,9 +12,27 @@ class ErrorBoundary extends React.Component {
     }
 
     componentDidCatch(error, errorInfo) {
-        console.error('❌ Error Boundary caught error:', error, errorInfo);
+        // ALWAYS log to console (production + dev)
+        console.error('❌ Error Boundary caught error:', error);
+        console.error('Component stack:', errorInfo?.componentStack);
         this.setState({ error, errorInfo });
     }
+
+    handleGoToDashboard = () => {
+        // Try to determine user role from localStorage
+        try {
+            const token = localStorage.getItem('token');
+            if (token) {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                const role = payload.role || 'operator';
+                window.location.href = `/dashboard/${role}`;
+                return;
+            }
+        } catch (e) {
+            console.error('Could not parse token for redirect:', e);
+        }
+        window.location.href = '/login';
+    };
 
     render() {
         if (this.state.hasError) {
@@ -38,18 +56,25 @@ class ErrorBoundary extends React.Component {
                                 Refresh Page
                             </button>
                             <button
+                                onClick={this.handleGoToDashboard}
+                                className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition"
+                            >
+                                Go to Dashboard
+                            </button>
+                            <button
                                 onClick={() => window.location.href = '/login'}
                                 className="w-full bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition"
                             >
                                 Go to Login
                             </button>
                         </div>
-                        {process.env.NODE_ENV === 'development' && this.state.error && (
+                        {/* Always show error summary in production too for debugging */}
+                        {this.state.error && (
                             <details className="mt-6 p-4 bg-gray-50 rounded-lg">
                                 <summary className="cursor-pointer text-sm font-medium text-gray-700">
-                                    Error Details (Dev Only)
+                                    Error Details
                                 </summary>
-                                <pre className="mt-2 text-xs text-red-600 overflow-auto">
+                                <pre className="mt-2 text-xs text-red-600 overflow-auto max-h-40">
                                     {this.state.error.toString()}
                                     {this.state.errorInfo?.componentStack}
                                 </pre>
@@ -65,3 +90,4 @@ class ErrorBoundary extends React.Component {
 }
 
 export default ErrorBoundary;
+
