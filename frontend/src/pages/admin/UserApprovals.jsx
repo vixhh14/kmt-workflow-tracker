@@ -206,9 +206,9 @@ const UserApprovals = () => {
                                                     <option value="admin">Admin</option>
                                                 </select>
 
-                                                {user.machine_types && (
+                                                {user.machine_types && String(user.machine_types).length > 0 && (
                                                     <div className="flex flex-wrap gap-1">
-                                                        {user.machine_types.split(',').map((skill, idx) => (
+                                                        {String(user.machine_types).split(',').map((skill, idx) => (
                                                             <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
                                                                 {skill.trim()}
                                                             </span>

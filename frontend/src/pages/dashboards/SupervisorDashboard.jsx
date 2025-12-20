@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { getRunningTasks, getTaskStatus, getProjectsSummary, getTaskStats, getProjectSummary, getPriorityStatus, getOperators } from '../../api/supervisor';
+import { getRunningTasks, getTaskStatus, getProjectsSummary, getTaskStats, getProjectSummary, getPriorityStatus, getOperators, assignTask } from '../../api/supervisor';
 import QuickAssign from '../../components/QuickAssign';
 import { getUsers, getDashboardOverview, getProjectOverviewStats, getSupervisorUnifiedDashboard } from '../../api/services';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Folder, CheckCircle, Clock, TrendingUp, AlertCircle, RefreshCw, UserPlus, Play, Users, X } from 'lucide-react';
+import { Folder, CheckCircle, Clock, TrendingUp, AlertCircle, RefreshCw, UserPlus, Play, Users, X, Pause } from 'lucide-react';
 
 
 const COLORS = {
@@ -429,33 +429,33 @@ const SupervisorDashboard = () => {
                     )}
                 </div>
 
-                {/* Project Status Distribution */}
+                {/* Machine Status (Read-only) */}
                 <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Project Status Distribution</h2>
-                    {projectChartData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                                <Pie
-                                    data={projectChartData}
-                                    cx="50%"
-                                    cy="50%"
-                                    labelLine={false}
-                                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                    outerRadius={100}
-                                    fill="#8884d8"
-                                    dataKey="value"
-                                >
-                                    {projectChartData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                </Pie>
-                                <Tooltip />
-                            </PieChart>
-                        </ResponsiveContainer>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold text-gray-900">Machine Status</h2>
+                        <span className="text-xs text-gray-500">Live Status</span>
+                    </div>
+                    {(unified.machines || []).length > 0 ? (
+                        <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                            {unified.machines.map(machine => (
+                                <div key={machine.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                    <div className="flex items-center">
+                                        <div className={`w-3 h-3 rounded-full mr-3 ${machine.status === 'active' ? 'bg-green-500 animate-pulse' : machine.status === 'maintenance' ? 'bg-amber-500' : 'bg-gray-400'}`}></div>
+                                        <div>
+                                            <p className="text-sm font-bold text-gray-800">{machine.machine_name}</p>
+                                            <p className="text-[10px] text-gray-500 uppercase">{machine.category_name || 'General'}</p>
+                                        </div>
+                                    </div>
+                                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${machine.status === 'active' ? 'text-green-700 bg-green-100' : 'text-gray-700 bg-gray-200'}`}>
+                                        {machine.status}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
                     ) : (
                         <div className="text-center py-12 text-gray-500">
-                            <Folder className="mx-auto mb-4" size={48} />
-                            <p>No project data available</p>
+                            <TrendingUp className="mx-auto mb-4" size={48} />
+                            <p>No machine data available</p>
                         </div>
                     )}
                 </div>
