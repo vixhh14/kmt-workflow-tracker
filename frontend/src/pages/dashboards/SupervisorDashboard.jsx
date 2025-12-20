@@ -444,7 +444,7 @@ const SupervisorDashboard = () => {
                                     <div className="flex items-center">
                                         <div className={`w-3 h-3 rounded-full mr-3 ${machine.status === 'active' ? 'bg-green-500 animate-pulse' : machine.status === 'maintenance' ? 'bg-amber-500' : 'bg-gray-400'}`}></div>
                                         <div>
-                                            <p className="text-sm font-bold text-gray-800">{machine.machine_name}</p>
+                                            <p className="text-sm font-bold text-gray-800">{machine?.name || machine?.machine_name || machine?.display_name || `Machine-${machine?.id || '?'}`}</p>
                                             <p className="text-[10px] text-gray-500 uppercase">{machine.category_name || 'General'}</p>
                                         </div>
                                     </div>
