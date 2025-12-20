@@ -511,11 +511,14 @@ const Tasks = () => {
                                     <option value="">
                                         {loading ? 'Loading machines...' : machines.length === 0 ? 'No machines available' : 'Select Machine'}
                                     </option>
-                                    {Array.isArray(machines) && machines.map((machine) => (
-                                        <option key={machine?.id || Math.random()} value={machine?.id || ''}>
-                                            {machine?.name || 'Unknown Machine'}
-                                        </option>
-                                    ))}
+                                    {Array.isArray(machines) && machines.map((machine) => {
+                                        const machineLabel = machine?.name || machine?.machine_name || machine?.display_name || `Machine-${machine?.id || '?'}`;
+                                        return (
+                                            <option key={machine?.id || Math.random()} value={machine?.id || ''}>
+                                                {machineLabel}
+                                            </option>
+                                        );
+                                    })}
                                 </select>
                                 {machines.length === 0 && !loading && (
                                     <p className="text-xs text-red-600 mt-1">⚠️ No machines available. Please add machines in the Machines page.</p>
