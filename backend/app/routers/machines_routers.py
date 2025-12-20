@@ -29,7 +29,7 @@ async def read_machines(db: Session = Depends(get_db)):
     return [
         {
             "id": m.id,
-            "name": m.machine_name,
+            "machine_name": m.machine_name,
             "status": m.status,
             "hourly_rate": m.hourly_rate,
             "last_maintenance": m.last_maintenance,
@@ -78,7 +78,7 @@ async def create_machine(machine: MachineCreate, db: Session = Depends(get_db)):
     
     return {
         "id": new_machine.id,
-        "name": new_machine.machine_name,
+        "machine_name": new_machine.machine_name,
         "status": new_machine.status,
         "hourly_rate": new_machine.hourly_rate,
         "last_maintenance": new_machine.last_maintenance,
@@ -116,7 +116,7 @@ async def update_machine(machine_id: str, machine_update: MachineUpdate, db: Ses
     
     return {
         "id": db_machine.id,
-        "name": db_machine.machine_name,
+        "machine_name": db_machine.machine_name,
         "status": db_machine.status,
         "hourly_rate": db_machine.hourly_rate,
         "last_maintenance": db_machine.last_maintenance,

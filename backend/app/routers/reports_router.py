@@ -53,10 +53,14 @@ def calculate_machine_runtime(db: Session, target_date: date) -> List[dict]:
         machine_stats[log.machine_id]["runtime"] += duration
 
     # 2. Get Completed Tasks for this date
-    completed_tasks = db.query(Task).filter(
+    # Fetch tasks completed within a safe window and filter in Python using IST
+    tasks_query = db.query(Task).filter(
         Task.status == 'completed',
-        func.date(Task.actual_end_time) == target_date
+        Task.actual_end_time >= datetime.combine(target_date - timedelta(days=1), datetime.min.time()),
+        Task.actual_end_time <= datetime.combine(target_date + timedelta(days=1), datetime.max.time())
     ).all()
+    
+    completed_tasks = [t for t in tasks_query if t.actual_end_time.astimezone(IST).date() == target_date]
     
     for t in completed_tasks:
         if t.machine_id in machine_stats:
@@ -108,10 +112,13 @@ def calculate_user_activity(db: Session, target_date: date) -> List[dict]:
             user_stats[log.user_id]["machines"].add(log.machine_id)
             
     # 2. Get Completed Tasks for this date
-    completed_tasks = db.query(Task).filter(
+    tasks_query = db.query(Task).filter(
         Task.status == 'completed',
-        func.date(Task.actual_end_time) == target_date
+        Task.actual_end_time >= datetime.combine(target_date - timedelta(days=1), datetime.min.time()),
+        Task.actual_end_time <= datetime.combine(target_date + timedelta(days=1), datetime.max.time())
     ).all()
+    
+    completed_tasks = [t for t in tasks_query if t.actual_end_time.astimezone(IST).date() == target_date]
     
     for t in completed_tasks:
         if t.assigned_to in user_stats:
@@ -179,6 +186,7 @@ def calculate_detailed_machine_activity(db: Session, machine_id: str, target_dat
             "start_time": log.start_time.isoformat(),
             "end_time": log.end_time.isoformat() if log.end_time else None,
             "runtime_seconds": max(0, duration),
+            "expected_duration_minutes": task.expected_completion_time if task else 0,
             "held_time_seconds": task.total_held_seconds if task else 0,
             "status": "Running" if log.end_time is None else "Finished"
         })
@@ -221,6 +229,7 @@ def calculate_detailed_user_activity(db: Session, user_id: str, target_date: dat
             "start_time": log.start_time.isoformat(),
             "end_time": log.end_time.isoformat() if log.end_time else None,
             "duration_seconds": max(0, duration),
+            "expected_duration_minutes": task.expected_completion_time if task else 0,
             "holds": hold_history,
             "status": "Running" if log.end_time is None else "Finished"
         })
