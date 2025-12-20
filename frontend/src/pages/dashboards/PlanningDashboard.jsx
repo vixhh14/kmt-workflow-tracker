@@ -136,25 +136,25 @@ const PlanningDashboard = () => {
                     color="bg-purple-500"
                 />
                 <StatCard
-                    title="Pending Tasks"
+                    title="Pending"
                     value={summary.pending_tasks}
                     icon={Clock}
                     color="bg-gray-500"
                 />
                 <StatCard
-                    title="Running Tasks"
+                    title="In Progress"
                     value={summary.total_tasks_running}
                     icon={TrendingUp}
                     color="bg-blue-500"
                 />
                 <StatCard
-                    title="Completed Tasks"
+                    title="Completed"
                     value={summary.completed_tasks}
                     icon={CheckCircle}
                     color="bg-green-500"
                 />
                 <StatCard
-                    title="On Hold Tasks"
+                    title="On Hold"
                     value={summary.on_hold_tasks}
                     icon={Pause}
                     color="bg-yellow-500"
