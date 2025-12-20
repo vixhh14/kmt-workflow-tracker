@@ -33,6 +33,7 @@ from app.routers import (
     attendance_router,
     projects_router,
     reports_router,
+    unified_dashboard_router,
 )
 from app.core.config import CORS_ORIGINS
 import uvicorn
@@ -163,6 +164,7 @@ app.include_router(operator_router.router)
 app.include_router(attendance_router.router)
 app.include_router(projects_router.router)
 app.include_router(reports_router.router)
+app.include_router(unified_dashboard_router.router)
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

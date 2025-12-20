@@ -58,6 +58,13 @@ async def get_pending_users(db: Session = Depends(get_db)):
     users = db.query(User).filter(User.approval_status == "pending").all()
     return users
 
+@router.get("/approvals")
+async def get_admin_approvals(db: Session = Depends(get_db)):
+    """GET /admin/approvals as requested by user"""
+    users = db.query(User).filter(User.approval_status == "pending").all()
+    # Format to match UserResponse or desired pending_users list
+    return {"pending_users": users}
+
 @router.put("/change-password")
 async def change_admin_password(
     request: ChangePasswordRequest,
