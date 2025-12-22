@@ -121,8 +121,8 @@ async def start_task(task_id: str, db: Session = Depends(get_db)):
         if task.status == 'in_progress':
             raise HTTPException(status_code=400, detail="Task is already in progress")
         
-        if task.status == 'completed':
-            raise HTTPException(status_code=400, detail="Task is already completed")
+        if task.status == 'completed' or task.status == 'ended':
+            raise HTTPException(status_code=400, detail=f"Task is already {task.status} and cannot be started")
         
         now = get_current_time_ist()
         task.status = 'in_progress'
@@ -198,8 +198,8 @@ async def complete_task(task_id: str, db: Session = Depends(get_db)):
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
         
-        if task.status == 'completed':
-            raise HTTPException(status_code=400, detail="Task is already completed")
+        if task.status == 'completed' or task.status == 'ended':
+            raise HTTPException(status_code=400, detail=f"Task is already {task.status}")
         
         if task.status == 'pending':
             raise HTTPException(status_code=400, detail="Cannot complete a task that hasn't been started")
@@ -290,6 +290,9 @@ async def hold_task(task_id: str, reason: str = "", db: Session = Depends(get_db
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
         
+        if task.status == 'ended':
+            raise HTTPException(status_code=400, detail="Task has been ended by admin and cannot be modified")
+        
         if task.status != 'in_progress':
             raise HTTPException(status_code=400, detail="Only in-progress tasks can be put on hold")
         
@@ -356,6 +359,9 @@ async def resume_task(task_id: str, db: Session = Depends(get_db)):
         task = db.query(Task).filter(Task.id == task_id).first()
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
+        
+        if task.status == 'ended':
+            raise HTTPException(status_code=400, detail="Task has been ended by admin and cannot be resumed")
         
         if task.status != 'on_hold':
             raise HTTPException(status_code=400, detail="Only on-hold tasks can be resumed")

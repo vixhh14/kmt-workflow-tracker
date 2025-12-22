@@ -29,14 +29,22 @@ async def get_planning_dashboard_summary(db: Session = Depends(get_db)):
             p_name = task.project
             if task.project_id and task.project_obj:
                 p_name = task.project_obj.project_name
-                
+            
+            # If still null/blank, try searching DB (for extra safety)
+            if (not p_name or p_name == '-') and task.project_id:
+                from app.models.models_db import Project as DBProject
+                p_obj = db.query(DBProject).filter(DBProject.project_id == task.project_id).first()
+                if p_obj:
+                    p_name = p_obj.project_name
+            
             if not p_name:
-                continue
+                p_name = "Unassigned"
             
             if p_name not in project_map:
                 project_map[p_name] = {
                     'total': 0,
                     'completed': 0,
+                    'ended': 0,
                     'in_progress': 0,
                     'pending': 0,
                     'on_hold': 0
@@ -45,6 +53,8 @@ async def get_planning_dashboard_summary(db: Session = Depends(get_db)):
             project_map[p_name]['total'] += 1
             if task.status == 'completed':
                 project_map[p_name]['completed'] += 1
+            elif task.status == 'ended':
+                project_map[p_name]['ended'] += 1
             elif task.status == 'in_progress':
                 project_map[p_name]['in_progress'] += 1
             elif task.status == 'pending':
@@ -56,11 +66,12 @@ async def get_planning_dashboard_summary(db: Session = Depends(get_db)):
         for project_name, stats in project_map.items():
             progress = 0
             if stats['total'] > 0:
-                progress = (stats['completed'] / stats['total']) * 100
+                # Progress counts both normally completed and admin-ended tasks
+                progress = ((stats['completed'] + stats['ended']) / stats['total']) * 100
             
             # Determine project status
             status = "Pending"
-            if stats['completed'] == stats['total']:
+            if (stats['completed'] + stats['ended']) == stats['total']:
                 status = "Completed"
             elif stats['in_progress'] > 0:
                 status = "In Progress"
@@ -71,7 +82,7 @@ async def get_planning_dashboard_summary(db: Session = Depends(get_db)):
                 "project": project_name,
                 "progress": round(progress, 1),
                 "total_tasks": stats['total'],
-                "completed_tasks": stats['completed'],
+                "completed_tasks": stats['completed'] + stats['ended'],
                 "status": status
             })
         
@@ -82,7 +93,9 @@ async def get_planning_dashboard_summary(db: Session = Depends(get_db)):
         total_projects = len(project_summary)
         total_tasks_running = len([t for t in all_tasks if t.status == 'in_progress'])
         pending_tasks = len([t for t in all_tasks if t.status == 'pending'])
-        completed_tasks = len([t for t in all_tasks if t.status == 'completed'])
+        completed_tasks = len([t for t in all_tasks if t.status in ['completed', 'ended']])
+        on_hold_tasks = len([t for t in all_tasks if t.status == 'on_hold'])
+        total_tasks = len(all_tasks)
         
         # Count active machines
         active_machine_ids = set()
@@ -110,10 +123,12 @@ async def get_planning_dashboard_summary(db: Session = Depends(get_db)):
         
         return {
             "total_projects": total_projects,
+            "total_tasks": total_tasks,
             "total_tasks_running": total_tasks_running,
             "machines_active": machines_active,
             "pending_tasks": pending_tasks,
             "completed_tasks": completed_tasks,
+            "on_hold_tasks": on_hold_tasks,
             "project_summary": project_summary,
             "operator_status": operator_status
         }
