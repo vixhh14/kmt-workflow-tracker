@@ -8,6 +8,37 @@ import { resolveMachineName } from '../utils/machineUtils';
 
 const Tasks = () => {
     const { user: currentUser } = useAuth();
+
+    // Helper to format due_datetime (supports legacy due_date)
+    const formatDueDateTime = (isoString, fallbackDate) => {
+        if (!isoString) {
+            if (!fallbackDate) return '-';
+            try {
+                const [year, month, day] = fallbackDate.split('-');
+                if (!year || !month || !day) return fallbackDate;
+                const date = new Date(year, month - 1, day, 9, 0); // Default to 09:00 AM
+                const options = { day: '2-digit', month: 'short', year: 'numeric' };
+                return date.toLocaleDateString('en-GB', options) + " • 09:00 AM";
+            } catch (e) { return fallbackDate; }
+        }
+
+        try {
+            // isoString from backend is like "2023-12-23T14:30:00" (Naive)
+            // Parsing it directly as naive depends on browser, but usually works as local.
+            // If it ends in Z, it's UTC, which we want to avoid but handle if present.
+            const date = new Date(isoString);
+            if (isNaN(date.getTime())) return isoString;
+
+            const options = {
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit',
+                hour12: true
+            };
+            const formatted = date.toLocaleString('en-GB', options);
+            return formatted.replace(',', ' •').toUpperCase();
+        } catch (e) { return isoString; }
+    };
+
     const [tasks, setTasks] = useState([]);
     const [machines, setMachines] = useState([]);
     const [users, setUsers] = useState([]);
@@ -43,6 +74,7 @@ const Tasks = () => {
         assigned_by: '',
         machine_id: '',
         due_date: '',
+        due_time: '09:00',
         expected_completion_time: ''
     });
 
@@ -127,10 +159,17 @@ const Tasks = () => {
                 return;
             }
 
-            // Normalize date to ISO string
+            // Combine Date and Time for due_datetime
+            let due_datetime = null;
+            if (formData.due_date) {
+                // Use selected time or default to 09:00
+                const timeStr = formData.due_time || '09:00';
+                due_datetime = `${formData.due_date}T${timeStr}:00`;
+            }
+
             const payload = {
                 ...formData,
-                due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null, // Ensures ISO format
+                due_datetime: due_datetime,
                 expected_completion_time: durationMinutes
             };
 
@@ -148,6 +187,7 @@ const Tasks = () => {
                 assigned_by: '',
                 machine_id: '',
                 due_date: '',
+                due_time: '09:00',
                 expected_completion_time: ''
             });
             setShowForm(false);
@@ -580,15 +620,27 @@ const Tasks = () => {
                                     )}
                                 </select>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Due Date *</label>
-                                <input
-                                    type="date"
-                                    required
-                                    value={formData.due_date}
-                                    onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Due Date *</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={formData.due_date}
+                                        onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Expected Time *</label>
+                                    <input
+                                        type="time"
+                                        required
+                                        value={formData.due_time}
+                                        onChange={(e) => setFormData({ ...formData, due_time: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Expected Duration (HH:MM) *</label>
@@ -652,6 +704,7 @@ const Tasks = () => {
                                 <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Priority</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Assigned To</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Deadline</th>
                                 <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
@@ -699,6 +752,11 @@ const Tasks = () => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                             {users.find(u => u.user_id === task.assigned_to)?.username || 'Unassigned'}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-[11px] font-bold text-gray-700 bg-gray-50 px-2 py-1 rounded inline-block">
+                                                {formatDueDateTime(task.due_datetime, task.due_date)}
+                                            </div>
                                         </td>
                                         <td className="px-2 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium">
                                             <div className="flex items-center space-x-2">
@@ -758,7 +816,11 @@ const Tasks = () => {
                                                                     <p className="text-[10px] text-purple-600 font-bold uppercase mb-1">Duration Analysis</p>
                                                                     <div className="space-y-1 text-xs">
                                                                         <p className="flex justify-between">
-                                                                            <span className="text-gray-500">Expected:</span>
+                                                                            <span className="text-gray-500">Deadline:</span>
+                                                                            <span className="font-bold text-red-600">{formatDueDateTime(task.due_datetime, task.due_date)}</span>
+                                                                        </p>
+                                                                        <p className="flex justify-between">
+                                                                            <span className="text-gray-500">Expected Dur.:</span>
                                                                             <span className="font-medium text-gray-900">{minutesToHHMM(task.expected_completion_time)} ({task.expected_completion_time || '0'}m)</span>
                                                                         </p>
                                                                         <p className="flex justify-between">
