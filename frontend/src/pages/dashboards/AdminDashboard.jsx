@@ -146,6 +146,27 @@ const AdminDashboard = () => {
         }
     };
 
+    const formatDueDateTime = (isoString, fallbackDate) => {
+        if (!isoString) {
+            if (!fallbackDate) return 'N/A';
+            try {
+                const [year, month, day] = fallbackDate.split('-');
+                if (!year || !month || !day) return fallbackDate;
+                const date = new Date(year, month - 1, day, 9, 0);
+                return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + " • 09:00 AM";
+            } catch (e) { return fallbackDate; }
+        }
+        try {
+            const date = new Date(isoString);
+            if (isNaN(date.getTime())) return isoString;
+            const options = {
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', hour12: true
+            };
+            return date.toLocaleString('en-GB', options).replace(',', ' •').toUpperCase();
+        } catch (e) { return isoString; }
+    };
+
     const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
         if (percent === 0) return null;
         const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
@@ -309,9 +330,9 @@ const AdminDashboard = () => {
                                             <p className="text-xs text-gray-600 mt-1 truncate">⚙️ {(!task.machine_name || task.machine_name === 'Unknown') ? (task.machine_id ? `Machine-${task.machine_id}` : 'Handwork') : task.machine_name}</p>
                                         </div>
                                         <div className="bg-white p-2 rounded-lg border border-gray-100">
-                                            <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Time Trace</p>
+                                            <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Timing Trace</p>
                                             <p className="text-xs font-bold text-blue-600">⏱️ {formatDuration(task.duration_seconds)}</p>
-                                            <p className="text-[10px] text-gray-500 mt-1">Start: {formatTime(task.started_at)}</p>
+                                            <p className="text-[10px] text-red-600 font-bold mt-1 uppercase">Due: {formatDueDateTime(task.due_datetime, task.due_date)}</p>
                                         </div>
                                     </div>
 

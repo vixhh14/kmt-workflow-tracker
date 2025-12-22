@@ -217,6 +217,27 @@ const SupervisorDashboard = () => {
         }
     };
 
+    const formatDueDateTime = (isoString, fallbackDate) => {
+        if (!isoString) {
+            if (!fallbackDate) return 'N/A';
+            try {
+                const [year, month, day] = fallbackDate.split('-');
+                if (!year || !month || !day) return fallbackDate;
+                const date = new Date(year, month - 1, day, 9, 0);
+                return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + " • 09:00 AM";
+            } catch (e) { return fallbackDate; }
+        }
+        try {
+            const date = new Date(isoString);
+            if (isNaN(date.getTime())) return isoString;
+            const options = {
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', hour12: true
+            };
+            return date.toLocaleString('en-GB', options).replace(',', ' •').toUpperCase();
+        } catch (e) { return isoString; }
+    };
+
     const getPriorityColor = (priority) => {
         switch (priority) {
             case 'high': return 'bg-red-100 text-red-800';
@@ -382,7 +403,8 @@ const SupervisorDashboard = () => {
                                             <div className="text-xs space-y-1">
                                                 <p className="text-gray-500 font-medium uppercase tracking-[0.05em]">Timing Analytics</p>
                                                 <p className="flex justify-between text-gray-600"><span>Started:</span> <span className="font-medium text-gray-900 ml-2">{formatTime(task.started_at)}</span></p>
-                                                <p className="flex justify-between text-gray-600"><span>Expected:</span> <span className="font-medium text-gray-900 ml-2">{task.expected_completion_time || 0}m</span></p>
+                                                <p className="flex justify-between text-gray-600"><span>Deadline:</span> <span className="font-bold text-red-600 ml-2">{formatDueDateTime(task.due_datetime, task.due_date)}</span></p>
+                                                <p className="flex justify-between text-gray-600"><span>Expected Dur:</span> <span className="font-medium text-gray-900 ml-2">{task.expected_completion_time || 0}m</span></p>
                                                 <p className="flex justify-between text-gray-600"><span>Net Dur:</span> <span className={`font-bold ml-2 ${task.expected_completion_time && (task.duration_seconds / 60) > task.expected_completion_time
                                                     ? 'text-red-600'
                                                     : 'text-green-600'
