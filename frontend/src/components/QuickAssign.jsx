@@ -218,7 +218,7 @@ const QuickAssign = ({ onAssignSuccess }) => {
                                     </select>
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Expected Duration (HH:MM)</label>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Task Completion Duration (HH:MM)</label>
                                     <input
                                         type="text"
                                         placeholder="02:30"
