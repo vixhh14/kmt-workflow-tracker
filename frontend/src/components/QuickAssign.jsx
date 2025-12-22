@@ -3,6 +3,7 @@ import { UserPlus, X, Clock, Play, CheckCircle, AlertCircle, Calendar } from 'lu
 import { getPendingTasks, assignTask, getOperators } from '../api/supervisor';
 import { getMachines, getUnits } from '../api/services';
 import { minutesToHHMM, hhmmToMinutes, validateHHMM } from '../utils/timeFormat';
+import { resolveMachineName } from '../utils/machineUtils';
 
 const QuickAssign = ({ onAssignSuccess }) => {
     const [pendingTasks, setPendingTasks] = useState([]);
@@ -81,10 +82,16 @@ const QuickAssign = ({ onAssignSuccess }) => {
                 ...assigningData,
                 expected_completion_time: durationMinutes
             });
+
+            // Optimistic update: remove from local list before refresh
+            setTasks(prev => prev.filter(t => t.id !== selectedTask.id));
+
             setShowModal(false);
             setSelectedTask(null);
-            fetchData();
+
+            // Global refresh
             if (onAssignSuccess) onAssignSuccess();
+            fetchData();
         } catch (err) {
             alert(err.response?.data?.detail || 'Failed to assign task');
         }
@@ -132,9 +139,7 @@ const QuickAssign = ({ onAssignSuccess }) => {
                                 {task.project && (
                                     <p className="text-xs text-gray-600 truncate">📁 <span className="font-medium text-gray-800">{task.project}</span></p>
                                 )}
-                                {task.machine_name && (
-                                    <p className="text-xs text-gray-600">⚙️ {task.machine_name}</p>
-                                )}
+                                <p className="text-xs text-gray-600">⚙️ {task.machine_name || (task.machine_id ? `Machine-${task.machine_id}` : 'Handwork')}</p>
                                 {task.due_date && (
                                     <p className="text-xs text-gray-600">📅 Due: {task.due_date}</p>
                                 )}
@@ -195,12 +200,9 @@ const QuickAssign = ({ onAssignSuccess }) => {
                                         className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                                     >
                                         <option value="">-- Choose Machine --</option>
-                                        {machines.map(m => {
-                                            const machineLabel = m?.name || m?.machine_name || m?.display_name || `Machine-${m?.id || '?'}`;
-                                            return (
-                                                <option key={m.id} value={m.id}>{machineLabel}</option>
-                                            );
-                                        })}
+                                        {machines.map(m => (
+                                            <option key={m.id} value={m.id}>{resolveMachineName(m)}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div className="space-y-1">

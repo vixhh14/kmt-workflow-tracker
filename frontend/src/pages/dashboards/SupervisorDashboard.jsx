@@ -4,6 +4,7 @@ import QuickAssign from '../../components/QuickAssign';
 import { getUsers, getDashboardOverview, getProjectOverviewStats, getSupervisorUnifiedDashboard } from '../../api/services';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Folder, CheckCircle, Clock, TrendingUp, AlertCircle, RefreshCw, UserPlus, Play, Users, X, Pause } from 'lucide-react';
+import { resolveMachineName } from '../../utils/machineUtils';
 
 
 const COLORS = {
@@ -63,6 +64,8 @@ const SupervisorDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    const isMounted = React.useRef(false);
+
     useEffect(() => {
         fetchDashboard();
         const interval = setInterval(fetchRunningTasksOnly, 60000); // Update running tasks every minute
@@ -70,11 +73,17 @@ const SupervisorDashboard = () => {
     }, []);
 
     useEffect(() => {
-        fetchOperatorStatus();
+        if (isMounted.current) {
+            fetchOperatorStatus();
+        }
     }, [selectedOperator]);
 
     useEffect(() => {
-        fetchTaskStatsFiltered();
+        if (isMounted.current) {
+            fetchTaskStatsFiltered();
+        } else {
+            isMounted.current = true;
+        }
     }, [selectedProject]);
 
 
@@ -180,7 +189,7 @@ const SupervisorDashboard = () => {
         if (!assigningOperator || !selectedTask) return;
 
         try {
-            await assignTask(selectedTask.id, assigningOperator);
+            await assignTask(selectedTask.id, { operator_id: assigningOperator });
             setShowAssignModal(false);
             setSelectedTask(null);
             setAssigningOperator('');
@@ -268,8 +277,8 @@ const SupervisorDashboard = () => {
                     >
                         <option value="all">All Operators</option>
                         {operators.map(op => (
-                            <option key={op.user_id} value={op.user_id}>
-                                {op.full_name || op.username}
+                            <option key={op.id} value={op.id}>
+                                {op.name || op.username}
                             </option>
                         ))}
                     </select>
@@ -298,12 +307,18 @@ const SupervisorDashboard = () => {
                         ))}
                     </select>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
                     <StatCard
                         title="Total Projects"
                         value={projectSummary.total_projects || 0}
                         icon={Folder}
                         color="bg-purple-500"
+                    />
+                    <StatCard
+                        title="Total Tasks"
+                        value={taskStats.total_tasks || 0}
+                        icon={TrendingUp}
+                        color="bg-indigo-500"
                     />
                     <StatCard
                         title="Pending"
@@ -361,7 +376,7 @@ const SupervisorDashboard = () => {
                                             <div className="text-xs space-y-1">
                                                 <p className="text-gray-500 font-medium uppercase tracking-[0.05em]">Assignment</p>
                                                 <p className="flex items-center text-gray-700">👤 <span className="ml-1 font-semibold">{task.operator_name}</span></p>
-                                                <p className="flex items-center text-gray-700">⚙️ <span className="ml-1">{task.machine_name}</span></p>
+                                                <p className="flex items-center text-gray-700">⚙️ <span className="ml-1 truncate">{(!task.machine_name || task.machine_name === 'Unknown') ? (task.machine_id ? `Machine-${task.machine_id}` : 'Handwork') : task.machine_name}</span></p>
                                                 <p className="flex items-center text-gray-700">📁 <span className="ml-1 truncate">{task.project}</span></p>
                                             </div>
                                             <div className="text-xs space-y-1">
@@ -444,7 +459,7 @@ const SupervisorDashboard = () => {
                                     <div className="flex items-center">
                                         <div className={`w-3 h-3 rounded-full mr-3 ${machine.status === 'active' ? 'bg-green-500 animate-pulse' : machine.status === 'maintenance' ? 'bg-amber-500' : 'bg-gray-400'}`}></div>
                                         <div>
-                                            <p className="text-sm font-bold text-gray-800">{machine?.name || machine?.machine_name || machine?.display_name || `Machine-${machine?.id || '?'}`}</p>
+                                            <p className="text-sm font-bold text-gray-800">{resolveMachineName(machine)}</p>
                                             <p className="text-[10px] text-gray-500 uppercase">{machine.category_name || 'General'}</p>
                                         </div>
                                     </div>

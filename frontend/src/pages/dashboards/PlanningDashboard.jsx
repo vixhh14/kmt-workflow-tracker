@@ -22,10 +22,12 @@ const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
 const PlanningDashboard = () => {
     const [summary, setSummary] = useState({
         total_projects: 0,
+        total_tasks: 0,
         total_tasks_running: 0,
         machines_active: 0,
         pending_tasks: 0,
         completed_tasks: 0,
+        on_hold_tasks: 0,
         project_summary: [],
         operator_status: []
     });
@@ -51,12 +53,13 @@ const PlanningDashboard = () => {
             ]);
             console.log('✅ Planning dashboard loaded');
 
-            const tasks = overviewRes?.data?.tasks || { in_progress: 0, pending: 0, completed: 0, on_hold: 0 };
+            const tasks = overviewRes?.data?.tasks || { total: 0, in_progress: 0, pending: 0, completed: 0, on_hold: 0 };
             const machines = overviewRes?.data?.machines || { active: 0 };
             const projectStats = projectStatsRes?.data || { total: 0 };
 
             setSummary({
                 total_projects: projectStats.total || 0,
+                total_tasks: tasks.total || 0,
                 total_tasks_running: tasks.in_progress || 0,
                 machines_active: machines.active || 0,
                 pending_tasks: tasks.pending || 0,
@@ -121,19 +124,26 @@ const PlanningDashboard = () => {
                 <button
                     onClick={fetchDashboard}
                     className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition w-full sm:w-auto"
+                    disabled={loading}
                 >
-                    <RefreshCw size={18} />
+                    <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                     <span>Refresh</span>
                 </button>
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
                 <StatCard
                     title="Total Projects"
                     value={summary.total_projects}
                     icon={Folder}
                     color="bg-purple-500"
+                />
+                <StatCard
+                    title="Total Tasks"
+                    value={summary.total_tasks}
+                    icon={TrendingUp}
+                    color="bg-indigo-500"
                 />
                 <StatCard
                     title="Pending"
