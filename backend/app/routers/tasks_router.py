@@ -47,6 +47,9 @@ async def read_tasks(
     if assigned_to:
         query = query.filter(Task.assigned_to == assigned_to)
     
+    # Sort by deadline (closest first), then by creation date (newest first)
+    query = query.order_by(Task.due_datetime.asc().nulls_last(), Task.created_at.desc())
+    
     tasks = query.all()
     results = []
     for t in tasks:
@@ -87,6 +90,7 @@ async def read_tasks(
             "assigned_to": t.assigned_to,
             "machine_id": t.machine_id,
             "due_date": t.due_date,
+            "due_datetime": t.due_datetime.isoformat() if t.due_datetime else None,
             "expected_completion_time": t.expected_completion_time,
             "created_at": t.created_at.isoformat() if t.created_at else None,
             "started_at": t.started_at.isoformat() if t.started_at else None,
@@ -140,6 +144,7 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
         assigned_to=task.assigned_to,
         machine_id=task.machine_id,
         due_date=task.due_date,
+        due_datetime=task.due_datetime,
         expected_completion_time=task.expected_completion_time,
         created_at=get_current_time_ist(),
     )
@@ -544,6 +549,7 @@ async def update_task(task_id: str, task_update: TaskUpdate, db: Session = Depen
         "assigned_to": db_task.assigned_to,
         "machine_id": db_task.machine_id,
         "due_date": db_task.due_date,
+        "due_datetime": db_task.due_datetime.isoformat() if db_task.due_datetime else None,
         "expected_completion_time": db_task.expected_completion_time,
         "started_at": db_task.started_at.isoformat() if db_task.started_at else None,
         "completed_at": db_task.completed_at.isoformat() if db_task.completed_at else None,
