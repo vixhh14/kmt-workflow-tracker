@@ -375,7 +375,7 @@ const OperatorDashboard = () => {
                                         <div className="space-y-1">
                                             <p className="text-gray-500 font-medium uppercase tracking-wider">Timing Details</p>
                                             {task.expected_completion_time && (
-                                                <p><span className="text-gray-600">Expected:</span> <span className="text-blue-600 font-bold">{formatMinutesToHHMM(task.expected_completion_time)} (HH:MM)</span></p>
+                                                <p><span className="text-gray-600">Task Completion Duration:</span> <span className="text-blue-600 font-bold">{formatMinutesToHHMM(task.expected_completion_time)} (HH:MM)</span></p>
                                             )}
                                             <p><span className="text-gray-600">Actual Runtime:</span> <span className={`font-bold ${task.expected_completion_time && (task.total_duration_seconds / 60) > task.expected_completion_time ? 'text-red-600' : 'text-green-600'}`}>{formatDuration(task.total_duration_seconds)}</span></p>
                                             {task.total_held_seconds > 0 && (

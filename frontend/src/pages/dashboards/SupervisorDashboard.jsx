@@ -404,7 +404,7 @@ const SupervisorDashboard = () => {
                                                 <p className="text-gray-500 font-medium uppercase tracking-[0.05em]">Timing Analytics</p>
                                                 <p className="flex justify-between text-gray-600"><span>Started:</span> <span className="font-medium text-gray-900 ml-2">{formatTime(task.started_at)}</span></p>
                                                 <p className="flex justify-between text-gray-600"><span>Deadline:</span> <span className="font-bold text-red-600 ml-2">{formatDueDateTime(task.due_datetime, task.due_date)}</span></p>
-                                                <p className="flex justify-between text-gray-600"><span>Expected Dur:</span> <span className="font-medium text-gray-900 ml-2">{task.expected_completion_time || 0}m</span></p>
+                                                <p className="flex justify-between text-gray-600"><span>Task Completion Duration:</span> <span className="font-medium text-gray-900 ml-2">{task.expected_completion_time || 0}m</span></p>
                                                 <p className="flex justify-between text-gray-600"><span>Net Dur:</span> <span className={`font-bold ml-2 ${task.expected_completion_time && (task.duration_seconds / 60) > task.expected_completion_time
                                                     ? 'text-red-600'
                                                     : 'text-green-600'

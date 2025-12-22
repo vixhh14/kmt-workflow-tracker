@@ -632,7 +632,7 @@ const Tasks = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Expected Time *</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Expected Time of Completion *</label>
                                     <input
                                         type="time"
                                         required
@@ -643,7 +643,7 @@ const Tasks = () => {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Expected Duration (HH:MM) *</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Task Completion Duration (HH:MM) *</label>
                                 <input
                                     type="text"
                                     required
@@ -820,7 +820,7 @@ const Tasks = () => {
                                                                             <span className="font-bold text-red-600">{formatDueDateTime(task.due_datetime, task.due_date)}</span>
                                                                         </p>
                                                                         <p className="flex justify-between">
-                                                                            <span className="text-gray-500">Expected Dur.:</span>
+                                                                            <span className="text-gray-500">Task Completion Duration:</span>
                                                                             <span className="font-medium text-gray-900">{minutesToHHMM(task.expected_completion_time)} ({task.expected_completion_time || '0'}m)</span>
                                                                         </p>
                                                                         <p className="flex justify-between">
