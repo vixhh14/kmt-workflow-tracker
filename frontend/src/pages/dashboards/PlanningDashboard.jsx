@@ -63,10 +63,10 @@ const PlanningDashboard = () => {
                 total_tasks_running: tasks.in_progress || 0,
                 machines_active: machines.active || 0,
                 pending_tasks: tasks.pending || 0,
-                completed_tasks: tasks.completed || 0,
+                completed_tasks: (tasks.completed || 0) + (tasks.ended || 0),
                 on_hold_tasks: tasks.on_hold || 0,
-                project_summary: Array.isArray(response?.data?.project_summary) ? response.data.project_summary : [],
-                operator_status: Array.isArray(response?.data?.operator_status) ? response.data.operator_status : []
+                project_summary: response?.data?.project_summary || [],
+                operator_status: response?.data?.operator_status || []
             });
         } catch (err) {
             console.error('❌ Failed to fetch planning dashboard:', err);

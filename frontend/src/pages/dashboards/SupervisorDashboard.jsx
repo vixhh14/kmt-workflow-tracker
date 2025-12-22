@@ -125,7 +125,7 @@ const SupervisorDashboard = () => {
                 total_tasks: tasks.total || 0,
                 pending: tasks.pending || 0,
                 in_progress: tasks.in_progress || 0,
-                completed: tasks.completed || 0,
+                completed: (tasks.completed || 0) + (tasks.ended || 0),
                 on_hold: tasks.on_hold || 0,
                 available_projects: statsRes?.data?.available_projects || []
             });

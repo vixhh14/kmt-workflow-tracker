@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { getTasks, createTask, deleteTask, getMachines, getUsers, updateTask, getProjects } from '../api/services';
-import { Plus, Trash2, CheckSquare, Search, Filter, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { getTasks, createTask, deleteTask, getMachines, getUsers, updateTask, getProjects, endTask } from '../api/services';
+import { Plus, Trash2, CheckSquare, Search, Filter, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Clock, Square } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import Subtask from '../components/Subtask';
 import { minutesToHHMM, hhmmToMinutes, validateHHMM } from '../utils/timeFormat';
 import { resolveMachineName } from '../utils/machineUtils';
 
 const Tasks = () => {
+    const { user: currentUser } = useAuth();
     const [tasks, setTasks] = useState([]);
     const [machines, setMachines] = useState([]);
     const [users, setUsers] = useState([]);
@@ -156,6 +158,18 @@ const Tasks = () => {
         }
     };
 
+    const handleEndTask = async (taskId) => {
+        if (window.confirm('Are you sure you want to end this task? It will be closed and cannot be resumed by operators.')) {
+            try {
+                await endTask(taskId);
+                fetchData();
+            } catch (error) {
+                console.error('Failed to end task:', error);
+                alert(error.response?.data?.detail || 'Failed to end task');
+            }
+        }
+    };
+
     const handleDelete = async (taskId) => {
         if (window.confirm('Are you sure you want to delete this task?')) {
             try {
@@ -262,6 +276,7 @@ const Tasks = () => {
     const getStatusColor = (status) => {
         switch (status) {
             case 'completed': return 'bg-green-100 text-green-800';
+            case 'ended': return 'bg-purple-100 text-purple-800';
             case 'in_progress': return 'bg-blue-100 text-blue-800';
             case 'on_hold': return 'bg-yellow-100 text-yellow-800';
             case 'pending': return 'bg-gray-100 text-gray-800';
@@ -686,12 +701,25 @@ const Tasks = () => {
                                             {users.find(u => u.user_id === task.assigned_to)?.username || 'Unassigned'}
                                         </td>
                                         <td className="px-2 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium">
-                                            <button
-                                                onClick={() => handleDelete(task.id)}
-                                                className="text-red-600 hover:text-red-900 p-1"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
+                                            <div className="flex items-center space-x-2">
+                                                {currentUser?.role === 'admin' && task.status !== 'ended' && task.status !== 'completed' && (
+                                                    <button
+                                                        onClick={() => handleEndTask(task.id)}
+                                                        className="text-purple-600 hover:text-purple-900 p-1 flex items-center space-x-1 border border-purple-200 rounded hover:bg-purple-50"
+                                                        title="End Task (Admin Only)"
+                                                    >
+                                                        <Square size={14} fill="currentColor" />
+                                                        <span className="text-[10px] uppercase font-bold">End</span>
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => handleDelete(task.id)}
+                                                    className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
+                                                    title="Delete Task"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                     {expandedTaskId === task.id && (
