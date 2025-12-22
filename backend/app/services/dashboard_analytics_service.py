@@ -15,6 +15,7 @@ def get_dashboard_overview(db: Session):
         func.count(case((Task.status == 'pending', 1))).label('pending'),
         func.count(case((Task.status == 'in_progress', 1))).label('in_progress'),
         func.count(case((Task.status == 'completed', 1))).label('completed'),
+        func.count(case((Task.status == 'ended', 1))).label('ended'),
         func.count(case((Task.status == 'on_hold', 1))).label('on_hold')
     ).filter(or_(Task.is_deleted == False, Task.is_deleted == None)).first()
 
@@ -40,6 +41,7 @@ def get_dashboard_overview(db: Session):
             "pending": task_counts.pending,
             "in_progress": task_counts.in_progress,
             "completed": task_counts.completed,
+            "ended": task_counts.ended,
             "on_hold": task_counts.on_hold
         },
         "machines": {

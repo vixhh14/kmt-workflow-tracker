@@ -50,6 +50,17 @@ async def read_tasks(
     tasks = query.all()
     results = []
     for t in tasks:
+        # Resolve Project Name if missing (Backward compatibility)
+        resolved_project = t.project
+        if (not resolved_project or resolved_project == '-') and t.project_id:
+            from app.models.models_db import Project as DBProject
+            p_obj = db.query(DBProject).filter(DBProject.project_id == t.project_id).first()
+            if p_obj:
+                resolved_project = p_obj.project_name
+                # Optional: Sync it back to DB if missing
+                t.project = resolved_project
+                db.commit()
+
         # Fetch holds
         hold_history = db.query(TaskHold).filter(TaskHold.task_id == t.id).order_by(TaskHold.hold_started_at.asc()).all()
         holds = [
@@ -66,7 +77,8 @@ async def read_tasks(
             "id": t.id,
             "title": t.title,
             "description": t.description,
-            "project": t.project,
+            "project": resolved_project or "-",
+            "project_id": t.project_id,
             "part_item": t.part_item,
             "nos_unit": t.nos_unit,
             "status": t.status,
@@ -105,17 +117,20 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
         if not assigner or assigner.role not in ['admin', 'supervisor', 'planning']:
             raise HTTPException(status_code=400, detail="Tasks can only be assigned by admin, supervisor, or planning")
 
-    # Validate Project
+    # Validate Project & Sync Name
+    project_name = task.project
     if task.project_id:
         project_exists = db.query(DBProject).filter(DBProject.project_id == task.project_id).first()
         if not project_exists:
             raise HTTPException(status_code=400, detail=f"Project with ID {task.project_id} does not exist")
+        # Ensure project name is correct
+        project_name = project_exists.project_name
 
     new_task = Task(
         # id is auto-generated
         title=task.title,
         description=task.description,
-        project=task.project,
+        project=project_name,
         project_id=task.project_id,
         part_item=task.part_item,
         nos_unit=task.nos_unit,
@@ -179,6 +194,8 @@ async def start_task(
     if task.status not in ["pending", "on_hold"]:
         if task.status == "in_progress":
              return {"message": "Task already in progress", "started_at": task.started_at.isoformat() if task.started_at else None}
+        if task.status == "ended":
+             raise HTTPException(status_code=400, detail="Task has been ended by admin and cannot be started")
         raise HTTPException(status_code=400, detail="Task must be pending or on hold to start")
 
     now = get_current_time_ist()
@@ -431,14 +448,86 @@ async def deny_task(task_id: str, request: TaskActionRequest, db: Session = Depe
     db.commit()
     return {"message": "Task denied", "reason": request.reason}
 
+@router.post("/{task_id}/end")
+async def end_task(
+    task_id: str, 
+    db: Session = Depends(get_db),
+    admin_user: dict = Depends(get_current_user) # We will check role inside or via dependency if strict
+):
+    """Admin action to force-end a task"""
+    from app.models.models_db import User
+    
+    # Check if admin
+    user_id = admin_user.get("user_id")
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user or user.role != 'admin':
+        raise HTTPException(status_code=403, detail="Only admins can end tasks")
+
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    now = get_current_time_ist()
+    
+    # Close any open intervals
+    if task.status == "in_progress":
+        # Calculate duration
+        if task.started_at:
+            duration = (now - task.started_at).total_seconds()
+            task.total_duration_seconds = (task.total_duration_seconds or 0) + int(duration)
+        
+        # Close logs
+        open_machine_logs = db.query(MachineRuntimeLog).filter(MachineRuntimeLog.task_id == task_id, MachineRuntimeLog.end_time == None).all()
+        for m_log in open_machine_logs:
+            m_log.end_time = now
+            m_log.duration_seconds = int((now - m_log.start_time).total_seconds())
+            
+        open_user_logs = db.query(UserWorkLog).filter(UserWorkLog.task_id == task_id, UserWorkLog.end_time == None).all()
+        for u_log in open_user_logs:
+            u_log.end_time = now
+            u_log.duration_seconds = int((now - u_log.start_time).total_seconds())
+
+    # Close open hold
+    open_hold = db.query(TaskHold).filter(TaskHold.task_id == task_id, TaskHold.hold_ended_at == None).first()
+    if open_hold:
+        open_hold.hold_ended_at = now
+        held_duration = (now - open_hold.hold_started_at).total_seconds()
+        task.total_held_seconds = (task.total_held_seconds or 0) + int(held_duration)
+
+    task.status = "ended"
+    if not task.actual_end_time:
+        task.actual_end_time = now
+    task.completed_at = now
+    task.started_at = None
+    
+    log = TaskTimeLog(
+        id=str(uuid.uuid4()),
+        task_id=task_id,
+        action="end_by_admin",
+        timestamp=now,
+    )
+    db.add(log)
+    db.commit()
+    return {"message": "Task ended successfully by admin", "status": "ended"}
+
 @router.put("/{task_id}", response_model=dict)
 async def update_task(task_id: str, task_update: TaskUpdate, db: Session = Depends(get_db)):
+    from app.models.models_db import Project as DBProject
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
+    
     update_data = task_update.dict(exclude_unset=True)
+    
+    # Sync project name if project_id is updated
+    if 'project_id' in update_data and update_data['project_id']:
+        p_obj = db.query(DBProject).filter(DBProject.project_id == update_data['project_id']).first()
+        if p_obj:
+            update_data['project'] = p_obj.project_name
+    
     for key, value in update_data.items():
         setattr(db_task, key, value)
+    
     db.commit()
     db.refresh(db_task)
     return {
@@ -446,6 +535,7 @@ async def update_task(task_id: str, task_update: TaskUpdate, db: Session = Depen
         "title": db_task.title,
         "description": db_task.description,
         "project": db_task.project,
+        "project_id": db_task.project_id,
         "part_item": db_task.part_item,
         "nos_unit": db_task.nos_unit,
         "status": db_task.status,
