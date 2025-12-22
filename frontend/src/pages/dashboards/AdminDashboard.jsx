@@ -64,7 +64,18 @@ const AdminDashboard = () => {
 
     useEffect(() => {
         fetchDashboard();
+        const interval = setInterval(fetchRunningTasksOnly, 60000); // Auto-refresh running tasks every minute
+        return () => clearInterval(interval);
     }, []);
+
+    const fetchRunningTasksOnly = async () => {
+        try {
+            const res = await getRunningTasks();
+            setRunningTasks(Array.isArray(res?.data) ? res.data : []);
+        } catch (err) {
+            console.error('Failed to auto-refresh running tasks', err);
+        }
+    };
 
     const fetchDashboard = async () => {
         try {
@@ -85,7 +96,7 @@ const AdminDashboard = () => {
             const overview = unified.overview || {};
             const tasks = overview.tasks || { total: 0, pending: 0, in_progress: 0, completed: 0, on_hold: 0 };
             const projectsData = unified.projects || [];
-            const projectStats = overview.projects || { total: 0, yet_to_start: 0, in_progress: 0, completed: 0, held: 0 };
+            const projectStatsData = overview.projects || { total: 0, yet_to_start: 0, in_progress: 0, completed: 0, held: 0 };
 
             setProjects(Array.isArray(projectsData) ? projectsData : []);
 
@@ -99,7 +110,7 @@ const AdminDashboard = () => {
             });
 
             // 2. Project Stats (Unified logic)
-            setProjectStats(projectStats);
+            setProjectStats(projectStatsData);
 
             setAttendanceSummary(attendanceRes?.data || {
                 date: '',
@@ -225,12 +236,18 @@ const AdminDashboard = () => {
                 </div>
 
                 {/* Status Cards - Aligned with Supervisor (Total Projects + Task Stats) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
                     <StatCard
                         title="Total Projects"
                         value={projectStats.total}
                         icon={Folder}
                         color="bg-purple-500"
+                    />
+                    <StatCard
+                        title="Total Tasks"
+                        value={taskStats.total}
+                        icon={TrendingUp}
+                        color="bg-indigo-500"
                     />
                     <StatCard
                         title="Pending"
@@ -289,7 +306,7 @@ const AdminDashboard = () => {
                                         <div className="bg-white p-2 rounded-lg border border-gray-100">
                                             <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Assignment</p>
                                             <p className="text-xs font-semibold text-gray-800 truncate">👤 {task.operator_name}</p>
-                                            <p className="text-xs text-gray-600 mt-1 truncate">⚙️ {task.machine_name}</p>
+                                            <p className="text-xs text-gray-600 mt-1 truncate">⚙️ {(!task.machine_name || task.machine_name === 'Unknown') ? (task.machine_id ? `Machine-${task.machine_id}` : 'Handwork') : task.machine_name}</p>
                                         </div>
                                         <div className="bg-white p-2 rounded-lg border border-gray-100">
                                             <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Time Trace</p>

@@ -3,6 +3,7 @@ import { getTasks, createTask, deleteTask, getMachines, getUsers, updateTask, ge
 import { Plus, Trash2, CheckSquare, Search, Filter, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Clock } from 'lucide-react';
 import Subtask from '../components/Subtask';
 import { minutesToHHMM, hhmmToMinutes, validateHHMM } from '../utils/timeFormat';
+import { resolveMachineName } from '../utils/machineUtils';
 
 const Tasks = () => {
     const [tasks, setTasks] = useState([]);
@@ -511,14 +512,11 @@ const Tasks = () => {
                                     <option value="">
                                         {loading ? 'Loading machines...' : machines.length === 0 ? 'No machines available' : 'Select Machine'}
                                     </option>
-                                    {Array.isArray(machines) && machines.map((machine) => {
-                                        const machineLabel = machine?.name || machine?.machine_name || machine?.display_name || `Machine-${machine?.id || '?'}`;
-                                        return (
-                                            <option key={machine?.id || Math.random()} value={machine?.id || ''}>
-                                                {machineLabel}
-                                            </option>
-                                        );
-                                    })}
+                                    {Array.isArray(machines) && machines.map((machine) => (
+                                        <option key={machine?.id || Math.random()} value={machine?.id || ''}>
+                                            {resolveMachineName(machine)}
+                                        </option>
+                                    ))}
                                 </select>
                                 {machines.length === 0 && !loading && (
                                     <p className="text-xs text-red-600 mt-1">⚠️ No machines available. Please add machines in the Machines page.</p>

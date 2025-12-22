@@ -22,6 +22,7 @@ import {
     ChevronDown,
     ChevronUp
 } from 'lucide-react';
+import { resolveMachineName } from '../../utils/machineUtils';
 
 const Reports = () => {
     const [activeTab, setActiveTab] = useState('machine-summary');
@@ -205,10 +206,9 @@ const Reports = () => {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         >
                             <option value="">-- Choose Machine --</option>
-                            {machines.map(m => {
-                                const mLabel = m?.name || m?.machine_name || m?.display_name || `Machine-${m?.id || '?'}`;
-                                return <option key={m.id} value={m.id}>{mLabel}</option>;
-                            })}
+                            {machines.map(m => (
+                                <option key={m.id} value={m.id}>{resolveMachineName(m)}</option>
+                            ))}
                         </select>
                     </div>
                 )}

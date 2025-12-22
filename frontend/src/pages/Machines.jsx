@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getMachines, createMachine, updateMachine, deleteMachine } from '../api/services';
 import { Plus, Trash2, Monitor, Search, X, Edit2, Building2, Tag } from 'lucide-react';
+import { resolveMachineName } from '../utils/machineUtils';
 
 const Machines = () => {
     const [machines, setMachines] = useState([]);
@@ -384,7 +385,7 @@ const Machines = () => {
                                     <Monitor className="text-blue-600" size={24} />
                                 </div>
                                 <div>
-                                    <h3 className="font-semibold text-gray-900">{machine?.name || machine?.machine_name || machine?.display_name || `Machine-${machine?.id || '?'}`}</h3>
+                                    <h3 className="font-semibold text-gray-900">{resolveMachineName(machine)}</h3>
                                     <div className="flex flex-wrap gap-1 mt-1">
                                         {machine.unit_name && (
                                             <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs">
