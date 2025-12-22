@@ -24,8 +24,7 @@ const OperatorDashboard = () => {
         completed_tasks: 0,
         in_progress_tasks: 0,
         pending_tasks: 0,
-        on_hold_tasks: 0,
-        completion_rate: 0
+        on_hold_tasks: 0
     });
     const [userInfo, setUserInfo] = useState({ username: '', full_name: '' });
     const [loading, setLoading] = useState(true);
@@ -65,8 +64,7 @@ const OperatorDashboard = () => {
                 completed_tasks: taskStats?.completed_tasks || 0,
                 in_progress_tasks: taskStats?.in_progress_tasks || 0,
                 pending_tasks: taskStats?.pending_tasks || 0,
-                on_hold_tasks: taskStats?.on_hold_tasks || 0,
-                completion_rate: taskStats?.completion_rate || 0
+                on_hold_tasks: taskStats?.on_hold_tasks || 0
             });
             setUserInfo({
                 username: user?.username || 'Operator',
@@ -287,7 +285,6 @@ const OperatorDashboard = () => {
                     value={stats.completed_tasks}
                     icon={CheckCircle}
                     color="bg-green-500"
-                    subtitle={`${stats.completion_rate.toFixed(1)}% completion rate`}
                 />
                 <StatCard
                     title="On Hold"
