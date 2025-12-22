@@ -15,6 +15,7 @@ class TaskBase(BaseModel):
     machine_id: Optional[str] = None
     assigned_by: Optional[str] = None  # user_id who assigned
     due_date: Optional[str] = None
+    due_datetime: Optional[datetime] = None
     expected_completion_time: Optional[int] = None
 
 class TaskCreate(TaskBase):
@@ -33,6 +34,7 @@ class TaskUpdate(BaseModel):
     machine_id: Optional[str] = None
     assigned_by: Optional[str] = None
     due_date: Optional[str] = None
+    due_datetime: Optional[datetime] = None
     expected_completion_time: Optional[int] = None
 
 class TaskOut(TaskBase):
