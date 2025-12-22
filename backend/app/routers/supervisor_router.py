@@ -31,7 +31,8 @@ async def get_pending_tasks(db: Session = Depends(get_db)):
                 Task.status == 'pending',
                 Task.assigned_to == None,
                 Task.assigned_to == ''
-            )
+            ),
+            or_(Task.is_deleted == False, Task.is_deleted == None)
         ).all()
         
         all_users = db.query(User).all()
@@ -68,7 +69,11 @@ async def get_pending_tasks(db: Session = Depends(get_db)):
 async def get_running_tasks(db: Session = Depends(get_db)):
     """Get all currently running (in_progress) tasks"""
     try:
-        running_tasks = db.query(Task).filter(Task.status == 'in_progress').all()
+        from sqlalchemy import or_
+        running_tasks = db.query(Task).filter(
+            Task.status == 'in_progress',
+            or_(Task.is_deleted == False, Task.is_deleted == None)
+        ).all()
         
         all_users = db.query(User).all()
         user_map = {u.user_id: u for u in all_users}

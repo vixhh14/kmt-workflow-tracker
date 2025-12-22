@@ -23,7 +23,7 @@ async def get_admin_dashboard(db: Session = Depends(get_db)):
         project_list = [{"id": p.project_id, "name": p.project_name, "code": p.project_code} for p in projects]
         
         # 2. Tasks
-        tasks = db.query(Task).all()
+        tasks = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None)).all()
         task_list = [{"id": t.id, "title": t.title, "status": t.status} for t in tasks]
         
         # 3. Machines
@@ -76,7 +76,7 @@ async def get_supervisor_dashboard(db: Session = Depends(get_db)):
         project_list = [{"id": p.project_id, "name": p.project_name} for p in projects]
         
         # 2. Tasks
-        tasks = db.query(Task).all()
+        tasks = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None)).all()
         task_list = [{"id": t.id, "title": t.title, "status": t.status} for t in tasks]
         
         # 3. Machines

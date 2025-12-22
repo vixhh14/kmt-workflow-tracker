@@ -56,6 +56,7 @@ def calculate_machine_runtime(db: Session, target_date: date) -> List[dict]:
     # Fetch tasks completed within a safe window and filter in Python using IST
     tasks_query = db.query(Task).filter(
         Task.status == 'completed',
+        or_(Task.is_deleted == False, Task.is_deleted == None),
         Task.actual_end_time >= datetime.combine(target_date - timedelta(days=1), datetime.min.time()),
         Task.actual_end_time <= datetime.combine(target_date + timedelta(days=1), datetime.max.time())
     ).all()
@@ -114,6 +115,7 @@ def calculate_user_activity(db: Session, target_date: date) -> List[dict]:
     # 2. Get Completed Tasks for this date
     tasks_query = db.query(Task).filter(
         Task.status == 'completed',
+        or_(Task.is_deleted == False, Task.is_deleted == None),
         Task.actual_end_time >= datetime.combine(target_date - timedelta(days=1), datetime.min.time()),
         Task.actual_end_time <= datetime.combine(target_date + timedelta(days=1), datetime.max.time())
     ).all()
@@ -241,7 +243,8 @@ def calculate_monthly_performance(db: Session, year: int) -> dict:
     
     tasks = db.query(Task).filter(
         extract('year', Task.completed_at) == year,
-        Task.status == 'completed'
+        Task.status == 'completed',
+        or_(Task.is_deleted == False, Task.is_deleted == None)
     ).all()
     
     for t in tasks:
@@ -452,7 +455,8 @@ async def export_projects_summary_csv(year_month: Optional[str] = None, db: Sess
     tasks = db.query(Task).join(Project, Task.project_id == Project.project_id).filter(
         extract('year', Task.completed_at) == target_dt.year,
         extract('month', Task.completed_at) == target_dt.month,
-        Task.status == 'completed'
+        Task.status == 'completed',
+        or_(Task.is_deleted == False, Task.is_deleted == None)
     ).all()
     
     # Aggregate by Project
