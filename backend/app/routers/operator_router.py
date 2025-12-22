@@ -85,11 +85,6 @@ async def get_operator_tasks(
         pending_tasks = len([t for t in tasks if t.status == 'pending'])
         on_hold_tasks = len([t for t in tasks if t.status == 'on_hold'])
         
-        completion_rate = 0
-        if total_tasks > 0:
-            raw_rate = (completed_tasks / total_tasks) * 100
-            completion_rate = max(0, raw_rate - 2)
-        
         return {
             "tasks": task_list,
             "stats": {
@@ -97,8 +92,7 @@ async def get_operator_tasks(
                 "completed_tasks": completed_tasks,
                 "in_progress_tasks": in_progress_tasks,
                 "pending_tasks": pending_tasks,
-                "on_hold_tasks": on_hold_tasks,
-                "completion_rate": round(completion_rate, 2)
+                "on_hold_tasks": on_hold_tasks
             },
             "user": {
                 "user_id": user.user_id if user else user_id,
