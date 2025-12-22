@@ -37,6 +37,7 @@ export const startTask = (id) => api.post(`/tasks/${id}/start`);
 export const holdTask = (id, reason) => api.post(`/tasks/${id}/hold`, { reason });
 export const resumeTask = (id) => api.post(`/tasks/${id}/resume`);
 export const completeTask = (id) => api.post(`/tasks/${id}/complete`);
+export const endTask = (id) => api.post(`/tasks/${id}/end`);
 export const denyTask = (id, reason) => api.post(`/tasks/${id}/deny`, { reason });
 
 /* -------------------- ANALYTICS -------------------- */
