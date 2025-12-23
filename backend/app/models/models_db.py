@@ -129,6 +129,7 @@ class Task(Base):
     total_held_seconds = Column(BigInteger, default=0)
     expected_completion_time = Column(Integer, nullable=True) # Duration in minutes
     due_datetime = Column(DateTime(timezone=False), nullable=True) # Precisely selected date + time
+    work_order_number = Column(String, nullable=True) # Work Order Number for Normal Tasks
 
     # Relationships
     machine = relationship("Machine")
@@ -266,3 +267,47 @@ class UserWorkLog(Base):
     user = relationship("User")
     task = relationship("Task")
     machine = relationship("Machine")
+
+class FilingTask(Base):
+    __tablename__ = "filing_tasks"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=True)
+    part_item = Column(String, nullable=True)  # Project / Item
+    quantity = Column(Integer, default=1)
+    due_date = Column(Date, nullable=True)
+    priority = Column(String, default="medium")
+    assigned_to = Column(String, ForeignKey("users.user_id"), nullable=True)
+    completed_quantity = Column(Integer, default=0)
+    remarks = Column(String, nullable=True)
+    status = Column(String, default="Pending") # Pending, In Progress, On Hold, Completed
+    machine_id = Column(String, ForeignKey("machines.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
+    updated_at = Column(DateTime(timezone=True), default=get_current_time_ist, onupdate=get_current_time_ist)
+
+    # Relationships
+    project = relationship("Project")
+    machine = relationship("Machine")
+    assignee = relationship("User", foreign_keys=[assigned_to])
+
+class FabricationTask(Base):
+    __tablename__ = "fabrication_tasks"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=True)
+    part_item = Column(String, nullable=True)  # Project / Item
+    quantity = Column(Integer, default=1)
+    due_date = Column(Date, nullable=True)
+    priority = Column(String, default="medium")
+    assigned_to = Column(String, ForeignKey("users.user_id"), nullable=True)
+    completed_quantity = Column(Integer, default=0)
+    remarks = Column(String, nullable=True)
+    status = Column(String, default="Pending") # Pending, In Progress, On Hold, Completed
+    machine_id = Column(String, ForeignKey("machines.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
+    updated_at = Column(DateTime(timezone=True), default=get_current_time_ist, onupdate=get_current_time_ist)
+
+    # Relationships
+    project = relationship("Project")
+    machine = relationship("Machine")
+    assignee = relationship("User", foreign_keys=[assigned_to])

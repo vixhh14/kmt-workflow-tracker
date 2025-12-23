@@ -64,6 +64,8 @@ def create_demo_users():
     operator_password = "Operator@Demo2025!"
     supervisor_password = "Supervisor@Demo2025!"
     planning_password = "Planning@Demo2025!"
+    file_master_password = "File@Demo2025!"
+    fab_master_password = "Fab@Demo2025!"
     
     demo_users = [
         {
@@ -96,6 +98,22 @@ def create_demo_users():
             "email": "planning@workflow.com",
             "role": "planning",
             "full_name": "Planning User",
+            "approval_status": "approved"
+        },
+        {
+            "username": "file",
+            "password": file_master_password,
+            "email": "file@workflow.com",
+            "role": "file_master",
+            "full_name": "File Master",
+            "approval_status": "approved"
+        },
+        {
+            "username": "fab",
+            "password": fab_master_password,
+            "email": "fab@workflow.com",
+            "role": "fab_master",
+            "full_name": "Fab Master",
             "approval_status": "approved"
         }
     ]

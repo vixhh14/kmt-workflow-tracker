@@ -17,6 +17,7 @@ class TaskBase(BaseModel):
     due_date: Optional[str] = None
     due_datetime: Optional[datetime] = None
     expected_completion_time: Optional[int] = None
+    work_order_number: Optional[str] = None
 
 class TaskCreate(TaskBase):
     pass
@@ -36,6 +37,7 @@ class TaskUpdate(BaseModel):
     due_date: Optional[str] = None
     due_datetime: Optional[datetime] = None
     expected_completion_time: Optional[int] = None
+    work_order_number: Optional[str] = None
 
 class TaskOut(TaskBase):
     id: str  # UUID as string
@@ -48,6 +50,49 @@ class TaskOut(TaskBase):
     actual_start_time: Optional[datetime] = None
     actual_end_time: Optional[datetime] = None
     total_held_seconds: int = 0
+
+    class Config:
+        from_attributes = True
+
+# Operational Tasks (Filing/Fabrication)
+from datetime import date
+
+class OperationalTaskBase(BaseModel):
+    project_id: Optional[int] = None
+    part_item: Optional[str] = None
+    quantity: int = 1
+    due_date: Optional[date] = None
+    priority: str = "medium"
+    assigned_to: Optional[str] = None
+    completed_quantity: int = 0
+    remarks: Optional[str] = None
+    status: str = "Pending"
+    machine_id: Optional[str] = None
+
+class OperationalTaskCreate(OperationalTaskBase):
+    pass
+
+class OperationalTaskUpdate(BaseModel):
+    assigned_to: Optional[str] = None
+    completed_quantity: Optional[int] = None
+    remarks: Optional[str] = None
+    status: Optional[str] = None
+    # For Admin edits
+    project_id: Optional[int] = None
+    part_item: Optional[str] = None
+    quantity: Optional[int] = None
+    due_date: Optional[date] = None
+    priority: Optional[str] = None
+
+class OperationalTaskOut(OperationalTaskBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    
+    # Nested objects if needed
+    project_name: Optional[str] = None
+    machine_name: Optional[str] = None
+    assignee_name: Optional[str] = None
 
     class Config:
         from_attributes = True
