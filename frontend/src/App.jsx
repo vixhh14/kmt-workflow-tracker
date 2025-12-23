@@ -12,6 +12,8 @@ import AdminDashboard from './pages/dashboards/AdminDashboard.jsx';
 import OperatorDashboard from './pages/dashboards/OperatorDashboard.jsx';
 import SupervisorDashboard from './pages/dashboards/SupervisorDashboard.jsx';
 import PlanningDashboard from './pages/dashboards/PlanningDashboard.jsx';
+import FileMasterDashboard from './pages/dashboards/FileMasterDashboard.jsx';
+import FabMasterDashboard from './pages/dashboards/FabMasterDashboard.jsx';
 
 // Pages
 import Dashboard from './pages/Dashboard.jsx';
@@ -59,6 +61,16 @@ function App() {
                     <Route path="/dashboard/planning" element={
                         <ProtectedRoute allowedRoles={['planning']}>
                             <PlanningLayout><PlanningDashboard /></PlanningLayout>
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/dashboard/file_master" element={
+                        <ProtectedRoute allowedRoles={['file_master']}>
+                            <Layout><FileMasterDashboard /></Layout>
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/dashboard/fab_master" element={
+                        <ProtectedRoute allowedRoles={['fab_master']}>
+                            <Layout><FabMasterDashboard /></Layout>
                         </ProtectedRoute>
                     } />
 

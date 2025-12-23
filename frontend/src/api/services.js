@@ -112,3 +112,9 @@ export const downloadUserReport = (dateStr) => {
 /* -------------------- UNIFIED DASHBOARDS -------------------- */
 export const getAdminUnifiedDashboard = () => api.get('/dashboard/admin');
 export const getSupervisorUnifiedDashboard = () => api.get('/dashboard/supervisor');
+
+/* -------------------- OPERATIONAL TASKS (FILING / FABRICATION) -------------------- */
+export const getOperationalTasks = (type) => api.get(`/operational-tasks/${type}`);
+export const createOperationalTask = (type, data) => api.post(`/operational-tasks/${type}`, data);
+export const updateOperationalTask = (type, id, data) => api.put(`/operational-tasks/${type}/${id}`, data);
+export const deleteOperationalTask = (type, id) => api.delete(`/operational-tasks/${type}/${id}`);

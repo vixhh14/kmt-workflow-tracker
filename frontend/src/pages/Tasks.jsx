@@ -63,6 +63,7 @@ const Tasks = () => {
 
     const [formData, setFormData] = useState({
         title: '',
+        work_order_number: '',
         description: '',
         project: '',
         project_id: '',
@@ -176,6 +177,7 @@ const Tasks = () => {
             await createTask(payload);
             setFormData({
                 title: '',
+                work_order_number: '',
                 description: '',
                 project: '',
                 project_id: '',
@@ -496,6 +498,16 @@ const Tasks = () => {
                                 />
                             </div>
                             <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Work Order Number</label>
+                                <input
+                                    type="text"
+                                    value={formData.work_order_number}
+                                    onChange={(e) => setFormData({ ...formData, work_order_number: e.target.value })}
+                                    readOnly={currentUser?.role === 'supervisor'}
+                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${currentUser?.role === 'supervisor' ? 'bg-gray-100' : ''}`}
+                                />
+                            </div>
+                            <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Project *</label>
                                 <select
                                     required
@@ -698,7 +710,7 @@ const Tasks = () => {
                                         className="rounded border-gray-300"
                                     />
                                 </th>
-                                <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                                <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title / WO</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Project</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Part/Item</th>
                                 <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -730,6 +742,9 @@ const Tasks = () => {
                                                 </button>
                                                 <div className="min-w-0">
                                                     <div className="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[100px] sm:max-w-[200px]">{task.title}</div>
+                                                    {task.work_order_number && (
+                                                        <div className="text-[10px] text-blue-600 font-bold uppercase">WO: {task.work_order_number}</div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </td>
