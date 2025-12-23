@@ -52,8 +52,14 @@ const OperationalDashboard = ({ type }) => {
             const res = await getOperationalTasks(type);
             const data = res.data || [];
 
-            // Filter by assigned user if it's not admin
-            const filteredData = (currentUser?.role === 'admin')
+            // Filter by assigned user
+            // Admin and Masters see all tasks of the given type
+            // Operators see only their assigned tasks or unassigned ones
+            const canSeeAll = currentUser?.role === 'admin' ||
+                (type === 'filing' && currentUser?.role === 'file_master') ||
+                (type === 'fabrication' && currentUser?.role === 'fab_master');
+
+            const filteredData = canSeeAll
                 ? data
                 : data.filter(t => t.assigned_to === currentUser?.user_id || t.assigned_to === null);
 
@@ -182,6 +188,9 @@ const OperationalDashboard = ({ type }) => {
                                         <div className="flex flex-wrap items-center gap-2 mb-2">
                                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border ${getPriorityColor(task.priority)}`}>
                                                 {task.priority || 'Medium'}
+                                            </span>
+                                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 uppercase">
+                                                WO: {task.work_order_number}
                                             </span>
                                             <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
                                                 {task.part_item}

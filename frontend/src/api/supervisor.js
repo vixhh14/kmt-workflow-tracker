@@ -49,12 +49,12 @@ export const getPriorityStatus = () => {
     return api.get('/supervisor/priority-task-status');
 };
 
-// Get all operators for dropdown
+// Get all assignable users for dropdown
 export const getOperators = () => {
     return api.get('/users').then(res => {
         return {
             ...res,
-            data: res.data.filter(u => u.role === 'operator')
+            data: res.data.filter(u => u.role !== 'admin')
         };
     });
 };
