@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
 
@@ -59,9 +59,7 @@ class TaskResponse(BaseModel):
     denial_reason: Optional[str] = None
     expected_completion_time: Optional[str] = None
 
-    class Config:
-        from_attributes = True
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TaskHoldRequest(BaseModel):
     reason: Optional[str] = "On hold"

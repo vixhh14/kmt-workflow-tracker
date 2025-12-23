@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from app.core.database import get_db
 from app.models.models_db import Subtask, User
 from app.core.dependencies import get_current_active_user
@@ -31,8 +31,7 @@ class SubtaskResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 @router.get("/{task_id}", response_model=List[SubtaskResponse])
 async def get_subtasks(task_id: int, db: Session = Depends(get_db)):

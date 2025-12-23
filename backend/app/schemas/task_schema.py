@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
 
@@ -51,8 +51,7 @@ class TaskOut(TaskBase):
     actual_end_time: Optional[datetime] = None
     total_held_seconds: int = 0
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Operational Tasks (Filing/Fabrication)
 from datetime import date
@@ -97,5 +96,4 @@ class OperationalTaskOut(OperationalTaskBase):
     machine_name: Optional[str] = None
     assignee_name: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from app.core.database import get_db
 from app.models.models_db import User, UserApproval
 from app.core.dependencies import get_current_active_admin
@@ -45,8 +45,7 @@ class UserResponse(BaseModel):
     machine_types: Optional[str] = None
     contact_number: Optional[str] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 @router.get("/users", response_model=List[UserResponse])
 async def get_all_users(db: Session = Depends(get_db)):

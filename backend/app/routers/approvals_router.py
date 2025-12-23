@@ -2,7 +2,7 @@
 User Approvals Router - API endpoints for user approval workflow
 """
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -21,8 +21,7 @@ class UserApproval(BaseModel):
     created_at: Optional[datetime] = None
     user: Optional[dict] = None # To hold nested user data
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ApprovalAction(BaseModel):
     notes: Optional[str] = None

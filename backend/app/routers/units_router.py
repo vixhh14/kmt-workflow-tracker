@@ -5,7 +5,7 @@ Refactored to use SQLAlchemy for better compatibility with Render (Postgres/SQLi
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from app.core.database import get_db
 from app.models.models_db import Unit as UnitModel
@@ -19,8 +19,7 @@ class UnitResponse(BaseModel):
     description: Optional[str] = None
     created_at: Optional[datetime] = None
     
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UnitCreate(BaseModel):
     name: str
