@@ -2,7 +2,7 @@
 User Skills Router - API endpoints for user-machine skill mapping
 """
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -18,8 +18,7 @@ class UserMachine(BaseModel):
     skill_level: str
     created_at: Optional[datetime] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserMachineCreate(BaseModel):
     machine_id: str

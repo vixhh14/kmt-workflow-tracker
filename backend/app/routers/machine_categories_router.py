@@ -2,7 +2,7 @@
 Machine Categories Router - API endpoints for machine categories
 """
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -17,8 +17,7 @@ class MachineCategory(BaseModel):
     description: Optional[str] = None
     created_at: Optional[datetime] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 @router.get("", response_model=List[MachineCategory])
 async def get_machine_categories(db: Session = Depends(get_db)):
