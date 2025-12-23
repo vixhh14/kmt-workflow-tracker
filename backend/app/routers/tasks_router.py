@@ -107,20 +107,35 @@ async def read_tasks(
     return results
 
 @router.post("/", response_model=TaskOut)
-async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
+async def create_task(
+    task: TaskCreate, 
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
     from app.models.models_db import User, Project as DBProject
     
-    # Validate assigned_to exists
-    if task.assigned_to:
-        assignee = db.query(User).filter(User.user_id == task.assigned_to).first()
-        if not assignee:
-             raise HTTPException(status_code=400, detail="Assigned user does not exist")
+    # Validation (as requested in Section 4)
+    if not task.work_order_number:
+        raise HTTPException(status_code=400, detail="work_order_number is required")
+    if not task.title:
+        raise HTTPException(status_code=400, detail="title is required")
+    if not task.machine_id:
+        raise HTTPException(status_code=400, detail="machine_id is required")
 
-    # Validate assigned_by is admin/supervisor/planning
-    if task.assigned_by:
-        assigner = db.query(User).filter(User.user_id == task.assigned_by).first()
-        if not assigner or assigner.role not in ['admin', 'supervisor', 'planning']:
-            raise HTTPException(status_code=400, detail="Tasks can only be assigned by admin, supervisor, or planning")
+    # Validate assigned_to exists (Support username -> user_id conversion)
+    assigned_to = task.assigned_to
+    if assigned_to:
+        assignee = db.query(User).filter(User.user_id == assigned_to).first()
+        if not assignee:
+            # Fallback: check if it's a username
+            assignee = db.query(User).filter(User.username == assigned_to).first()
+            if assignee:
+                assigned_to = assignee.user_id # Convert username to user_id
+            else:
+                 raise HTTPException(status_code=400, detail=f"Assigned user '{assigned_to}' does not exist")
+
+    # Set assigned_by from logged-in admin token (as requested in Section 2)
+    assigned_by = current_user.get("user_id")
 
     # Validate Project & Sync Name
     project_name = task.project
@@ -128,11 +143,12 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
         project_exists = db.query(DBProject).filter(DBProject.project_id == task.project_id).first()
         if not project_exists:
             raise HTTPException(status_code=400, detail=f"Project with ID {task.project_id} does not exist")
-        # Ensure project name is correct
         project_name = project_exists.project_name
 
+    # Priority Normalization: LOW | MEDIUM | HIGH
+    priority_norm = (task.priority or "medium").upper()
+
     new_task = Task(
-        # id is auto-generated
         title=task.title,
         description=task.description,
         project=project_name,
@@ -140,9 +156,9 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
         part_item=task.part_item,
         nos_unit=task.nos_unit,
         status=task.status,
-        priority=task.priority,
-        assigned_by=task.assigned_by,
-        assigned_to=task.assigned_to,
+        priority=priority_norm,
+        assigned_by=assigned_by,
+        assigned_to=assigned_to,
         machine_id=task.machine_id,
         due_date=task.due_date,
         due_datetime=task.due_datetime,

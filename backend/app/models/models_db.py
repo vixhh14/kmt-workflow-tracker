@@ -282,6 +282,8 @@ class FilingTask(Base):
     remarks = Column(String, nullable=True)
     status = Column(String, default="Pending") # Pending, In Progress, On Hold, Completed
     machine_id = Column(String, ForeignKey("machines.id"), nullable=True)
+    work_order_number = Column(String, nullable=True)
+    assigned_by = Column(String, ForeignKey("users.user_id"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
     updated_at = Column(DateTime(timezone=True), default=get_current_time_ist, onupdate=get_current_time_ist)
 
@@ -289,6 +291,7 @@ class FilingTask(Base):
     project = relationship("Project")
     machine = relationship("Machine")
     assignee = relationship("User", foreign_keys=[assigned_to])
+    assigner = relationship("User", foreign_keys=[assigned_by])
 
 class FabricationTask(Base):
     __tablename__ = "fabrication_tasks"
@@ -304,6 +307,8 @@ class FabricationTask(Base):
     remarks = Column(String, nullable=True)
     status = Column(String, default="Pending") # Pending, In Progress, On Hold, Completed
     machine_id = Column(String, ForeignKey("machines.id"), nullable=True)
+    work_order_number = Column(String, nullable=True)
+    assigned_by = Column(String, ForeignKey("users.user_id"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
     updated_at = Column(DateTime(timezone=True), default=get_current_time_ist, onupdate=get_current_time_ist)
 
@@ -311,3 +316,4 @@ class FabricationTask(Base):
     project = relationship("Project")
     machine = relationship("Machine")
     assignee = relationship("User", foreign_keys=[assigned_to])
+    assigner = relationship("User", foreign_keys=[assigned_by])

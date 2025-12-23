@@ -58,14 +58,66 @@ async def create_operational_task(
     if current_user.get("role") not in ["admin", "planning"]:
         raise HTTPException(status_code=403, detail="Only Admin or Planning can create operational tasks")
         
+    # Manual Validation (as requested in Section 4)
+    if not task.machine_id:
+        raise HTTPException(status_code=400, detail="machine_id is required")
+    
+    # task_type validation
+    if task.task_type:
+        if task.task_type.lower() != task_type.lower():
+             raise HTTPException(status_code=400, detail="task_type mismatch between URL and payload")
+        if task.task_type.upper() not in ["FILING", "FABRICATION"]:
+             raise HTTPException(status_code=400, detail="task_type must be FILING or FABRICATION")
+
+    if not task.work_order_number:
+        raise HTTPException(status_code=400, detail="work_order_number is required")
+    if not task.part_item:
+        raise HTTPException(status_code=400, detail="part_item (Project / Item) is required")
+    if not task.quantity or task.quantity <= 0:
+        raise HTTPException(status_code=400, detail="quantity must be greater than 0")
+    if not task.due_date:
+        raise HTTPException(status_code=400, detail="due_date is required")
+
     model = get_model(task_type)
-    new_task = model(**task.dict())
+    
+    # Normalization & Defaults
+    task_data = task.dict()
+    
+    # Priority Normalization: LOW | MEDIUM | HIGH | URGENT
+    if task_data.get("priority"):
+        task_data["priority"] = task_data["priority"].upper()
+    else:
+        task_data["priority"] = "MEDIUM"
+
+    # Set assigned_by from current user token
+    task_data["assigned_by"] = current_user.get("user_id")
+
+    # Handle Auto-Assign Later: If assigned_to is empty string or None, set to None
+    assigned_to = task_data.get("assigned_to")
+    if not assigned_to:
+        task_data["assigned_to"] = None
+    else:
+        # Support username -> user_id conversion
+        assignee = db.query(User).filter(User.user_id == assigned_to).first()
+        if not assignee:
+            assignee = db.query(User).filter(User.username == assigned_to).first()
+            if assignee:
+                task_data["assigned_to"] = assignee.user_id
+            else:
+                 raise HTTPException(status_code=400, detail=f"Assigned user '{assigned_to}' does not exist")
+
+    new_task = model(**task_data)
     new_task.created_at = get_current_time_ist()
     new_task.updated_at = get_current_time_ist()
     
-    db.add(new_task)
-    db.commit()
-    db.refresh(new_task)
+    try:
+        db.add(new_task)
+        db.commit()
+        db.refresh(new_task)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        
     return new_task
 
 @router.put("/{task_type}/{task_id}", response_model=OperationalTaskOut)
@@ -84,6 +136,17 @@ async def update_operational_task(
     role = current_user.get("role")
     update_data = task_update.dict(exclude_unset=True)
     
+    # Support username -> user_id conversion for assigned_to
+    if "assigned_to" in update_data and update_data["assigned_to"]:
+        assigned_to = update_data["assigned_to"]
+        assignee = db.query(User).filter(User.user_id == assigned_to).first()
+        if not assignee:
+            assignee = db.query(User).filter(User.username == assigned_to).first()
+            if assignee:
+                update_data["assigned_to"] = assignee.user_id
+            else:
+                 raise HTTPException(status_code=400, detail=f"Assigned user '{assigned_to}' does not exist")
+
     # Execution-level fields can be updated by Masters or Admin
     # Admin can update everything
     if role == "admin":

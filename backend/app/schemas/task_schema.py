@@ -68,6 +68,9 @@ class OperationalTaskBase(BaseModel):
     remarks: Optional[str] = None
     status: str = "Pending"
     machine_id: Optional[str] = None
+    work_order_number: Optional[str] = None
+    assigned_by: Optional[str] = None
+    task_type: Optional[str] = None # FILING or FABRICATION
 
 class OperationalTaskCreate(OperationalTaskBase):
     pass
