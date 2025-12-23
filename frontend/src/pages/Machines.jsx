@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getMachines, createMachine, updateMachine, deleteMachine } from '../api/services';
-import { Plus, Trash2, Monitor, Search, X, Edit2, Building2, Tag } from 'lucide-react';
+import { Plus, Trash2, Monitor, Search, X, Edit2, Building2, Tag, ChevronRight } from 'lucide-react';
 import { resolveMachineName } from '../utils/machineUtils';
+import OperationalTaskSection from '../components/OperationalTaskSection.jsx';
 
 const Machines = () => {
     const [machines, setMachines] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
+    const [expandedMachine, setExpandedMachine] = useState(null);
 
     // Search and Filter states
     const [searchQuery, setSearchQuery] = useState('');
@@ -440,6 +442,23 @@ const Machines = () => {
                                 </div>
                             )}
                         </div>
+
+                        <div className="mt-4 pt-4 border-t">
+                            <button
+                                onClick={() => setExpandedMachine(expandedMachine === machine.id ? null : machine.id)}
+                                className="w-full text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center justify-center space-x-1"
+                            >
+                                <span>{expandedMachine === machine.id ? 'Hide Tasks' : 'Show Operational Tasks'}</span>
+                                <ChevronRight size={14} className={`transform transition-transform ${expandedMachine === machine.id ? 'rotate-90' : ''}`} />
+                            </button>
+                        </div>
+
+                        {expandedMachine === machine.id && (
+                            <div className="mt-2 animate-fade-in">
+                                <OperationalTaskSection type="filing" machineId={machine.id} machineName={resolveMachineName(machine)} />
+                                <OperationalTaskSection type="fabrication" machineId={machine.id} machineName={resolveMachineName(machine)} />
+                            </div>
+                        )}
                     </div>
                 ))}
             </div>

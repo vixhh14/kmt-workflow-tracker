@@ -12,14 +12,15 @@ const Layout = ({ children }) => {
     // Check if we're on a role-specific dashboard
     const isRoleDashboard = location.pathname.startsWith('/dashboard/');
 
-    // Determine if user is operator or supervisor (limited access roles)
-    const isLimitedRole = user?.role === 'operator' || user?.role === 'supervisor';
+    // Determine if user is operator, supervisor, or masters (limited access roles)
+    const isLimitedRole = user?.role === 'operator' || user?.role === 'supervisor' || user?.role === 'file_master' || user?.role === 'fab_master';
 
     // Navigation items based on role
     const getNavItems = () => {
         // Operators and Supervisors only see Profile and Change Password
         if (isLimitedRole) {
             return [
+                { path: `/dashboard/${user.role}`, label: 'Dashboard', icon: LayoutDashboard },
                 { path: '/profile', label: 'View Profile', icon: User },
                 { path: '/admin/change-password', label: 'Change Password', icon: Lock },
             ];

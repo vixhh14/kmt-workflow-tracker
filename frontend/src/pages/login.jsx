@@ -48,6 +48,8 @@ const Login = () => {
           operator: '/dashboard/operator',
           supervisor: '/dashboard/supervisor',
           planning: '/dashboard/planning',
+          file_master: '/dashboard/file_master',
+          fab_master: '/dashboard/fab_master',
         };
 
         const targetPath = dashboardRoutes[role] || '/';

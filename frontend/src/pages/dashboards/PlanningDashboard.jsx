@@ -3,6 +3,7 @@ import { getPlanningDashboardSummary } from '../../api/planning';
 import { getDashboardOverview, getProjectOverviewStats } from '../../api/services';
 import { Folder, TrendingUp, Settings, Clock, CheckCircle, Users, Activity, RefreshCw, Pause, UserPlus } from 'lucide-react';
 import QuickAssign from '../../components/QuickAssign';
+import OperationalTaskSection from '../../components/OperationalTaskSection.jsx';
 
 const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
     <div className="bg-white rounded-lg shadow p-4 sm:p-6">
@@ -251,6 +252,24 @@ const PlanningDashboard = () => {
                         <p>No operators found</p>
                     </div>
                 )}
+            </div>
+
+            {/* Filing & Fabrication Monitoring */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white rounded-lg shadow p-6">
+                    <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <span className="w-3 h-3 bg-blue-600 rounded-full mr-2"></span>
+                        Filing Monitoring
+                    </h2>
+                    <OperationalTaskSection type="filing" />
+                </div>
+                <div className="bg-white rounded-lg shadow p-6">
+                    <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <span className="w-3 h-3 bg-orange-600 rounded-full mr-2"></span>
+                        Fabrication Monitoring
+                    </h2>
+                    <OperationalTaskSection type="fabrication" />
+                </div>
             </div>
         </div>
     );

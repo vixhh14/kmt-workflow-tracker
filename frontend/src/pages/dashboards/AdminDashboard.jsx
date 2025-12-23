@@ -6,6 +6,7 @@ import { TrendingUp, CheckCircle, Clock, Pause, UserCheck, UserX, Folder, Refres
 import ReportsSection from './ReportsSection';
 import { getDashboardOverview, getProjectOverviewStats, getAdminUnifiedDashboard } from '../../api/services';
 import QuickAssign from '../../components/QuickAssign';
+import OperationalTaskSection from '../../components/OperationalTaskSection.jsx';
 
 const COLORS = {
     'Yet to Start': '#6b7280',
@@ -487,6 +488,24 @@ const AdminDashboard = () => {
                             <p>All users are present today</p>
                         </div>
                     )}
+                </div>
+            </div>
+
+            {/* Filing & Fabrication Monitoring */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white rounded-lg shadow p-6">
+                    <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <span className="w-3 h-3 bg-blue-600 rounded-full mr-2"></span>
+                        Filing Monitoring
+                    </h2>
+                    <OperationalTaskSection type="filing" />
+                </div>
+                <div className="bg-white rounded-lg shadow p-6">
+                    <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <span className="w-3 h-3 bg-orange-600 rounded-full mr-2"></span>
+                        Fabrication Monitoring
+                    </h2>
+                    <OperationalTaskSection type="fabrication" />
                 </div>
             </div>
 

@@ -9,7 +9,6 @@ const Projects = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [formData, setFormData] = useState({
         project_name: '',
-        work_order_number: '',
         client_name: '',
         project_code: ''
     });
@@ -39,7 +38,6 @@ const Projects = () => {
             await createProject(formData);
             setFormData({
                 project_name: '',
-                work_order_number: '',
                 client_name: '',
                 project_code: ''
             });
@@ -135,15 +133,6 @@ const Projects = () => {
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Work Order Number</label>
-                                <input
-                                    type="text"
-                                    value={formData.work_order_number}
-                                    onChange={(e) => setFormData({ ...formData, work_order_number: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
                         </div>
                         <div className="flex space-x-3 pt-2">
                             <button
@@ -172,7 +161,6 @@ const Projects = () => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Name</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Work Order</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Created</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
@@ -197,9 +185,6 @@ const Projects = () => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {project.client_name || '-'}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {project.work_order_number || '-'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {new Date(project.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}
