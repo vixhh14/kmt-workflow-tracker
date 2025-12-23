@@ -409,12 +409,12 @@ const Tasks = () => {
                             onChange={(e) => setOperatorFilter(e.target.value)}
                             className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
-                            <option value="all">All Operators</option>
+                            <option value="all">All Users</option>
                             {Array.isArray(users) && users
-                                .filter(u => u?.role === 'operator')
+                                .filter(u => u?.role !== 'admin')
                                 .map(user => (
                                     <option key={user?.user_id || Math.random()} value={user?.user_id || ''}>
-                                        {user?.full_name || user?.username || 'Unknown'}
+                                        {user?.full_name || user?.username || 'Unknown'} ({user?.role})
                                     </option>
                                 ))}
                         </select>
@@ -501,6 +501,7 @@ const Tasks = () => {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Work Order Number</label>
                                 <input
                                     type="text"
+                                    required
                                     value={formData.work_order_number}
                                     onChange={(e) => setFormData({ ...formData, work_order_number: e.target.value })}
                                     readOnly={currentUser?.role === 'supervisor'}

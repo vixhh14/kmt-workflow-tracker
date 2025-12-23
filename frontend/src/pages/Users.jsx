@@ -133,6 +133,8 @@ const Users = () => {
             case 'supervisor': return 'bg-yellow-100 text-yellow-800';
             case 'operator': return 'bg-green-100 text-green-800';
             case 'planning': return 'bg-blue-100 text-blue-800';
+            case 'file_master': return 'bg-indigo-100 text-indigo-800';
+            case 'fab_master': return 'bg-orange-100 text-orange-800';
             default: return 'bg-gray-100 text-gray-800';
         }
     };
@@ -189,6 +191,8 @@ const Users = () => {
                             <option value="supervisor">Supervisor</option>
                             <option value="operator">Operator</option>
                             <option value="planning">Planning</option>
+                            <option value="file_master">File Master</option>
+                            <option value="fab_master">Fab Master</option>
                             <option value="user">User</option>
                         </select>
                     </div>
@@ -271,6 +275,8 @@ const Users = () => {
                                     <option value="operator">Operator</option>
                                     <option value="supervisor">Supervisor</option>
                                     <option value="planning">Planning Dept</option>
+                                    <option value="file_master">FILE_MASTER</option>
+                                    <option value="fab_master">FAB_MASTER</option>
                                 </select>
                             </div>
 

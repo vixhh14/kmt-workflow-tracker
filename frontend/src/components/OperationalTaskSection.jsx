@@ -23,6 +23,7 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
 
     const [formData, setFormData] = useState({
         project_id: '',
+        work_order_number: '',
         part_item: '',
         quantity: 1,
         due_date: '',
@@ -66,6 +67,7 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
             const payload = {
                 ...formData,
                 machine_id: machineId,
+                task_type: type.toUpperCase(),
                 quantity: parseInt(formData.quantity)
             };
 
@@ -79,6 +81,7 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
             setEditingTask(null);
             setFormData({
                 project_id: '',
+                work_order_number: '',
                 part_item: '',
                 quantity: 1,
                 due_date: '',
@@ -153,11 +156,11 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 animate-fade-in">
                     <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="sm:col-span-2">
-                            <label className="block text-[10px] font-bold text-gray-500 uppercase">Project / Item *</label>
-                            <div className="flex gap-2">
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase">Project & Work Order *</label>
+                            <div className="flex flex-wrap gap-2">
                                 <select
                                     required
-                                    className="flex-1 text-sm border rounded p-1.5"
+                                    className="flex-1 min-w-[150px] text-sm border rounded p-1.5"
                                     value={formData.project_id}
                                     onChange={e => setFormData({ ...formData, project_id: e.target.value })}
                                 >
@@ -168,8 +171,15 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
                                 </select>
                                 <input
                                     required
+                                    placeholder="Work Order #"
+                                    className="flex-1 min-w-[120px] text-sm border rounded p-1.5"
+                                    value={formData.work_order_number}
+                                    onChange={e => setFormData({ ...formData, work_order_number: e.target.value })}
+                                />
+                                <input
+                                    required
                                     placeholder="Part / Item"
-                                    className="flex-1 text-sm border rounded p-1.5"
+                                    className="flex-1 min-w-[150px] text-sm border rounded p-1.5"
                                     value={formData.part_item}
                                     onChange={e => setFormData({ ...formData, part_item: e.target.value })}
                                 />
@@ -272,6 +282,7 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
                             tasks.map(task => (
                                 <tr key={task.id} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-3 py-2">
+                                        <div className="text-[10px] font-bold text-blue-600 uppercase">WO: {task.work_order_number}</div>
                                         <div className="text-xs font-bold text-gray-900">{task.part_item}</div>
                                         <div className="text-[10px] text-gray-500">{task.project_name || 'No Project'}</div>
                                     </td>
@@ -306,6 +317,7 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
                                                             setEditingTask(task);
                                                             setFormData({
                                                                 project_id: task.project_id || '',
+                                                                work_order_number: task.work_order_number || '',
                                                                 part_item: task.part_item || '',
                                                                 quantity: task.quantity,
                                                                 due_date: task.due_date || '',

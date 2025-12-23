@@ -180,15 +180,15 @@ const QuickAssign = ({ onAssignSuccess }) => {
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Operator</label>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Assignee</label>
                                     <select
                                         value={assigningData.operator_id}
                                         onChange={(e) => setAssigningData({ ...assigningData, operator_id: e.target.value })}
                                         className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                                     >
-                                        <option value="">-- Choose Operator --</option>
+                                        <option value="">Auto-Assign Later</option>
                                         {operators.map(op => (
-                                            <option key={op.user_id} value={op.user_id}>{op.full_name || op.username}</option>
+                                            <option key={op.user_id} value={op.user_id}>{op.full_name || op.username} ({op.role})</option>
                                         ))}
                                     </select>
                                 </div>
@@ -249,8 +249,7 @@ const QuickAssign = ({ onAssignSuccess }) => {
                             </button>
                             <button
                                 onClick={handleSubmit}
-                                disabled={!assigningData.operator_id}
-                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
                             >
                                 Confirm Assignment
                             </button>
