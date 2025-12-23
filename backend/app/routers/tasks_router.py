@@ -101,6 +101,7 @@ async def read_tasks(
             "actual_start_time": t.actual_start_time.isoformat() if t.actual_start_time else None,
             "actual_end_time": t.actual_end_time.isoformat() if t.actual_end_time else None,
             "total_held_seconds": t.total_held_seconds,
+            "work_order_number": t.work_order_number,
             "holds": holds
         })
     return results
@@ -146,6 +147,7 @@ async def create_task(task: TaskCreate, db: Session = Depends(get_db)):
         due_date=task.due_date,
         due_datetime=task.due_datetime,
         expected_completion_time=task.expected_completion_time,
+        work_order_number=task.work_order_number,
         created_at=get_current_time_ist(),
     )
     
@@ -556,6 +558,7 @@ async def update_task(task_id: str, task_update: TaskUpdate, db: Session = Depen
         "total_duration_seconds": db_task.total_duration_seconds,
         "hold_reason": db_task.hold_reason,
         "denial_reason": db_task.denial_reason,
+        "work_order_number": db_task.work_order_number,
     }
 
 @router.delete("/{task_id}")
