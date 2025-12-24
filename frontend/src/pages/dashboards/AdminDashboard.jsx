@@ -383,33 +383,35 @@ const AdminDashboard = () => {
                         Total Tasks: {taskStats.total}
                     </span>
                 </div>
-                {chartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                            <Pie
-                                data={chartData}
-                                cx="50%"
-                                cy="50%"
-                                labelLine={false}
-                                label={renderCustomLabel}
-                                outerRadius={100}
-                                fill="#8884d8"
-                                dataKey="value"
-                            >
-                                {chartData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                ))}
-                            </Pie>
-                            <Tooltip />
-                            <Legend />
-                        </PieChart>
-                    </ResponsiveContainer>
-                ) : (
-                    <div className="text-center py-12 text-gray-500">
-                        <Folder className="mx-auto mb-4" size={48} />
-                        <p>No task data available</p>
-                    </div>
-                )}
+                <div className="h-[300px] w-full">
+                    {chartData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={chartData}
+                                    cx="50%"
+                                    cy="50%"
+                                    labelLine={false}
+                                    label={renderCustomLabel}
+                                    outerRadius={100}
+                                    fill="#8884d8"
+                                    dataKey="value"
+                                >
+                                    {chartData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                                <Legend />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                            <Folder className="mb-2 opacity-20" size={48} />
+                            <p className="text-sm font-medium">No task data available</p>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Attendance Summary */}

@@ -169,7 +169,7 @@ const Subtask = ({ taskId, taskAssigneeId }) => {
                             </div>
 
                             {/* Actions Section */}
-                            {canEdit && (
+                            {(isMaster || isAssignedOperator) && (
                                 <div className="flex flex-row sm:flex-col justify-center gap-2 mt-2 sm:mt-0">
                                     <button
                                         onClick={() => handleSave(subtask.id)}
@@ -179,14 +179,17 @@ const Subtask = ({ taskId, taskAssigneeId }) => {
                                         <Save size={14} />
                                         <span>Save</span>
                                     </button>
-                                    <button
-                                        onClick={() => handleDelete(subtask.id)}
-                                        className="flex items-center justify-center space-x-1 bg-red-100 text-red-700 px-3 py-1.5 rounded hover:bg-red-200 transition text-xs font-medium"
-                                        title="Delete Subtask"
-                                    >
-                                        <Trash2 size={14} />
-                                        <span>Delete</span>
-                                    </button>
+
+                                    {isMaster && (
+                                        <button
+                                            onClick={() => handleDelete(subtask.id)}
+                                            className="flex items-center justify-center space-x-1 bg-red-100 text-red-700 px-3 py-1.5 rounded hover:bg-red-200 transition text-xs font-medium"
+                                            title="Delete Subtask"
+                                        >
+                                            <Trash2 size={14} />
+                                            <span>Delete</span>
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -194,8 +197,8 @@ const Subtask = ({ taskId, taskAssigneeId }) => {
                 )}
             </div>
 
-            {/* Add Subtask Form - Only for authorized roles */}
-            {canEdit && (
+            {/* Add Subtask Form - Only for masters */}
+            {isMaster && (
                 <form onSubmit={handleAddSubtask} className="mt-6 border-t border-gray-200 pt-4">
                     <div className="flex items-center space-x-2">
                         <input
