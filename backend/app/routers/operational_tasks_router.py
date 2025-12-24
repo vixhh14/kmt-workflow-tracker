@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from app.schemas.task_schema import OperationalTaskCreate, OperationalTaskUpdate, OperationalTaskOut
 from app.models.models_db import FilingTask, FabricationTask, Project, User, Machine
 from app.core.database import get_db
@@ -37,8 +38,8 @@ async def read_operational_tasks(
     if role in ["admin", "planning"]:
         pass
     # Masters see all of their type
-    elif (task_type == "filing" and role in ["file_master", "FILE_MASTER"]) or \
-         (task_type == "fabrication" and role in ["fab_master", "FAB_MASTER"]):
+    elif (task_type == "filing" and role.lower() == "file_master") or \
+         (task_type == "fabrication" and role.lower() == "fab_master"):
         pass
     # Operators see only assigned to them or unassigned
     else:
@@ -170,8 +171,8 @@ async def update_operational_task(
     if role == "admin":
         for key, value in update_data.items():
             setattr(db_task, key, value)
-    elif (task_type == "filing" and role.lower() in ["file_master", "file_master"]) or \
-         (task_type == "fabrication" and role.lower() in ["fab_master", "fab_master"]):
+    elif (task_type == "filing" and role.lower() == "file_master") or \
+         (task_type == "fabrication" and role.lower() == "fab_master"):
         # Masters can only update execution fields
         execution_fields = ["assigned_to", "completed_quantity", "remarks", "status"]
         for key in execution_fields:
