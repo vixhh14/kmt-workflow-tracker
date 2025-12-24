@@ -27,7 +27,24 @@ async def read_operational_tasks(
     current_user: dict = Depends(get_current_user)
 ):
     model = get_model(task_type)
-    tasks = db.query(model).order_by(model.created_at.desc()).all()
+    query = db.query(model)
+    
+    # Role-based filtering
+    role = current_user.get("role")
+    user_id = current_user.get("user_id")
+    
+    # Admin and Planning see all
+    if role in ["admin", "planning"]:
+        pass
+    # Masters see all of their type
+    elif (task_type == "filing" and role in ["file_master", "FILE_MASTER"]) or \
+         (task_type == "fabrication" and role in ["fab_master", "FAB_MASTER"]):
+        pass
+    # Operators see only assigned to them or unassigned
+    else:
+        query = query.filter(or_(model.assigned_to == user_id, model.assigned_to == None))
+        
+    tasks = query.order_by(model.created_at.desc()).all()
     
     results = []
     for t in tasks:
@@ -58,7 +75,7 @@ async def create_operational_task(
     if current_user.get("role") not in ["admin", "planning"]:
         raise HTTPException(status_code=403, detail="Only Admin or Planning can create operational tasks")
         
-    # Manual Validation (as requested in Section 4)
+    # Manual Validation
     if not task.machine_id:
         raise HTTPException(status_code=400, detail="machine_id is required")
     
@@ -69,11 +86,11 @@ async def create_operational_task(
         if task.task_type.upper() not in ["FILING", "FABRICATION"]:
              raise HTTPException(status_code=400, detail="task_type must be FILING or FABRICATION")
 
-    if not task.work_order_number:
+    if not task.work_order_number or not task.work_order_number.strip():
         raise HTTPException(status_code=400, detail="work_order_number is required")
-    if not task.part_item:
+    if not task.part_item or not task.part_item.strip():
         raise HTTPException(status_code=400, detail="part_item (Project / Item) is required")
-    if not task.quantity or task.quantity <= 0:
+    if task.quantity is None or task.quantity <= 0:
         raise HTTPException(status_code=400, detail="quantity must be greater than 0")
     if not task.due_date:
         raise HTTPException(status_code=400, detail="due_date is required")
@@ -82,6 +99,9 @@ async def create_operational_task(
     
     # Normalization & Defaults
     task_data = task.dict()
+    
+    # FIX: Remove task_type before passing to model as it's not a column
+    task_data.pop("task_type", None)
     
     # Priority Normalization: LOW | MEDIUM | HIGH | URGENT
     if task_data.get("priority"):
@@ -92,7 +112,7 @@ async def create_operational_task(
     # Set assigned_by from current user token
     task_data["assigned_by"] = current_user.get("user_id")
 
-    # Handle Auto-Assign Later: If assigned_to is empty string or None, set to None
+    # Handle User Resolution
     assigned_to = task_data.get("assigned_to")
     if not assigned_to:
         task_data["assigned_to"] = None
@@ -106,19 +126,18 @@ async def create_operational_task(
             else:
                  raise HTTPException(status_code=400, detail=f"Assigned user '{assigned_to}' does not exist")
 
-    new_task = model(**task_data)
-    new_task.created_at = get_current_time_ist()
-    new_task.updated_at = get_current_time_ist()
-    
     try:
+        new_task = model(**task_data)
+        new_task.created_at = get_current_time_ist()
+        new_task.updated_at = get_current_time_ist()
         db.add(new_task)
         db.commit()
         db.refresh(new_task)
+        return new_task
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-        
-    return new_task
+        print(f"Error creating operational task: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database error during creation: {str(e)}")
 
 @router.put("/{task_type}/{task_id}", response_model=OperationalTaskOut)
 async def update_operational_task(
