@@ -16,7 +16,7 @@ router = APIRouter(
 # ----------------------------------------------------------------------
 # GET ALL OUTSOURCE ITEMS
 # ----------------------------------------------------------------------
-@router.get("/", response_model=List[dict])
+@router.get("", response_model=List[dict])
 async def read_outsource_items(db: Session = Depends(get_db)):
     items = db.query(OutsourceItem).all()
     return [
@@ -40,7 +40,7 @@ async def read_outsource_items(db: Session = Depends(get_db)):
 # ----------------------------------------------------------------------
 # CREATE OUTSOURCE ITEM
 # ----------------------------------------------------------------------
-@router.post("/", response_model=dict)
+@router.post("", response_model=dict)
 async def create_outsource_item(item: OutsourceCreate, db: Session = Depends(get_db)):
     new_item = OutsourceItem(
         id=str(uuid.uuid4()),

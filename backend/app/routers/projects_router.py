@@ -21,14 +21,14 @@ from app.schemas.project_schema import ProjectCreate, ProjectOut
 # API Endpoints
 # ----------------------------------------------------------------------
 
-@router.get("/", response_model=List[ProjectOut])
+@router.get("", response_model=List[ProjectOut])
 async def read_projects(db: Session = Depends(get_db)):
     """
     Get all projects.
     """
     return db.query(Project).filter(or_(Project.is_deleted == False, Project.is_deleted == None)).all()
 
-@router.post("/", response_model=ProjectOut)
+@router.post("", response_model=ProjectOut)
 async def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
     """
     Create a new project.

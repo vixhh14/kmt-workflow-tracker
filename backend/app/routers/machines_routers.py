@@ -18,7 +18,7 @@ router = APIRouter(
 # ----------------------------------------------------------------------
 # GET ALL MACHINES
 # ----------------------------------------------------------------------
-@router.get("/", response_model=List[dict])
+@router.get("", response_model=List[dict])
 async def read_machines(db: Session = Depends(get_db)):
     machines = db.query(Machine).filter(or_(Machine.is_deleted == False, Machine.is_deleted == None)).all()
     
@@ -47,7 +47,7 @@ async def read_machines(db: Session = Depends(get_db)):
 # ----------------------------------------------------------------------
 # CREATE MACHINE
 # ----------------------------------------------------------------------
-@router.post("/", response_model=dict)
+@router.post("", response_model=dict)
 async def create_machine(machine: MachineCreate, db: Session = Depends(get_db)):
     # Use provided location (Machine ID) as the primary key ID if provided, else UUID
     machine_id = machine.location if machine.location else str(uuid.uuid4())

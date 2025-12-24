@@ -39,7 +39,7 @@ async def get_subtasks(task_id: str, db: Session = Depends(get_db)):
     subtasks = db.query(Subtask).filter(Subtask.task_id == task_id).order_by(Subtask.created_at.asc()).all()
     return subtasks
 
-@router.post("/", response_model=SubtaskResponse)
+@router.post("", response_model=SubtaskResponse)
 async def create_subtask(
     subtask: SubtaskCreate,
     current_user: User = Depends(get_current_active_user),

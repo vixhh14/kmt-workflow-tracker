@@ -20,15 +20,19 @@ default_origins = [
     "http://localhost:5174",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
-    # Production Vercel URL
+    "http://127.0.0.1:5174",
+    # Production Vercel URLs
     "https://kmt-workflow-tracker.vercel.app",
-    # Vercel preview/staging URLs (add more as needed)
+    "https://kmt-workflow-tracker2.vercel.app", # Potential variant
+    # Vercel preview/staging URLs
     "https://kmt-workflow-tracker-qayt.vercel.app",
     "https://kmt-workflow-tracker-qayt-l7ytc60vt.vercel.app",
-    "https://kmt-workflow-tracker-i8gyfx9gi-vishnu-sureshs-projects-5ca6ac91.vercel.app",
 ]
 
-for origin in default_origins:
-    if origin not in CORS_ORIGINS:
-        CORS_ORIGINS.append(origin)
+# Combined list with normalization
+CORS_ORIGINS = list(set([o.rstrip("/") for o in CORS_ORIGINS + default_origins]))
+
+# Allow wildcard for vercel preview branches if they match a pattern
+# But CORSMiddleware doesn't support regex in allow_origins, we'd need a custom middleware for that.
+# For now, we rely on specific URLs provided by the user.
 
