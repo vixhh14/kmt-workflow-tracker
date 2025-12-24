@@ -114,73 +114,68 @@ async def create_task(
 ):
     from app.models.models_db import User, Project as DBProject
     
-    # Validation (as requested in Section 4)
-    if not task.work_order_number:
-        raise HTTPException(status_code=400, detail="work_order_number is required")
-    if not task.title:
-        raise HTTPException(status_code=400, detail="title is required")
+    # 1. Input Validation
+    if not task.work_order_number or not task.work_order_number.strip():
+        raise HTTPException(status_code=400, detail="Work Order Number is required")
+    if not task.title or not task.title.strip():
+        raise HTTPException(status_code=400, detail="Task title is required")
     if not task.machine_id:
-        raise HTTPException(status_code=400, detail="machine_id is required")
+        raise HTTPException(status_code=400, detail="Machine assignment is required")
 
-    # Validate assigned_to exists (Support username -> user_id conversion)
+    # 2. Assignee Resolution
     assigned_to = task.assigned_to
     if assigned_to:
-        assignee = db.query(User).filter(User.user_id == assigned_to).first()
+        assignee = db.query(User).filter(User.user_id == assigned_to, or_(User.is_deleted == False, User.is_deleted == None)).first()
         if not assignee:
             # Fallback: check if it's a username
-            assignee = db.query(User).filter(User.username == assigned_to).first()
+            assignee = db.query(User).filter(User.username == assigned_to, or_(User.is_deleted == False, User.is_deleted == None)).first()
             if assignee:
-                assigned_to = assignee.user_id # Convert username to user_id
+                assigned_to = assignee.user_id 
             else:
-                 raise HTTPException(status_code=400, detail=f"Assigned user '{assigned_to}' does not exist")
+                 raise HTTPException(status_code=400, detail=f"Assigned user '{assigned_to}' does not exist or is inactive")
 
-    # Set assigned_by from logged-in admin token (as requested in Section 2)
-    assigned_by = current_user.get("user_id")
-
-    # Validate Project & Sync Name
-    project_name = task.project
+    # 3. Project Validation & Sync
+    project_name = task.project.strip() if task.project else "-"
     if task.project_id:
         project_exists = db.query(DBProject).filter(DBProject.project_id == task.project_id).first()
         if not project_exists:
-            raise HTTPException(status_code=400, detail=f"Project with ID {task.project_id} does not exist")
+            raise HTTPException(status_code=400, detail=f"Selected project (ID: {task.project_id}) not found")
         project_name = project_exists.project_name
 
-    # Priority Normalization: LOW | MEDIUM | HIGH
-    priority_norm = (task.priority or "medium").upper()
+    # 4. Normalization
+    priority_norm = (task.priority or "MEDIUM").upper()
+    assigned_by = current_user.get("user_id")
 
-    new_task = Task(
-        title=task.title,
-        description=task.description,
-        project=project_name,
-        project_id=task.project_id,
-        part_item=task.part_item,
-        nos_unit=task.nos_unit,
-        status=task.status,
-        priority=priority_norm,
-        assigned_by=assigned_by,
-        assigned_to=assigned_to,
-        machine_id=task.machine_id,
-        due_date=task.due_date,
-        due_datetime=task.due_datetime,
-        expected_completion_time=task.expected_completion_time,
-        work_order_number=task.work_order_number,
-        created_at=get_current_time_ist(),
-    )
-    
     try:
+        new_task = Task(
+            title=task.title.strip(),
+            description=task.description.strip() if task.description else None,
+            project=project_name,
+            project_id=task.project_id,
+            part_item=task.part_item.strip() if task.part_item else None,
+            nos_unit=task.nos_unit.strip() if task.nos_unit else None,
+            status=task.status or "pending",
+            priority=priority_norm,
+            assigned_by=assigned_by,
+            assigned_to=assigned_to,
+            machine_id=task.machine_id,
+            due_date=task.due_date,
+            due_datetime=task.due_datetime,
+            expected_completion_time=task.expected_completion_time,
+            work_order_number=task.work_order_number.strip(),
+            created_at=get_current_time_ist(),
+        )
+        
         db.add(new_task)
         db.commit()
         db.refresh(new_task)
+        return new_task
     except Exception as e:
         db.rollback()
+        print(f"❌ DB Error in create_task: {str(e)}")
         import traceback
-        print(f"❌ Error creating task: {str(e)}")
         traceback.print_exc()
-        if "invalid input syntax" in str(e):
-             raise HTTPException(status_code=400, detail=f"Database input error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to create task in DB: {str(e)}")
-
-    return new_task
+        raise HTTPException(status_code=500, detail=f"Critical database error: {str(e)}")
 
 # Get task time logs for a specific task
 @router.get("/{task_id}/time-logs", response_model=List[dict])

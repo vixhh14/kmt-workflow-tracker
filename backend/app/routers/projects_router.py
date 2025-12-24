@@ -33,26 +33,39 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
     """
     Create a new project.
     """
-    # Check if project code already exists
-    existing = db.query(Project).filter(Project.project_code == project.project_code).first()
+    # 1. Validation
+    if not project.project_name or not project.project_name.strip():
+        raise HTTPException(status_code=400, detail="Project name is required")
+    if not project.project_code or not project.project_code.strip():
+        raise HTTPException(status_code=400, detail="Project code is required")
+    
+    # 2. Check if project code already exists (Ignoring soft-deleted ones)
+    existing = db.query(Project).filter(
+        Project.project_code == project.project_code.strip(),
+        or_(Project.is_deleted == False, Project.is_deleted == None)
+    ).first()
+    
     if existing:
-        raise HTTPException(status_code=400, detail="Project code already exists")
+        raise HTTPException(status_code=409, detail=f"Project code '{project.project_code}' is already in use by an active project.")
     
-    new_project = Project(
-        # project_id is auto-increment
-        project_name=project.project_name,
-        work_order_number=project.work_order_number,
-        client_name=project.client_name,
-        project_code=project.project_code,
-        created_at=get_current_time_ist(),
-        is_deleted=False
-    )
-    
-    db.add(new_project)
-    db.commit()
-    db.refresh(new_project)
-    
-    return new_project
+    try:
+        new_project = Project(
+            project_name=project.project_name.strip(),
+            work_order_number=project.work_order_number.strip() if project.work_order_number else None,
+            client_name=project.client_name.strip() if project.client_name else None,
+            project_code=project.project_code.strip(),
+            created_at=get_current_time_ist(),
+            is_deleted=False
+        )
+        
+        db.add(new_project)
+        db.commit()
+        db.refresh(new_project)
+        return new_project
+    except Exception as e:
+        db.rollback()
+        print(f"Error creating project: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal database error while creating project: {str(e)}")
 
 @router.get("/{project_id}", response_model=ProjectOut)
 async def read_project(project_id: int, db: Session = Depends(get_db)):
