@@ -234,11 +234,17 @@ const Tasks = () => {
     // Filter and search logic
     const getFilteredTasks = () => {
         return tasks.filter(task => {
+            // Role-based logic: Operators only see their own tasks
+            if (currentUser?.role === 'operator' && task.assigned_to !== currentUser?.user_id) {
+                return false;
+            }
+
             // Search filter
             const matchesSearch = searchQuery === '' ||
                 task.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 task.project?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                task.part_item?.toLowerCase().includes(searchQuery.toLowerCase());
+                task.part_item?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                task.work_order_number?.toLowerCase().includes(searchQuery.toLowerCase());
 
             // Status filter
             const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
@@ -520,21 +526,26 @@ const Tasks = () => {
                                     onChange={(e) => {
                                         const pId = e.target.value;
                                         const selectedProject = projects.find(p => String(p.project_id) === String(pId));
+                                        console.log('Project selected:', { id: pId, name: selectedProject?.project_name });
                                         setFormData({
                                             ...formData,
-                                            project_id: pId,
+                                            project_id: pId ? parseInt(pId) : '',
                                             project: selectedProject ? selectedProject.project_name : ''
                                         });
                                     }}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm"
                                     disabled={loading || projects.length === 0}
                                 >
                                     <option value="">Select Project</option>
-                                    {projects.map((p) => (
-                                        <option key={p.project_id} value={p.project_id}>
-                                            {p.project_name} ({p.project_code})
-                                        </option>
-                                    ))}
+                                    {projects.length > 0 ? (
+                                        projects.map((p) => (
+                                            <option key={p.project_id} value={p.project_id}>
+                                                {p.project_name} {p.project_code ? `(${p.project_code})` : ''}
+                                            </option>
+                                        ))
+                                    ) : (
+                                        <option disabled>No projects available</option>
+                                    )}
                                 </select>
                                 {projects.length === 0 && !loading && (
                                     <p className="text-xs text-red-600 mt-1">⚠️ No projects available. Please add projects first.</p>
@@ -807,7 +818,7 @@ const Tasks = () => {
                                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                                     {/* Subtasks Section */}
                                                     <div>
-                                                        <Subtask taskId={task.id} />
+                                                        <Subtask taskId={task.id} taskAssigneeId={task.assigned_to} />
                                                     </div>
 
                                                     {/* Timing Analytics Section */}

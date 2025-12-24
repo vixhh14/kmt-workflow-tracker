@@ -64,11 +64,18 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
+            // Validate required fields explicitly if needed
+            if (!formData.project_id) {
+                alert('Please select a project');
+                return;
+            }
+
             const payload = {
                 ...formData,
                 machine_id: machineId,
                 task_type: type.toUpperCase(),
-                quantity: parseInt(formData.quantity)
+                quantity: parseInt(formData.quantity),
+                project_id: parseInt(formData.project_id)
             };
 
             if (editingTask) {
@@ -92,7 +99,8 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
             fetchData();
         } catch (error) {
             console.error('Failed to save task:', error);
-            alert('Failed to save task');
+            const detail = error.response?.data?.detail;
+            alert(typeof detail === 'string' ? detail : 'Failed to save task. Please check all required fields.');
         }
     };
 
@@ -160,14 +168,24 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
                             <div className="flex flex-wrap gap-2">
                                 <select
                                     required
-                                    className="flex-1 min-w-[150px] text-sm border rounded p-1.5"
-                                    value={formData.project_id}
-                                    onChange={e => setFormData({ ...formData, project_id: e.target.value })}
+                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all bg-gray-50/50"
+                                    value={formData.project_id || ''}
+                                    onChange={e => {
+                                        const pId = e.target.value;
+                                        setFormData({
+                                            ...formData,
+                                            project_id: pId ? parseInt(pId) : ''
+                                        });
+                                    }}
                                 >
-                                    <option value="">Select Project</option>
-                                    {projects.map(p => (
-                                        <option key={p.project_id} value={p.project_id}>{p.project_name}</option>
-                                    ))}
+                                    <option value="">Select Project / Asset</option>
+                                    {projects.length > 0 ? (
+                                        projects.map(p => (
+                                            <option key={p.project_id} value={p.project_id}>{p.project_name}</option>
+                                        ))
+                                    ) : (
+                                        <option disabled>No projects available</option>
+                                    )}
                                 </select>
                                 <input
                                     required

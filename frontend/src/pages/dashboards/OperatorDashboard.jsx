@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getOperatorTasks, operatorStartTask, operatorCompleteTask, operatorHoldTask, operatorResumeTask } from '../../api/services';
-import { Play, CheckCircle, Pause, Clock, AlertCircle, TrendingUp, ListTodo, Target } from 'lucide-react';
+import { Play, CheckCircle, Pause, Clock, AlertCircle, TrendingUp, ListTodo, Target, ChevronDown, ChevronUp } from 'lucide-react';
+import Subtask from '../../components/Subtask';
 
 const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
     <div className="bg-white rounded-lg shadow p-4 sm:p-6">
@@ -32,6 +33,7 @@ const OperatorDashboard = () => {
     const [actionLoading, setActionLoading] = useState({});
     const [selectedStatus, setSelectedStatus] = useState('all');
     const [holdReasons, setHoldReasons] = useState({});
+    const [expandedTaskId, setExpandedTaskId] = useState(null);
 
     useEffect(() => {
         fetchTasks();
@@ -410,6 +412,15 @@ const OperatorDashboard = () => {
 
                                 {/* Action Buttons */}
                                 <div className="flex flex-row lg:flex-col gap-2 flex-shrink-0">
+                                    <button
+                                        onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
+                                        className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 flex-1 lg:flex-none"
+                                        title={expandedTaskId === task.id ? "Hide Subtasks" : "Show Subtasks"}
+                                    >
+                                        {expandedTaskId === task.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                        <span>{expandedTaskId === task.id ? "Hide Details" : "Details"}</span>
+                                    </button>
+
                                     {task.status === 'pending' && (
                                         <button
                                             onClick={() => handleStartTask(task.id)}
@@ -454,6 +465,13 @@ const OperatorDashboard = () => {
                                     )}
                                 </div>
                             </div>
+
+                            {/* Expanded Content: Subtasks */}
+                            {expandedTaskId === task.id && (
+                                <div className="mt-6 pt-6 border-t border-gray-100 animate-fade-in">
+                                    <Subtask taskId={task.id} taskAssigneeId={task.assigned_to} />
+                                </div>
+                            )}
                         </div>
                     ))
                 )}
