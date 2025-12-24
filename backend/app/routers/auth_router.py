@@ -24,7 +24,7 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     try:
         # Find user by username in SQLite
         t1 = time.time()
-        user = db.query(User).filter(User.username == credentials.username).first()
+        user = db.query(User).filter(User.username == credentials.username, User.is_deleted == False).first()
         print(f"Database query took: {time.time() - t1:.4f}s")
         
         if not user:

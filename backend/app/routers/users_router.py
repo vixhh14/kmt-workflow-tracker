@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.schemas.user_schema import UserCreate, UserOut, UserUpdate
 from app.core.database import get_db
+from app.core.dependencies import get_current_active_admin
 from app.models.models_db import User
 from uuid import uuid4
 import hashlib
@@ -18,7 +19,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 # --------------------------
 @router.get("/", response_model=list[UserOut])
 def list_users(db: Session = Depends(get_db)):
-    users = db.query(User).all()
+    users = db.query(User).filter(User.is_deleted == False).all()
     return [
         UserOut(
             user_id=u.user_id,
@@ -56,6 +57,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
         full_name=user.full_name or "",
         machine_types=user.machine_types or "",
         approval_status="approved", # Admin-created users are auto-approved
+        is_deleted=False,
         updated_at=get_current_time_ist()
     )
     
@@ -98,11 +100,20 @@ def update_user_data(user_id: str, updates: UserUpdate, db: Session = Depends(ge
 # DELETE USER
 # --------------------------
 @router.delete("/{user_id}")
-def delete_user_data(user_id: str, db: Session = Depends(get_db)):
+def delete_user_data(
+    user_id: str, 
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_active_admin)
+):
+    # Requirement F: Prevent deleting currently logged-in admin
+    if user_id == current_admin.user_id:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
+
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    db.delete(user)
+    # Soft delete only
+    user.is_deleted = True
     db.commit()
     return {"message": "User deleted successfully"}

@@ -28,6 +28,7 @@ class User(Base):
     security_question = Column(String, nullable=True)
     security_answer = Column(String, nullable=True)
     
+    is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
     updated_at = Column(DateTime(timezone=True), default=get_current_time_ist, onupdate=get_current_time_ist)
 
