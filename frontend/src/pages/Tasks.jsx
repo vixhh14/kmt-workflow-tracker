@@ -357,13 +357,15 @@ const Tasks = () => {
                     <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Tasks Management</h1>
                     <p className="text-sm sm:text-base text-gray-600">Manage and track tasks</p>
                 </div>
-                <button
-                    onClick={() => setShowForm(!showForm)}
-                    className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2.5 rounded-lg hover:bg-blue-700 transition w-full sm:w-auto text-sm sm:text-base"
-                >
-                    <Plus size={20} />
-                    <span>Add Task</span>
-                </button>
+                {currentUser?.role !== 'operator' && (
+                    <button
+                        onClick={() => setShowForm(!showForm)}
+                        className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2.5 rounded-lg hover:bg-blue-700 transition w-full sm:w-auto text-sm sm:text-base"
+                    >
+                        <Plus size={20} />
+                        <span>Add Task</span>
+                    </button>
+                )}
             </div>
 
             {/* Search and Filters */}
@@ -449,7 +451,7 @@ const Tasks = () => {
             </div>
 
             {/* Bulk Actions */}
-            {selectedTasks.length > 0 && (
+            {selectedTasks.length > 0 && currentUser?.role !== 'operator' && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <span className="text-sm font-medium text-blue-900">
@@ -720,12 +722,14 @@ const Tasks = () => {
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="px-2 sm:px-4 py-3 text-left">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedTasks.length === paginatedTasks.length && paginatedTasks.length > 0}
-                                        onChange={handleSelectAll}
-                                        className="rounded border-gray-300"
-                                    />
+                                    {currentUser?.role !== 'operator' && (
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedTasks.length === paginatedTasks.length && paginatedTasks.length > 0}
+                                            onChange={handleSelectAll}
+                                            className="rounded border-gray-300"
+                                        />
+                                    )}
                                 </th>
                                 <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title / WO</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Project</th>
@@ -742,12 +746,14 @@ const Tasks = () => {
                                 <React.Fragment key={task.id}>
                                     <tr className="hover:bg-gray-50">
                                         <td className="px-2 sm:px-4 py-3 sm:py-4">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedTasks.includes(task.id)}
-                                                onChange={() => handleSelectTask(task.id)}
-                                                className="rounded border-gray-300"
-                                            />
+                                            {currentUser?.role !== 'operator' && (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedTasks.includes(task.id)}
+                                                    onChange={() => handleSelectTask(task.id)}
+                                                    className="rounded border-gray-300"
+                                                />
+                                            )}
                                         </td>
                                         <td className="px-2 sm:px-6 py-3 sm:py-4">
                                             <div className="flex items-center">
@@ -802,13 +808,15 @@ const Tasks = () => {
                                                         <span className="text-[10px] uppercase font-bold">End</span>
                                                     </button>
                                                 )}
-                                                <button
-                                                    onClick={() => handleDelete(task.id)}
-                                                    className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
-                                                    title="Delete Task"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
+                                                {currentUser?.role !== 'operator' && (
+                                                    <button
+                                                        onClick={() => handleDelete(task.id)}
+                                                        className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
+                                                        title="Delete Task"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
