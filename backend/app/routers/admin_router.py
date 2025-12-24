@@ -49,18 +49,18 @@ class UserResponse(BaseModel):
 
 @router.get("/users", response_model=List[UserResponse])
 async def get_all_users(db: Session = Depends(get_db)):
-    users = db.query(User).all()
+    users = db.query(User).filter(User.is_deleted == False).all()
     return users
 
 @router.get("/pending-users", response_model=List[UserResponse])
 async def get_pending_users(db: Session = Depends(get_db)):
-    users = db.query(User).filter(User.approval_status == "pending").all()
+    users = db.query(User).filter(User.approval_status == "pending", User.is_deleted == False).all()
     return users
 
 @router.get("/approvals")
 async def get_admin_approvals(db: Session = Depends(get_db)):
     """GET /admin/approvals as requested by user"""
-    users = db.query(User).filter(User.approval_status == "pending").all()
+    users = db.query(User).filter(User.approval_status == "pending", User.is_deleted == False).all()
     # Format to match UserResponse or desired pending_users list
     return {"pending_users": users}
 

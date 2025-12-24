@@ -31,11 +31,11 @@ async def get_admin_dashboard(db: Session = Depends(get_db)):
         machine_list = [{"id": m.id, "machine_name": m.machine_name} for m in machines]
         
         # 4. Users (all)
-        users = db.query(User).all()
+        users = db.query(User).filter(User.is_deleted == False).all()
         user_list = [{"id": u.user_id, "username": u.username, "role": u.role} for u in users]
         
         # 5. Operators only
-        operators = db.query(User).filter(User.role == 'operator').all()
+        operators = db.query(User).filter(User.role == 'operator', User.is_deleted == False).all()
         operator_list = [{"id": u.user_id, "username": u.username, "name": u.full_name} for u in operators]
         
         # 6. Global Overview (Unified logic)
@@ -84,7 +84,7 @@ async def get_supervisor_dashboard(db: Session = Depends(get_db)):
         machine_list = [{"id": m.id, "machine_name": m.machine_name} for m in machines]
         
         # 4. Operators
-        operators = db.query(User).filter(User.role == 'operator').all()
+        operators = db.query(User).filter(User.role == 'operator', User.is_deleted == False).all()
         operator_list = [{"id": u.user_id, "username": u.username, "name": u.full_name} for u in operators]
         
         # 5. Global Overview
