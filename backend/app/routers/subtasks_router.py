@@ -86,15 +86,23 @@ async def update_subtask(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    # STRICT VALIDATION: Operators cannot update subtasks
+    # Authorize
+    subtask = db.query(Subtask).filter(Subtask.id == subtask_id).first()
+    if not subtask:
+        raise HTTPException(status_code=404, detail="Subtask not found")
+
+    # STRICT VALIDATION: Operators can only update if assigned to parent task
     if current_user.role == "operator":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Operators are not allowed to update subtasks"
-        )
+        from app.models.models_db import Task
+        parent_task = db.query(Task).filter(Task.id == subtask.task_id).first()
+        if not parent_task or parent_task.assigned_to != current_user.user_id:
+             raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Operators are only allowed to update subtasks of tasks assigned to them"
+            )
     
-    # Allow admin, planning, supervisor
-    if current_user.role not in ["admin", "planning", "supervisor"]:
+    # Allow admin, planning, supervisor, or authorized operator
+    if current_user.role not in ["admin", "planning", "supervisor", "operator"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to update subtasks"
