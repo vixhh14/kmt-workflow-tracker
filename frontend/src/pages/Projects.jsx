@@ -34,6 +34,7 @@ const Projects = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setError(null);
         try {
             await createProject(formData);
             setFormData({
@@ -43,9 +44,13 @@ const Projects = () => {
             });
             setShowForm(false);
             fetchProjects();
+            alert('Project created successfully!');
         } catch (err) {
             console.error('Failed to create project:', err);
-            alert(err.response?.data?.detail || 'Failed to create project');
+            const detail = err.response?.data?.detail;
+            const message = typeof detail === 'string' ? detail : 'Failed to create project';
+            setError(message);
+            alert(message);
         }
     };
 

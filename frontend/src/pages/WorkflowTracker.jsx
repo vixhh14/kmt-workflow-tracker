@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getUsers, createUser, deleteUser } from '../api/services';
 import { Plus, Trash2, User, Search, X, Eye, EyeOff, Shield, Mail, Briefcase } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { ROLE_LABELS } from '../constants/roles';
 
 const Users = () => {
     const [users, setUsers] = useState([]);
@@ -125,15 +126,6 @@ const Users = () => {
     const clearFilters = () => {
         setSearchQuery('');
         setRoleFilter('all');
-    };
-
-    const ROLE_LABELS = {
-        'admin': 'Admin',
-        'supervisor': 'Supervisor',
-        'planning': 'Planning Dept',
-        'operator': 'Operator',
-        'FILE_MASTER': 'File Master',
-        'FAB_MASTER': 'Fab Master'
     };
 
     const getRoleBadgeColor = (role) => {

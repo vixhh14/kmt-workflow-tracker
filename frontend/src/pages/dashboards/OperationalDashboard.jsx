@@ -56,8 +56,8 @@ const OperationalDashboard = ({ type }) => {
             // Admin and Masters see all tasks of the given type
             // Operators see only their assigned tasks or unassigned ones
             const canSeeAll = currentUser?.role === 'admin' ||
-                (type === 'filing' && currentUser?.role === 'file_master') ||
-                (type === 'fabrication' && currentUser?.role === 'fab_master');
+                (type === 'filing' && (currentUser?.role === 'file_master' || currentUser?.role === 'FILE_MASTER')) ||
+                (type === 'fabrication' && (currentUser?.role === 'fab_master' || currentUser?.role === 'FAB_MASTER'));
 
             const filteredData = canSeeAll
                 ? data

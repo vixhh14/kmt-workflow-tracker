@@ -18,6 +18,12 @@ const Dashboard = () => {
             return <Navigate to="/dashboard/supervisor" />;
         case 'planning':
             return <Navigate to="/dashboard/planning" />;
+        case 'FILE_MASTER':
+        case 'file_master':
+            return <Navigate to="/dashboard/file-master" />;
+        case 'FAB_MASTER':
+        case 'fab_master':
+            return <Navigate to="/dashboard/fab-master" />;
         default:
             return <Navigate to="/login" />;
     }
