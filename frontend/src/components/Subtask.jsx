@@ -3,7 +3,7 @@ import { getSubtasks, createSubtask, updateSubtask, deleteSubtask } from '../api
 import { useAuth } from '../context/AuthContext';
 import { Plus, Trash2, Save } from 'lucide-react';
 
-const Subtask = ({ taskId }) => {
+const Subtask = ({ taskId, taskAssigneeId }) => {
     const { user } = useAuth();
     const [subtasks, setSubtasks] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -13,8 +13,10 @@ const Subtask = ({ taskId }) => {
     // State to track edits for each subtask individually
     const [edits, setEdits] = useState({});
 
-    // Roles allowed to edit
-    const canEdit = ['admin', 'planning', 'supervisor'].includes(user?.role);
+    // Roles allowed to edit: Admin, Planning, Supervisor, or the Operator assigned to the task
+    const isMaster = ['admin', 'planning', 'supervisor'].includes(user?.role);
+    const isAssignedOperator = user?.role === 'operator' && user?.user_id === taskAssigneeId;
+    const canEdit = isMaster || isAssignedOperator;
 
     useEffect(() => {
         if (taskId) {
