@@ -194,9 +194,12 @@ const Tasks = () => {
             });
             setShowForm(false);
             fetchData();
+            alert('Task created successfully!');
         } catch (error) {
             console.error('Failed to create task:', error);
-            alert(error.response?.data?.detail || 'Failed to create task');
+            const detail = error.response?.data?.detail;
+            const message = typeof detail === 'string' ? detail : 'Failed to create task';
+            alert(message);
         }
     };
 
@@ -291,7 +294,8 @@ const Tasks = () => {
             fetchData();
         } catch (error) {
             console.error('Failed to bulk assign:', error);
-            alert(error.response?.data?.detail || 'Failed to assign tasks');
+            const detail = error.response?.data?.detail;
+            alert(typeof detail === 'string' ? detail : 'Failed to assign tasks');
         }
     };
 
@@ -514,10 +518,11 @@ const Tasks = () => {
                                     required
                                     value={formData.project_id || ''}
                                     onChange={(e) => {
-                                        const selectedProject = projects.find(p => p.project_id === e.target.value);
+                                        const pId = e.target.value;
+                                        const selectedProject = projects.find(p => String(p.project_id) === String(pId));
                                         setFormData({
                                             ...formData,
-                                            project_id: e.target.value,
+                                            project_id: pId,
                                             project: selectedProject ? selectedProject.project_name : ''
                                         });
                                     }}

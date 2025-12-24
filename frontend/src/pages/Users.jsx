@@ -3,6 +3,7 @@ import { getUsers, createUser, deleteUser } from '../api/services';
 import { Plus, Trash2, User, Search, X, Eye, EyeOff, Shield, Mail, Briefcase } from 'lucide-react';
 import { validatePasswordFull } from '../utils/passwordValidation';
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
+import { ROLE_LABELS } from '../constants/roles';
 
 const Users = () => {
     const [users, setUsers] = useState([]);
@@ -20,7 +21,7 @@ const Users = () => {
         email: '',
         password: '',
         confirm_password: '',
-        role: 'user',
+        role: 'operator',
         machine_types: '' // Using this for Unit Allocation as per previous code context
     });
 
@@ -84,7 +85,7 @@ const Users = () => {
                 email: '',
                 password: '',
                 confirm_password: '',
-                role: 'user',
+                role: 'operator',
                 machine_types: ''
             });
             setShowForm(false);
@@ -125,15 +126,6 @@ const Users = () => {
     const clearFilters = () => {
         setSearchQuery('');
         setRoleFilter('all');
-    };
-
-    const ROLE_LABELS = {
-        'admin': 'Admin',
-        'supervisor': 'Supervisor',
-        'planning': 'Planning Dept',
-        'operator': 'Operator',
-        'FILE_MASTER': 'File Master',
-        'FAB_MASTER': 'Fab Master'
     };
 
     const getRoleBadgeColor = (role) => {

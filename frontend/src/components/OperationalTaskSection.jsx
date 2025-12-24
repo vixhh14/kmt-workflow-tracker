@@ -227,7 +227,11 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
                                 onChange={e => setFormData({ ...formData, assigned_to: e.target.value })}
                             >
                                 <option value="">Auto-Assign Later</option>
-                                {users.filter(u => u.role === (type === 'filing' ? 'file_master' : 'fab_master') || u.role === 'operator').map(u => (
+                                {users.filter(u => {
+                                    const role = (u.role || '').toLowerCase();
+                                    const targetRole = type === 'filing' ? 'file_master' : 'fab_master';
+                                    return role === targetRole || role === 'operator';
+                                }).map(u => (
                                     <option key={u.user_id} value={u.user_id}>{u.full_name || u.username}</option>
                                 ))}
                             </select>

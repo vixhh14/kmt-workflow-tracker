@@ -63,13 +63,13 @@ function App() {
                             <PlanningLayout><PlanningDashboard /></PlanningLayout>
                         </ProtectedRoute>
                     } />
-                    <Route path="/dashboard/file_master" element={
-                        <ProtectedRoute allowedRoles={['file_master']}>
+                    <Route path="/dashboard/file-master" element={
+                        <ProtectedRoute allowedRoles={['FILE_MASTER', 'file_master']}>
                             <Layout><FileMasterDashboard /></Layout>
                         </ProtectedRoute>
                     } />
-                    <Route path="/dashboard/fab_master" element={
-                        <ProtectedRoute allowedRoles={['fab_master']}>
+                    <Route path="/dashboard/fab-master" element={
+                        <ProtectedRoute allowedRoles={['FAB_MASTER', 'fab_master']}>
                             <Layout><FabMasterDashboard /></Layout>
                         </ProtectedRoute>
                     } />

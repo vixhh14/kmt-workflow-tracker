@@ -1,15 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getPendingUsers, getUnits, approveUser, rejectUser } from '../../api/services';
 import { Check, X, UserCheck, AlertCircle, Briefcase, User } from 'lucide-react';
-
-const ROLE_LABELS = {
-    'admin': 'Admin',
-    'supervisor': 'Supervisor',
-    'planning': 'Planning',
-    'operator': 'Operator',
-    'FILE_MASTER': 'File Master',
-    'FAB_MASTER': 'Fab Master'
-};
+import { ROLE_LABELS } from '../../constants/roles';
 
 const UserApprovals = () => {
     const [users, setUsers] = useState([]);

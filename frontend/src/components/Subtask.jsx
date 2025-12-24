@@ -45,6 +45,7 @@ const Subtask = ({ taskId }) => {
     const handleAddSubtask = async (e) => {
         e.preventDefault();
         if (!newSubtaskTitle.trim()) return;
+        setError('');
 
         try {
             await createSubtask({
@@ -53,10 +54,11 @@ const Subtask = ({ taskId }) => {
                 notes: ''
             });
             setNewSubtaskTitle('');
-            fetchSubtasks();
+            await fetchSubtasks();
         } catch (err) {
             console.error('Failed to create subtask:', err);
-            setError('Failed to create subtask');
+            const detail = err.response?.data?.detail;
+            setError(typeof detail === 'string' ? detail : 'Failed to create subtask');
         }
     };
 
