@@ -24,13 +24,18 @@ class RescheduleRequestModel(BaseModel):
     requested_date: datetime
     reason: str
 
-@router.get("/", response_model=List[dict])
+@router.get("", response_model=List[dict])
 async def read_tasks(
     month: Optional[int] = None,
     year: Optional[int] = None,
     assigned_to: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
+    # Role-based restriction: Operators only see their own tasks
+    if current_user.get("role") == "operator":
+        assigned_to = current_user.get("user_id")
+
     query = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None))
     
     # Filter by month and year if provided
@@ -106,7 +111,7 @@ async def read_tasks(
         })
     return results
 
-@router.post("/", response_model=TaskOut)
+@router.post("", response_model=dict)
 async def create_task(
     task: TaskCreate, 
     db: Session = Depends(get_db),
@@ -529,14 +534,34 @@ async def end_task(
     return {"message": "Task ended successfully by admin", "status": "ended"}
 
 @router.put("/{task_id}", response_model=dict)
-async def update_task(task_id: str, task_update: TaskUpdate, db: Session = Depends(get_db)):
+async def update_task(
+    task_id: str, 
+    task_update: TaskUpdate, 
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
     from app.models.models_db import Project as DBProject
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
     
+    role = current_user.get("role")
     update_data = task_update.dict(exclude_unset=True)
-    
+
+    # Restriction: Operators can only update basic workflow fields if assigned
+    if role == "operator":
+        if db_task.assigned_to != current_user.get("user_id"):
+            raise HTTPException(status_code=403, detail="Not assigned to this task")
+        # Allowed fields for operator: maybe just notes?
+        # But status is changed via specialized endpoints.
+        allowed_operator_fields = ["description"] # 'description' is often used as notes
+        for key in list(update_data.keys()):
+            if key not in allowed_operator_fields:
+                del update_data[key]
+    elif role not in ["admin", "planning", "supervisor"]:
+         # Masters don't usually manage general tasks, but let's allow read-only
+         raise HTTPException(status_code=403, detail="Not authorized to edit general tasks")
+
     # Sync project name if project_id is updated
     if 'project_id' in update_data and update_data['project_id']:
         p_obj = db.query(DBProject).filter(DBProject.project_id == update_data['project_id']).first()
@@ -573,12 +598,17 @@ async def update_task(task_id: str, task_update: TaskUpdate, db: Session = Depen
     }
 
 @router.delete("/{task_id}")
-async def delete_task(task_id: str, db: Session = Depends(get_db)):
+async def delete_task(
+    task_id: str, 
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    if current_user.get("role") not in ["admin", "supervisor", "planning"]:
+        raise HTTPException(status_code=403, detail="Not authorized to delete tasks")
+        
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
     db_task.is_deleted = True
-    # Optional: Cancel pending subtasks or release holds if desired, 
-    # but for soft delete we usually just mark the parent.
     db.commit()
     return {"message": "Task deleted successfully"}

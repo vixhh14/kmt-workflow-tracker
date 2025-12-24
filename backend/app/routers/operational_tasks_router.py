@@ -167,13 +167,19 @@ async def update_operational_task(
                  raise HTTPException(status_code=400, detail=f"Assigned user '{assigned_to}' does not exist")
 
     # Execution-level fields can be updated by Masters or Admin
-    # Admin can update everything
     if role == "admin":
         for key, value in update_data.items():
             setattr(db_task, key, value)
-    elif (task_type == "filing" and role == "file_master") or (task_type == "fabrication" and role == "fab_master"):
+    elif (task_type == "filing" and role.lower() in ["file_master", "file_master"]) or \
+         (task_type == "fabrication" and role.lower() in ["fab_master", "fab_master"]):
         # Masters can only update execution fields
         execution_fields = ["assigned_to", "completed_quantity", "remarks", "status"]
+        for key in execution_fields:
+            if key in update_data:
+                setattr(db_task, key, update_data[key])
+    elif role == "operator" and db_task.assigned_to == current_user.get("user_id"):
+        # Operators can only update their own progress
+        execution_fields = ["completed_quantity", "remarks", "status"]
         for key in execution_fields:
             if key in update_data:
                 setattr(db_task, key, update_data[key])

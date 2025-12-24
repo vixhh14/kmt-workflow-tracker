@@ -17,7 +17,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 # --------------------------
 # GET ALL USERS
 # --------------------------
-@router.get("/", response_model=list[UserOut])
+@router.get("", response_model=list[UserOut])
 def list_users(db: Session = Depends(get_db)):
     users = db.query(User).filter(User.is_deleted == False).all()
     return [
@@ -37,7 +37,7 @@ def list_users(db: Session = Depends(get_db)):
 # --------------------------
 # CREATE USER
 # --------------------------
-@router.post("/", response_model=UserOut)
+@router.post("", response_model=UserOut)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     # Check if username exists
     if db.query(User).filter(User.username == user.username).first():

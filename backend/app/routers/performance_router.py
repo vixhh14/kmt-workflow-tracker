@@ -13,7 +13,7 @@ router = APIRouter(
     dependencies=[Depends(get_current_active_admin)]
 )
 
-@router.get("/")
+@router.get("")
 async def get_monthly_performance(
     user_id: str,
     year: int,
