@@ -32,6 +32,7 @@ const OperationalDashboard = ({ type }) => {
     const accentText = isFileMaster ? 'text-blue-600' : 'text-orange-600';
 
     const [tasks, setTasks] = useState([]);
+    const [operators, setOperators] = useState([]);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
         pending: 0,
@@ -41,18 +42,33 @@ const OperationalDashboard = ({ type }) => {
         completedQty: 0
     });
 
+    // Masters can assign tasks
+    const canAssign = currentUser?.role === 'admin' ||
+        (type === 'filing' && (currentUser?.role === 'file_master' || currentUser?.role === 'FILE_MASTER')) ||
+        (type === 'fabrication' && (currentUser?.role === 'fab_master' || currentUser?.role === 'FAB_MASTER'));
+
     useEffect(() => {
         fetchTasks();
+        if (canAssign) fetchOperators();
         const interval = setInterval(fetchTasks, 15000);
         return () => clearInterval(interval);
     }, [type]);
+
+    const fetchOperators = async () => {
+        try {
+            const { getUsers } = await import('../../api/services');
+            const res = await getUsers();
+            setOperators(res.data.filter(u => u.role === 'operator'));
+        } catch (e) {
+            console.error('Failed to fetch operators:', e);
+        }
+    }
 
     const fetchTasks = async () => {
         try {
             const res = await getOperationalTasks(type);
             const data = res.data || [];
 
-            // Filter by assigned user
             // Admin and Masters see all tasks of the given type
             // Operators see only their assigned tasks or unassigned ones
             const canSeeAll = currentUser?.role === 'admin' ||
@@ -61,15 +77,16 @@ const OperationalDashboard = ({ type }) => {
 
             const filteredData = canSeeAll
                 ? data
-                : data.filter(t => t.assigned_to === currentUser?.user_id || t.assigned_to === null);
+                : data.filter(t => t.assigned_to === currentUser?.user_id || t.assigned_to === null || t.assigned_to === '');
 
             setTasks(filteredData);
 
             // Calculate stats
             const newStats = filteredData.reduce((acc, t) => {
-                acc[t.status.toLowerCase().replace(' ', '')] = (acc[t.status.toLowerCase().replace(' ', '')] || 0) + 1;
-                acc.totalQty += t.quantity;
-                acc.completedQty += t.completed_quantity;
+                const status = (t.status || 'pending').toLowerCase().replace(/\s/g, '');
+                acc[status] = (acc[status] || 0) + 1;
+                acc.totalQty += (t.quantity || 0);
+                acc.completedQty += (t.completed_quantity || 0);
                 return acc;
             }, { pending: 0, inprogress: 0, completed: 0, totalQty: 0, completedQty: 0 });
 
@@ -87,6 +104,16 @@ const OperationalDashboard = ({ type }) => {
         }
     };
 
+    const handleAssignTask = async (taskId, userId) => {
+        try {
+            await updateOperationalTask(type, taskId, { assigned_to: userId });
+            fetchTasks();
+        } catch (error) {
+            console.error('Failed to assign task:', error);
+            alert(error.response?.data?.detail || 'Failed to assign task');
+        }
+    };
+
     const handleUpdateQuantity = async (task, delta) => {
         try {
             const newQty = Math.max(0, Math.min(task.quantity, task.completed_quantity + delta));
@@ -96,6 +123,7 @@ const OperationalDashboard = ({ type }) => {
             fetchTasks();
         } catch (error) {
             console.error('Failed to update quantity:', error);
+            alert(error.response?.data?.detail || 'Failed to update quantity');
         }
     };
 
@@ -206,16 +234,56 @@ const OperationalDashboard = ({ type }) => {
                                                 <span>Due: <span className="font-bold text-red-600">{task.due_date || 'ASAP'}</span></span>
                                             </div>
                                         </div>
-                                        {task.remarks && (
-                                            <div className="mt-3 bg-gray-50 border border-gray-100 rounded-lg p-2 flex items-start">
-                                                <MessageSquare size={14} className="mr-2 text-gray-400 mt-1 shrink-0" />
-                                                <p className="text-xs text-gray-600 italic">"{task.remarks}"</p>
+
+                                        {/* Assignee / Master Actions */}
+                                        <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                                            <div className="flex-1">
+                                                <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Notes / Remarks</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Add notes..."
+                                                    defaultValue={task.remarks || ''}
+                                                    onBlur={(e) => {
+                                                        if (e.target.value !== task.remarks) {
+                                                            updateOperationalTask(type, task.id, { remarks: e.target.value })
+                                                                .then(() => fetchTasks());
+                                                        }
+                                                    }}
+                                                    className="w-full text-xs border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500"
+                                                />
                                             </div>
-                                        )}
+
+                                            {canAssign && (
+                                                <div className="sm:w-48">
+                                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Assign To</label>
+                                                    <select
+                                                        value={task.assigned_to || ''}
+                                                        onChange={(e) => handleAssignTask(task.id, e.target.value)}
+                                                        className="w-full text-xs border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 py-1.5"
+                                                    >
+                                                        <option value="">Unassigned</option>
+                                                        {operators.map(op => (
+                                                            <option key={op.id || op.user_id} value={op.user_id}>
+                                                                {op.full_name || op.username}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
+
+                                            {!canAssign && task.assignee_name && (
+                                                <div className="sm:w-48">
+                                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Assigned To</label>
+                                                    <div className="text-xs font-semibold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+                                                        {task.assignee_name}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {/* Task Execution / Progress */}
-                                    <div className="flex flex-col sm:flex-row items-center gap-6 shrink-0 lg:w-[400px]">
+                                    <div className="flex flex-col sm:flex-row items-center gap-6 shrink-0 lg:w-[350px]">
                                         <div className="w-full flex-1">
                                             <div className="flex items-center justify-between mb-2">
                                                 <span className="text-xs font-bold text-gray-500 uppercase tracking-tighter">Production Completion</span>
