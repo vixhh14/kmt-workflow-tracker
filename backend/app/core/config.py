@@ -23,7 +23,8 @@ default_origins = [
     "http://127.0.0.1:5174",
     # Production Vercel URLs
     "https://kmt-workflow-tracker.vercel.app",
-    "https://kmt-workflow-tracker2.vercel.app", # Potential variant
+    "https://kmt-workflow-tracker2.vercel.app",
+    "https://kmt-backend.onrender.com",
     # Vercel preview/staging URLs
     "https://kmt-workflow-tracker-qayt.vercel.app",
     "https://kmt-workflow-tracker-qayt-l7ytc60vt.vercel.app",
