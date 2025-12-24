@@ -127,14 +127,26 @@ const Users = () => {
         setRoleFilter('all');
     };
 
+    const ROLE_LABELS = {
+        'admin': 'Admin',
+        'supervisor': 'Supervisor',
+        'planning': 'Planning Dept',
+        'operator': 'Operator',
+        'FILE_MASTER': 'File Master',
+        'FAB_MASTER': 'Fab Master'
+    };
+
     const getRoleBadgeColor = (role) => {
-        switch (role) {
+        const lowerRole = (role || '').toLowerCase();
+        switch (lowerRole) {
             case 'admin': return 'bg-red-100 text-red-800';
             case 'supervisor': return 'bg-yellow-100 text-yellow-800';
             case 'operator': return 'bg-green-100 text-green-800';
             case 'planning': return 'bg-blue-100 text-blue-800';
-            case 'file_master': return 'bg-indigo-100 text-indigo-800';
-            case 'fab_master': return 'bg-orange-100 text-orange-800';
+            case 'file_master':
+            case 'FILE_MASTER': return 'bg-indigo-100 text-indigo-800';
+            case 'fab_master':
+            case 'FAB_MASTER': return 'bg-orange-100 text-orange-800';
             default: return 'bg-gray-100 text-gray-800';
         }
     };
@@ -187,13 +199,9 @@ const Users = () => {
                             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
                             <option value="all">All Roles</option>
-                            <option value="admin">Admin</option>
-                            <option value="supervisor">Supervisor</option>
-                            <option value="operator">Operator</option>
-                            <option value="planning">Planning</option>
-                            <option value="file_master">File Master</option>
-                            <option value="fab_master">Fab Master</option>
-                            <option value="user">User</option>
+                            {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                                <option key={value} value={value}>{label}</option>
+                            ))}
                         </select>
                     </div>
                 </div>
@@ -270,13 +278,9 @@ const Users = () => {
                                     onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 >
-                                    <option value="user">User</option>
-                                    <option value="admin">Admin</option>
-                                    <option value="operator">Operator</option>
-                                    <option value="supervisor">Supervisor</option>
-                                    <option value="planning">Planning Dept</option>
-                                    <option value="file_master">FILE_MASTER</option>
-                                    <option value="fab_master">FAB_MASTER</option>
+                                    {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                                        <option key={value} value={value}>{label}</option>
+                                    ))}
                                 </select>
                             </div>
 
@@ -367,8 +371,8 @@ const Users = () => {
                                 </div>
                                 <div>
                                     <h3 className="font-semibold text-gray-900">{user.username}</h3>
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getRoleBadgeColor(user.role)}`}>
-                                        {user.role}
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${getRoleBadgeColor(user.role)}`}>
+                                        {ROLE_LABELS[user.role] || ROLE_LABELS[user.role?.toLowerCase()] || user.role}
                                     </span>
                                 </div>
                             </div>

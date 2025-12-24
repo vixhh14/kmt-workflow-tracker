@@ -2,6 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { getPendingUsers, getUnits, approveUser, rejectUser } from '../../api/services';
 import { Check, X, UserCheck, AlertCircle, Briefcase, User } from 'lucide-react';
 
+const ROLE_LABELS = {
+    'admin': 'Admin',
+    'supervisor': 'Supervisor',
+    'planning': 'Planning',
+    'operator': 'Operator',
+    'FILE_MASTER': 'File Master',
+    'FAB_MASTER': 'Fab Master'
+};
+
 const UserApprovals = () => {
     const [users, setUsers] = useState([]);
     const [units, setUnits] = useState([]);
@@ -200,10 +209,9 @@ const UserApprovals = () => {
                                                     onChange={(e) => handleRoleChange(user.username, e.target.value)}
                                                     className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 border p-1"
                                                 >
-                                                    <option value="operator">Operator</option>
-                                                    <option value="supervisor">Supervisor</option>
-                                                    <option value="planning">Planning</option>
-                                                    <option value="admin">Admin</option>
+                                                    {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                                                        <option key={value} value={value}>{label}</option>
+                                                    ))}
                                                 </select>
 
                                                 {user.machine_types && String(user.machine_types).length > 0 && (
