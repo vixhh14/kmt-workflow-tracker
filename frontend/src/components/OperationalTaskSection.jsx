@@ -7,7 +7,7 @@ import {
     getProjectsDropdown,
     getAssignableUsers
 } from '../api/services';
-import { Plus, Trash2, Edit2, CheckCircle, Clock, AlertCircle, User, MessageSquare, Hash, Calendar } from 'lucide-react';
+import { Plus, Trash2, Edit2, CheckCircle, Clock, AlertCircle, User, MessageSquare, Hash, Calendar, Play, Pause, Square, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const OperationalTaskSection = ({ type, machineId, machineName }) => {
@@ -116,15 +116,28 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
         }
     };
 
-    const handleUpdateProgress = async (task, increment) => {
+    const handleUpdateProgress = async (task, newValue) => {
         try {
-            const newQty = Math.max(0, Math.min(task.quantity, task.completed_quantity + increment));
+            const qty = parseInt(newValue);
+            if (isNaN(qty)) return;
+
+            const newQty = Math.max(0, Math.min(task.quantity, qty));
             if (newQty === task.completed_quantity) return;
 
             await updateOperationalTask(type, task.id, { completed_quantity: newQty });
             fetchData();
         } catch (error) {
             console.error('Failed to update progress:', error);
+        }
+    };
+
+    const handleUpdateStatus = async (taskId, newStatus) => {
+        try {
+            await updateOperationalTask(type, taskId, { status: newStatus });
+            fetchData();
+        } catch (error) {
+            console.error('Failed to update status:', error);
+            alert(error.response?.data?.detail || 'Failed to update status');
         }
     };
 
@@ -343,24 +356,68 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
                                     </td>
                                     <td className="px-3 py-2">
                                         <div className="flex flex-col items-center">
-                                            <div className="text-xs font-bold">{task.completed_quantity} / {task.quantity}</div>
-                                            <div className="w-16 h-1 bg-gray-100 rounded-full mt-1 overflow-hidden">
+                                            <div className="flex items-center space-x-1 mb-1">
+                                                <input
+                                                    type="number"
+                                                    value={task.completed_quantity}
+                                                    onChange={(e) => handleUpdateProgress(task, e.target.value)}
+                                                    className="w-12 text-center text-xs font-bold border rounded p-0.5 focus:ring-1 focus:ring-blue-500"
+                                                    min="0"
+                                                    max={task.quantity}
+                                                />
+                                                <span className="text-xs text-gray-400">/ {task.quantity}</span>
+                                            </div>
+                                            <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden border">
                                                 <div
                                                     className="h-full bg-green-500 transition-all"
                                                     style={{ width: `${(task.completed_quantity / task.quantity) * 100}%` }}
                                                 />
                                             </div>
+                                            {task.completed_at && (
+                                                <span className="text-[8px] text-gray-400 mt-0.5 whitespace-nowrap">
+                                                    End: {new Date(task.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            )}
                                         </div>
                                     </td>
                                     <td className="px-3 py-2 text-center">
-                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${getStatusColor(task.status)}`}>
-                                            {task.status}
-                                        </span>
+                                        <div className="flex flex-col items-center gap-1">
+                                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${getStatusColor(task.status)}`}>
+                                                {task.status}
+                                            </span>
+                                            {/* Minimal Quick Status Controls for Admin */}
+                                            {isAdmin && (
+                                                <div className="flex items-center gap-1">
+                                                    {(task.status === 'Pending' || task.status === 'On Hold') && (
+                                                        <button onClick={() => handleUpdateStatus(task.id, 'In Progress')} className="p-0.5 text-green-600 hover:bg-green-50 rounded">
+                                                            <Play size={10} fill="currentColor" />
+                                                        </button>
+                                                    )}
+                                                    {task.status === 'In Progress' && (
+                                                        <>
+                                                            <button onClick={() => handleUpdateStatus(task.id, 'On Hold')} className="p-0.5 text-orange-600 hover:bg-orange-50 rounded">
+                                                                <Pause size={10} fill="currentColor" />
+                                                            </button>
+                                                            <button onClick={() => handleUpdateStatus(task.id, 'Completed')} className="p-0.5 text-blue-600 hover:bg-blue-50 rounded">
+                                                                <Square size={10} fill="currentColor" />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-3 py-2">
-                                        <div className="flex items-center space-x-1 text-xs text-gray-600">
-                                            <User size={12} className="text-gray-400" />
-                                            <span>{task.assignee_name || 'Unassigned'}</span>
+                                        <div className="flex flex-col">
+                                            <div className="flex items-center space-x-1 text-xs text-gray-600">
+                                                <User size={12} className="text-gray-400" />
+                                                <span className="truncate max-w-[80px]">{task.assignee_name || 'Unassigned'}</span>
+                                            </div>
+                                            {task.total_active_duration > 0 && (
+                                                <span className="text-[9px] text-gray-400 font-medium">
+                                                    ⏱ {Math.floor(task.total_active_duration / 60)}m {task.total_active_duration % 60}s
+                                                </span>
+                                            )}
                                         </div>
                                     </td>
                                     <td className="px-3 py-2 text-right">
