@@ -34,6 +34,7 @@ const OperationalDashboard = ({ type }) => {
     const [tasks, setTasks] = useState([]);
     const [operators, setOperators] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [stats, setStats] = useState({
         pending: 0,
         inProgress: 0,
@@ -61,8 +62,10 @@ const OperationalDashboard = ({ type }) => {
         try {
             const res = await getProjects();
             setProjects(res.data || []);
+            setError(null);
         } catch (e) {
             console.error('Failed to fetch projects:', e);
+            if (!e.response) setError('Connection Error: Could not load projects.');
         }
     };
 
@@ -112,14 +115,14 @@ const OperationalDashboard = ({ type }) => {
                 totalQty: newStats.totalQty,
                 completedQty: newStats.completedQty
             });
+            setError(null);
         } catch (error) {
             console.error('Failed to fetch tasks:', error);
-            const errorMsg = error.response?.data?.detail || error.message;
-            if (!error.response) {
-                alert('Connection Error: Failed to connect to backend server. Please check CORS settings.');
-            } else {
-                alert(`Fetch Error: ${errorMsg}`);
-            }
+            const isNetworkError = !error.response;
+            const message = isNetworkError
+                ? `Connection Error: Failed to reach backend. Please check your internet or server status.`
+                : (error.response?.data?.detail || "Failed to load dashboard data");
+            setError(message);
         } finally {
             setLoading(false);
         }
@@ -220,6 +223,21 @@ const OperationalDashboard = ({ type }) => {
                     color="bg-indigo-500"
                 />
             </div>
+
+            {error && (
+                <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center">
+                        <AlertCircle className="text-red-500 mr-3" size={20} />
+                        <p className="text-sm text-red-700 font-medium">{error}</p>
+                    </div>
+                    <button
+                        onClick={() => { setError(null); fetchTasks(); fetchProjects(); }}
+                        className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200 font-bold"
+                    >
+                        RETRY
+                    </button>
+                </div>
+            )}
 
             {/* Tasks Section */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
