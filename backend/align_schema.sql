@@ -19,6 +19,23 @@ BEGIN
         ALTER TABLE filing_tasks ADD COLUMN assigned_by VARCHAR;
     END IF;
 
+    -- Add timestamp and duration columns
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='filing_tasks' AND column_name='started_at') THEN
+        ALTER TABLE filing_tasks ADD COLUMN started_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='filing_tasks' AND column_name='on_hold_at') THEN
+        ALTER TABLE filing_tasks ADD COLUMN on_hold_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='filing_tasks' AND column_name='resumed_at') THEN
+        ALTER TABLE filing_tasks ADD COLUMN resumed_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='filing_tasks' AND column_name='completed_at') THEN
+        ALTER TABLE filing_tasks ADD COLUMN completed_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='filing_tasks' AND column_name='total_active_duration') THEN
+        ALTER TABLE filing_tasks ADD COLUMN total_active_duration INTEGER DEFAULT 0;
+    END IF;
+
     -- Ensure quality constraints
     ALTER TABLE filing_tasks ALTER COLUMN quantity SET DEFAULT 1;
     ALTER TABLE filing_tasks ALTER COLUMN status SET DEFAULT 'Pending';
@@ -40,6 +57,23 @@ BEGIN
     -- Add assigned_by to track creator
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='fabrication_tasks' AND column_name='assigned_by') THEN
         ALTER TABLE fabrication_tasks ADD COLUMN assigned_by VARCHAR;
+    END IF;
+
+    -- Add timestamp and duration columns
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='fabrication_tasks' AND column_name='started_at') THEN
+        ALTER TABLE fabrication_tasks ADD COLUMN started_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='fabrication_tasks' AND column_name='on_hold_at') THEN
+        ALTER TABLE fabrication_tasks ADD COLUMN on_hold_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='fabrication_tasks' AND column_name='resumed_at') THEN
+        ALTER TABLE fabrication_tasks ADD COLUMN resumed_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='fabrication_tasks' AND column_name='completed_at') THEN
+        ALTER TABLE fabrication_tasks ADD COLUMN completed_at TIMESTAMPTZ;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='fabrication_tasks' AND column_name='total_active_duration') THEN
+        ALTER TABLE fabrication_tasks ADD COLUMN total_active_duration INTEGER DEFAULT 0;
     END IF;
 
     -- Ensure quality constraints

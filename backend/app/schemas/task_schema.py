@@ -85,6 +85,11 @@ class OperationalTaskUpdate(BaseModel):
     quantity: Optional[int] = None
     due_date: Optional[date] = None
     priority: Optional[str] = None
+    started_at: Optional[datetime] = None
+    on_hold_at: Optional[datetime] = None
+    resumed_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    total_active_duration: Optional[int] = None
 
 class OperationalTaskOut(OperationalTaskBase):
     id: int
@@ -95,5 +100,10 @@ class OperationalTaskOut(OperationalTaskBase):
     project_name: Optional[str] = None
     machine_name: Optional[str] = None
     assignee_name: Optional[str] = None
+    started_at: Optional[datetime] = None
+    on_hold_at: Optional[datetime] = None
+    resumed_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    total_active_duration: int = 0
 
     model_config = ConfigDict(from_attributes=True)
