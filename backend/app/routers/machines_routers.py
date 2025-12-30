@@ -55,7 +55,11 @@ async def read_machines(
 # CREATE MACHINE
 # ----------------------------------------------------------------------
 @router.post("", response_model=dict)
-async def create_machine(machine: MachineCreate, db: Session = Depends(get_db)):
+async def create_machine(
+    machine: MachineCreate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     # Use provided location (Machine ID) as the primary key ID if provided, else UUID
     machine_id = machine.location if machine.location else str(uuid.uuid4())
     
@@ -97,7 +101,12 @@ async def create_machine(machine: MachineCreate, db: Session = Depends(get_db)):
 # UPDATE MACHINE
 # ----------------------------------------------------------------------
 @router.put("/{machine_id}", response_model=dict)
-async def update_machine(machine_id: str, machine_update: MachineUpdate, db: Session = Depends(get_db)):
+async def update_machine(
+    machine_id: str, 
+    machine_update: MachineUpdate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     db_machine = db.query(Machine).filter(Machine.id == machine_id).first()
     if not db_machine:
         raise HTTPException(status_code=404, detail="Machine not found")
@@ -135,7 +144,11 @@ async def update_machine(machine_id: str, machine_update: MachineUpdate, db: Ses
 # DELETE MACHINE
 # ----------------------------------------------------------------------
 @router.delete("/{machine_id}")
-async def delete_machine(machine_id: str, db: Session = Depends(get_db)):
+async def delete_machine(
+    machine_id: str, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     from sqlalchemy.exc import IntegrityError
     
     db_machine = db.query(Machine).filter(Machine.id == machine_id).first()
@@ -157,7 +170,10 @@ async def delete_machine(machine_id: str, db: Session = Depends(get_db)):
 # SEED MACHINES (One-time endpoint to populate database)
 # ----------------------------------------------------------------------
 @router.post("/seed", response_model=dict)
-async def seed_machines(db: Session = Depends(get_db)):
+async def seed_machines(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
     One-time endpoint to seed the database with machines, units, and categories.
     Call this once after deployment to populate the machine master list.

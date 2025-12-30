@@ -153,7 +153,7 @@ async def update_operational_task(
     task_id: int, 
     task_update: OperationalTaskUpdate, 
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     model = get_model(task_type)
     db_task = db.query(model).filter(model.id == task_id).first()

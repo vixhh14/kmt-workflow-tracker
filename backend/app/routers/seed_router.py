@@ -161,7 +161,7 @@ def get_or_create_category(db: Session, category_name: str) -> MachineCategory:
 @router.post("/machines")
 async def seed_machines(
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Seed the database with production machines.
@@ -169,7 +169,7 @@ async def seed_machines(
     Admin only endpoint.
     """
     # Check if user is admin
-    if current_user.get("role") != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admin can seed machines")
     
     try:
