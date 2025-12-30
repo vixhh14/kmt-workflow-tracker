@@ -6,9 +6,50 @@ from sqlalchemy.orm import sessionmaker
 from app.core.database import engine
 from app.core.time_utils import get_current_time_ist
 
+def sync_schema():
+    """Manually sync schema changes that create_all might skip (like new columns)"""
+    from sqlalchemy import text
+    from sqlalchemy.orm import sessionmaker
+    from app.core.database import engine
+
+    SessionLocal = sessionmaker(bind=engine)
+    session = SessionLocal()
+    
+    try:
+        tables = ["filing_tasks", "fabrication_tasks"]
+        new_cols = [
+            ("started_at", "TIMESTAMPTZ"),
+            ("on_hold_at", "TIMESTAMPTZ"),
+            ("resumed_at", "TIMESTAMPTZ"),
+            ("completed_at", "TIMESTAMPTZ"),
+            ("total_active_duration", "INTEGER DEFAULT 0")
+        ]
+        
+        for table in tables:
+            for col_name, col_type in new_cols:
+                try:
+                    # Check if column exists
+                    query = text(f"SELECT column_name FROM information_schema.columns WHERE table_name='{table}' AND column_name='{col_name}'")
+                    exists = session.execute(query).fetchone()
+                    
+                    if not exists:
+                        print(f"🛠 Adding column {col_name} to {table}...")
+                        session.execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"))
+                        session.commit()
+                except Exception as col_err:
+                    print(f"⚠️ Could not add {col_name} to {table}: {col_err}")
+                    session.rollback()
+    except Exception as e:
+        print(f"❌ sync_schema error: {e}")
+    finally:
+        session.close()
+
 def init_db_data():
     print(f"Initializing database data...")
     
+    # 1. Sync Schema (Add missing columns if any)
+    sync_schema()
+
     # Connect to the ACTIVE database
     SessionLocal = sessionmaker(bind=engine)
     session = SessionLocal()
