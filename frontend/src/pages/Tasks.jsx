@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getTasks, createTask, deleteTask, getMachines, getUsers, updateTask, getProjects, endTask } from '../api/services';
+import { getTasks, createTask, deleteTask, getMachines, getUsers, updateTask, getProjects, endTask, getProjectsDropdown, getMachinesDropdown, getAssignableUsers } from '../api/services';
 import { Plus, Trash2, CheckSquare, Search, Filter, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Clock, Square } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Subtask from '../components/Subtask';
@@ -44,6 +44,7 @@ const Tasks = () => {
     const [users, setUsers] = useState([]);
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [apiError, setApiError] = useState(null);
     const [showForm, setShowForm] = useState(false);
     const [expandedTaskId, setExpandedTaskId] = useState(null);
 
@@ -91,18 +92,10 @@ const Tasks = () => {
 
             const [tasksRes, machinesRes, usersRes, projectsRes] = await Promise.all([
                 getTasks(),
-                getMachines(),
-                getUsers(),
-                getProjects()
+                getMachinesDropdown(),
+                getAssignableUsers(),
+                getProjectsDropdown()
             ]);
-
-            // log stats
-            console.log('📊 Tasks Dashboard Data Loaded:', {
-                tasks: tasksRes?.data?.length || 0,
-                machines: machinesRes?.data?.length || 0,
-                users: usersRes?.data?.length || 0,
-                projects: projectsRes?.data?.length || 0
-            });
 
             // Ensure data is always an array
             const tasksData = Array.isArray(tasksRes?.data) ? tasksRes.data : [];
@@ -127,12 +120,11 @@ const Tasks = () => {
 
             // Handle errors
             if (!error.response) {
-                console.error('🚨 Network/CORS Error - Server unreachable');
+                setApiError('Network or CORS Error: Server unreachable');
             } else if (error.response.status === 401) {
-                console.warn('🔒 Unauthorized - Redirecting...');
-                // axios interceptor handles redirect
+                setApiError('Authentication Error: Please login again');
             } else {
-                alert(`Data Fetch Error: ${error.response.status} - ${errorMsg}`);
+                setApiError(`API Error (${error.response.status}): ${errorMsg}`);
             }
         } finally {
             setLoading(false);
@@ -559,15 +551,15 @@ const Tasks = () => {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Project *</label>
                                 <select
                                     required
-                                    value={formData.project_id || ''}
+                                    value={formData.project_id}
                                     onChange={(e) => {
                                         const pId = e.target.value;
-                                        const selectedProject = projects.find(p => String(p.project_id) === String(pId));
-                                        console.log('Project selected:', { id: pId, name: selectedProject?.project_name });
+                                        const selectedProject = projects.find(p => String(p.id) === String(pId));
+                                        console.log('Project selected:', { id: pId, name: selectedProject?.name });
                                         setFormData({
                                             ...formData,
                                             project_id: pId ? parseInt(pId) : '',
-                                            project: selectedProject ? selectedProject.project_name : ''
+                                            project: selectedProject ? selectedProject.name : ''
                                         });
                                     }}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm"
@@ -575,14 +567,16 @@ const Tasks = () => {
                                 >
                                     <option value="">{loading ? 'Loading projects...' : 'Select Project'}</option>
                                     {projects.map((p) => (
-                                        <option key={p.project_id} value={p.project_id}>
-                                            {p.project_name} {p.project_code ? `(${p.project_code})` : ''}
+                                        <option key={p.id} value={p.id}>
+                                            {p.name}
                                         </option>
                                     ))}
                                 </select>
-                                {!loading && projects.length === 0 && (
+                                {apiError ? (
+                                    <p className="text-xs text-red-600 mt-1 font-bold">🚫 {apiError}</p>
+                                ) : (!loading && projects.length === 0 && (
                                     <p className="text-xs text-red-600 mt-1">⚠️ No projects available. Please add projects first.</p>
-                                )}
+                                ))}
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Part / Item *</label>
@@ -633,9 +627,11 @@ const Tasks = () => {
                                         </option>
                                     ))}
                                 </select>
-                                {machines.length === 0 && !loading && (
+                                {apiError ? (
+                                    <p className="text-xs text-red-600 mt-1 font-bold">🚫 {apiError}</p>
+                                ) : (machines.length === 0 && !loading && (
                                     <p className="text-xs text-red-600 mt-1">⚠️ No machines available. Please add machines in the Machines page.</p>
-                                )}
+                                ))}
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Assign To *</label>
@@ -646,15 +642,17 @@ const Tasks = () => {
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 >
                                     <option value="">{loading ? 'Loading users...' : 'Select User'}</option>
-                                    {users.filter(u => u?.role !== 'admin').map((user) => (
+                                    {users.map((user) => (
                                         <option key={user?.user_id} value={user?.user_id}>
-                                            {user?.full_name || user?.username || 'Unknown User'} ({user?.role})
+                                            {user?.full_name || user?.username} ({user?.role})
                                         </option>
                                     ))}
                                 </select>
-                                {!loading && users.filter(u => u?.role !== 'admin').length === 0 && (
+                                {apiError ? (
+                                    <p className="text-xs text-red-600 mt-1 font-bold">🚫 {apiError}</p>
+                                ) : (!loading && users.length === 0 && (
                                     <p className="text-xs text-red-600 mt-1">⚠️ No available users to assign.</p>
-                                )}
+                                ))}
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Assigned By *</label>

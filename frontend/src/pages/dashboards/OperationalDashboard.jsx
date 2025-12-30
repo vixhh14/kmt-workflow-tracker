@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getOperationalTasks, updateOperationalTask } from '../../api/services';
+import { getOperationalTasks, updateOperationalTask, getAssignableUsers } from '../../api/services';
 import {
     Plus, CheckCircle, Clock, AlertCircle, TrendingUp, ListTodo,
     Target, User, Hash, MessageSquare, Calendar, ChevronRight,
@@ -56,8 +56,7 @@ const OperationalDashboard = ({ type }) => {
 
     const fetchOperators = async () => {
         try {
-            const { getUsers } = await import('../../api/services');
-            const res = await getUsers();
+            const res = await getAssignableUsers();
             setOperators(res.data.filter(u => u.role === 'operator'));
         } catch (e) {
             console.error('Failed to fetch operators:', e);
