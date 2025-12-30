@@ -307,14 +307,14 @@ const OperationalDashboard = ({ type }) => {
                                         <div className="flex items-center gap-2">
                                             <button
                                                 onClick={() => handleUpdateQuantity(task, -1)}
-                                                disabled={task.completed_quantity === 0 || (!canAssign && task.assigned_to !== currentUser?.user_id)}
+                                                disabled={task.completed_quantity === 0 || !canAssign}
                                                 className="p-2 rounded-xl border border-gray-200 hover:border-red-500 hover:text-red-500 transition-all bg-white shadow-sm disabled:opacity-30 disabled:hover:border-gray-200 disabled:hover:text-gray-400"
                                             >
                                                 <ArrowDownCircle size={20} />
                                             </button>
                                             <button
                                                 onClick={() => handleUpdateQuantity(task, 1)}
-                                                disabled={task.completed_quantity >= task.quantity || (!canAssign && task.assigned_to !== currentUser?.user_id)}
+                                                disabled={task.completed_quantity >= task.quantity || !canAssign}
                                                 className={`p-3 rounded-2xl ${accentBg} text-white shadow-md hover:scale-105 active:scale-95 transition-all disabled:opacity-30 disabled:hover:scale-100`}
                                             >
                                                 <ArrowUpCircle size={24} />

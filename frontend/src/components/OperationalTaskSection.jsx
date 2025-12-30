@@ -161,14 +161,15 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
             </div>
 
             {showForm && (
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 animate-fade-in">
-                    <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="sm:col-span-2">
-                            <label className="block text-[10px] font-bold text-gray-500 uppercase">Project & Work Order *</label>
-                            <div className="flex flex-wrap gap-2">
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 animate-fade-in shadow-inner">
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* Project Field */}
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Project *</label>
                                 <select
                                     required
-                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all bg-gray-50/50"
+                                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white"
                                     value={formData.project_id || ''}
                                     onChange={e => {
                                         const pId = e.target.value;
@@ -187,95 +188,125 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
                                         <option disabled>No projects available</option>
                                     )}
                                 </select>
+                            </div>
+
+                            {/* Work Order Field */}
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Work Order Number *</label>
                                 <input
                                     required
-                                    placeholder="Work Order #"
-                                    className="flex-1 min-w-[120px] text-sm border rounded p-1.5"
+                                    placeholder="Enter Work Order #"
+                                    className="w-full text-sm border rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
                                     value={formData.work_order_number}
                                     onChange={e => setFormData({ ...formData, work_order_number: e.target.value })}
                                 />
+                            </div>
+
+                            {/* Part / Item Field */}
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Part / Item *</label>
                                 <input
                                     required
-                                    placeholder="Part / Item"
-                                    className="flex-1 min-w-[150px] text-sm border rounded p-1.5"
+                                    placeholder="Enter Part or Item Name"
+                                    className="w-full text-sm border rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
                                     value={formData.part_item}
                                     onChange={e => setFormData({ ...formData, part_item: e.target.value })}
                                 />
                             </div>
+
+                            {/* Quantity Field */}
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Quantity *</label>
+                                <input
+                                    type="number"
+                                    required
+                                    min="1"
+                                    className="w-full text-sm border rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                                    value={formData.quantity}
+                                    onChange={e => setFormData({ ...formData, quantity: e.target.value })}
+                                />
+                            </div>
+
+                            {/* Due Date Field */}
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Due Date *</label>
+                                <input
+                                    type="date"
+                                    required
+                                    className="w-full text-sm border rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                                    value={formData.due_date}
+                                    onChange={e => setFormData({ ...formData, due_date: e.target.value })}
+                                />
+                            </div>
+
+                            {/* Priority Field */}
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Priority *</label>
+                                <select
+                                    required
+                                    className="w-full text-sm border rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                                    value={formData.priority}
+                                    onChange={e => setFormData({ ...formData, priority: e.target.value })}
+                                >
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                    <option value="urgent">Urgent</option>
+                                </select>
+                            </div>
+
+                            {/* Assign To (Only during edit) */}
+                            {editingTask && (
+                                <div className="sm:col-span-2">
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Assign To</label>
+                                    <select
+                                        className="w-full text-sm border rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                                        value={formData.assigned_to}
+                                        onChange={e => setFormData({ ...formData, assigned_to: e.target.value })}
+                                    >
+                                        <option value="">Auto-Assign Later</option>
+                                        {users.filter(u => {
+                                            const role = (u.role || '').toLowerCase();
+                                            const targetRole = type === 'filing' ? 'file_master' : 'fab_master';
+                                            return role === targetRole || role === 'operator';
+                                        }).map(u => (
+                                            <option key={u.id || u.user_id} value={u.id || u.user_id}>{u.name || u.full_name || u.username}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            {/* Remarks Field */}
+                            <div className="sm:col-span-2">
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Remarks</label>
+                                <textarea
+                                    className="w-full text-sm border rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                                    rows="2"
+                                    value={formData.remarks}
+                                    onChange={e => setFormData({ ...formData, remarks: e.target.value })}
+                                    placeholder="Add any additional instructions..."
+                                />
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-gray-500 uppercase">Quantity *</label>
-                            <input
-                                type="number"
-                                required
-                                min="1"
-                                className="w-full text-sm border rounded p-1.5"
-                                value={formData.quantity}
-                                onChange={e => setFormData({ ...formData, quantity: e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-gray-500 uppercase">Due Date *</label>
-                            <input
-                                type="date"
-                                required
-                                className="w-full text-sm border rounded p-1.5"
-                                value={formData.due_date}
-                                onChange={e => setFormData({ ...formData, due_date: e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-gray-500 uppercase">Priority</label>
-                            <select
-                                className="w-full text-sm border rounded p-1.5"
-                                value={formData.priority}
-                                onChange={e => setFormData({ ...formData, priority: e.target.value })}
-                            >
-                                <option value="low">Low</option>
-                                <option value="medium">Medium</option>
-                                <option value="high">High</option>
-                                <option value="urgent">Urgent</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-gray-500 uppercase">Assign To</label>
-                            <select
-                                className="w-full text-sm border rounded p-1.5"
-                                value={formData.assigned_to}
-                                onChange={e => setFormData({ ...formData, assigned_to: e.target.value })}
-                            >
-                                <option value="">Auto-Assign Later</option>
-                                {users.filter(u => {
-                                    const role = (u.role || '').toLowerCase();
-                                    const targetRole = type === 'filing' ? 'file_master' : 'fab_master';
-                                    return role === targetRole || role === 'operator';
-                                }).map(u => (
-                                    <option key={u.id || u.user_id} value={u.id || u.user_id}>{u.name || u.full_name || u.username}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="sm:col-span-2">
-                            <label className="block text-[10px] font-bold text-gray-500 uppercase">Remarks</label>
-                            <textarea
-                                className="w-full text-sm border rounded p-1.5"
-                                rows="2"
-                                value={formData.remarks}
-                                onChange={e => setFormData({ ...formData, remarks: e.target.value })}
-                            />
-                        </div>
-                        <div className="sm:col-span-2 flex justify-end space-x-2">
+
+                        {/* Form Actions */}
+                        <div className="flex justify-end space-x-3 pt-2">
                             <button
                                 type="button"
-                                onClick={() => setShowForm(false)}
-                                className="text-xs px-3 py-1.5 border rounded hover:bg-gray-100"
+                                onClick={() => {
+                                    setShowForm(false);
+                                    setEditingTask(null);
+                                }}
+                                className="px-4 py-2 border rounded-lg text-sm bg-white hover:bg-gray-50 transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
-                                className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold"
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-sm hover:bg-blue-700 transition-all flex items-center space-x-1"
                             >
-                                {editingTask ? 'Update Task' : 'Create Task'}
+                                <CheckCircle size={16} />
+                                <span>{editingTask ? 'Update Task' : 'Create Task'}</span>
                             </button>
                         </div>
                     </form>
