@@ -37,6 +37,7 @@ from app.routers import (
     operational_tasks_router,
 )
 import uvicorn
+from app.core.config import CORS_ORIGINS
 
 # Create FastAPI app with metadata
 app = FastAPI(
@@ -49,10 +50,7 @@ app = FastAPI(
 # CORS configuration - MUST be defined immediately after app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://kmt-workflow-tracker.vercel.app",
-        "http://localhost:5173",
-    ],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
