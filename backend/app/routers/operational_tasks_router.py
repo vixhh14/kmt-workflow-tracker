@@ -83,21 +83,13 @@ async def create_operational_task(
     if current_user.role not in ["admin", "planning"]:
         raise HTTPException(status_code=403, detail="Only Admin or Planning can create operational tasks")
         
-    # Manual Validation: machine_id is only optional for operational tasks if not general, 
-    # but since this router ONLY handles Filing/Fabrication, we follow the user requirement 
-    # to not require it at creation.
-    
-    # task_type validation
-    if task.task_type:
-        if task.task_type.lower() != task_type.lower():
-             raise HTTPException(status_code=400, detail="task_type mismatch between URL and payload")
-        if task.task_type.upper() not in ["FILING", "FABRICATION"]:
-             raise HTTPException(status_code=400, detail="task_type must be FILING or FABRICATION")
-
+    # Manual Validation: Only these 7 fields are mandatory/expected for Filing/Fabrication
+    if not task.project_id:
+        raise HTTPException(status_code=400, detail="project_id is required")
     if not task.work_order_number or not task.work_order_number.strip():
         raise HTTPException(status_code=400, detail="work_order_number is required")
     if not task.part_item or not task.part_item.strip():
-        raise HTTPException(status_code=400, detail="part_item (Project / Item) is required")
+        raise HTTPException(status_code=400, detail="part_item is required")
     if task.quantity is None or task.quantity <= 0:
         raise HTTPException(status_code=400, detail="quantity must be greater than 0")
     if not task.due_date:
@@ -106,43 +98,37 @@ async def create_operational_task(
     model = get_model(task_type)
     
     # Normalization & Defaults
-    task_data = task.dict()
-    
-    # FIX: Remove task_type before passing to model as it's not a column
-    task_data.pop("task_type", None)
-    
-    # Priority Normalization: LOW | MEDIUM | HIGH | URGENT
-    if task_data.get("priority"):
-        task_data["priority"] = task_data["priority"].upper()
-    else:
-        task_data["priority"] = "MEDIUM"
-
-    # Set assigned_by from current user token
-    task_data["assigned_by"] = current_user.user_id
+    # Pull ONLY the fields the user wants to avoid "extra field" issues
+    task_data = {
+        "project_id": task.project_id,
+        "work_order_number": task.work_order_number,
+        "part_item": task.part_item,
+        "quantity": task.quantity,
+        "due_date": task.due_date,
+        "priority": (task.priority or "MEDIUM").upper(),
+        "remarks": task.remarks,
+        "assigned_by": current_user.user_id,
+        "status": "Pending"
+    }
 
     # Automatic Assignment based on task_type
     if task_type.lower() == "filing":
-        task_data["assigned_to"] = "FILE_MASTER"
+        assigned_to_username = "FILE_MASTER"
     elif task_type.lower() == "fabrication":
-        task_data["assigned_to"] = "FAB_MASTER"
-
-    # Handle User Resolution (Username -> ID)
-    assigned_to = task_data.get("assigned_to")
-    if not assigned_to:
-        task_data["assigned_to"] = None
+        assigned_to_username = "FAB_MASTER"
     else:
-        # Support username -> user_id conversion
-        assignee = db.query(User).filter(User.user_id == assigned_to).first()
-        if not assignee:
-            assignee = db.query(User).filter(User.username == assigned_to).first()
-            if assignee:
-                task_data["assigned_to"] = assignee.user_id
-            else:
-                 # Fallback: if master user doesn't exist by username, log warning or raise error
-                 # For auto-assignment, we expect these users to exist.
-                 if assigned_to in ["FILE_MASTER", "FAB_MASTER"]:
-                     raise HTTPException(status_code=400, detail=f"Required Master User '{assigned_to}' not found in database. Please ensure it exists.")
-                 raise HTTPException(status_code=400, detail=f"Assigned user '{assigned_to}' does not exist")
+        assigned_to_username = None
+
+    if assigned_to_username:
+        # Resolve username to user_id
+        assignee = db.query(User).filter(User.username == assigned_to_username).first()
+        if assignee:
+            task_data["assigned_to"] = assignee.user_id
+        else:
+            # Fallback for masters: if they don't exist, we still create the task but warn (or just set to None)
+            # The UI expects these to exist.
+            print(f"Warning: Master user {assigned_to_username} not found for auto-assignment")
+            task_data["assigned_to"] = None
 
     try:
         new_task = model(**task_data)
