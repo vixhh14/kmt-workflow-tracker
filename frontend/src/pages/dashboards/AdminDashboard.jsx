@@ -383,7 +383,7 @@ const AdminDashboard = () => {
                         Total Tasks: {taskStats.total}
                     </span>
                 </div>
-                <div className="min-h-[300px] w-full">
+                <div className="h-[300px] w-full">
                     {chartData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>

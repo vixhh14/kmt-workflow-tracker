@@ -161,16 +161,15 @@ const Tasks = () => {
 
                 await createTask(payload);
             } else {
-                // Filing or Fabrication - Simplified Payload based on instructions
+                // Filing or Fabrication - Strictly 7 fields
                 const payload = {
                     project_id: parseInt(formData.project_id),
                     work_order_number: formData.work_order_number,
-                    part_item: formData.title || formData.part_item, // Map title to part_item
-                    quantity: parseInt(formData.nos_unit) || 1,      // Map nos_unit to quantity
+                    part_item: formData.part_item,
+                    quantity: parseInt(formData.nos_unit) || 1,
                     due_date: formData.due_date,
                     priority: formData.priority,
-                    remarks: formData.description,                   // Map description to remarks
-                    task_type: formData.category.toUpperCase()
+                    remarks: formData.description
                 };
 
                 await createOperationalTask(formData.category, payload);
@@ -525,27 +524,7 @@ const Tasks = () => {
                                     {formData.category === 'fabrication' && '🔸 specialized fabrication workflow'}
                                 </p>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Title / Part Name *</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.title}
-                                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Work Order Number</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.work_order_number}
-                                    onChange={(e) => setFormData({ ...formData, work_order_number: e.target.value })}
-                                    readOnly={currentUser?.role === 'supervisor'}
-                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${currentUser?.role === 'supervisor' ? 'bg-gray-100' : ''}`}
-                                />
-                            </div>
+                            {/* 1. Project */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Project *</label>
                                 <select
@@ -554,7 +533,6 @@ const Tasks = () => {
                                     onChange={(e) => {
                                         const pId = e.target.value;
                                         const selectedProject = projects.find(p => String(p.id) === String(pId));
-                                        console.log('Project selected:', { id: pId, name: selectedProject?.name });
                                         setFormData({
                                             ...formData,
                                             project_id: pId ? parseInt(pId) : '',
@@ -571,22 +549,47 @@ const Tasks = () => {
                                         </option>
                                     ))}
                                 </select>
-                                {apiError ? (
-                                    <p className="text-xs text-red-600 mt-1 font-bold">🚫 {apiError}</p>
-                                ) : (!loading && projects.length === 0 && (
-                                    <p className="text-xs text-red-600 mt-1">⚠️ No projects available. Please add projects first.</p>
-                                ))}
                             </div>
+
+                            {/* 2. Work Order Number */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Part / Item *</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Work Order Number *</label>
                                 <input
                                     type="text"
                                     required
-                                    value={formData.part_item}
-                                    onChange={(e) => setFormData({ ...formData, part_item: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    value={formData.work_order_number}
+                                    onChange={(e) => setFormData({ ...formData, work_order_number: e.target.value })}
+                                    readOnly={currentUser?.role === 'supervisor'}
+                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${currentUser?.role === 'supervisor' ? 'bg-gray-100' : ''}`}
                                 />
                             </div>
+
+                            {/* 3. Part / Item */}
+                            {formData.category === 'general' ? (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Title / Part Name *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={formData.title}
+                                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
+                            ) : (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Part / Item *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={formData.part_item}
+                                        onChange={(e) => setFormData({ ...formData, part_item: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
+                            )}
+
+                            {/* 4. Quantity */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     {formData.category === 'general' ? 'Nos / Unit *' : 'Quantity *'}
@@ -599,6 +602,34 @@ const Tasks = () => {
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                             </div>
+
+                            {/* 5. Due Date / Time & Duration (Mixed depending on category) */}
+                            <div className={`grid gap-2 ${formData.category === 'general' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Due Date *</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={formData.due_date}
+                                        onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
+                                {formData.category === 'general' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Expected Time *</label>
+                                        <input
+                                            type="time"
+                                            required
+                                            value={formData.due_time}
+                                            onChange={(e) => setFormData({ ...formData, due_time: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 6. Priority */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Priority *</label>
                                 <select
@@ -610,6 +641,7 @@ const Tasks = () => {
                                     <option value="low">Low</option>
                                     <option value="medium">Medium</option>
                                     <option value="high">High</option>
+                                    <option value="urgent">Urgent</option>
                                 </select>
                             </div>
                             {formData.category === 'general' && (
@@ -668,30 +700,6 @@ const Tasks = () => {
                                     </div>
                                 </>
                             )}
-                            <div className={`grid gap-2 ${formData.category === 'general' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Due Date *</label>
-                                    <input
-                                        type="date"
-                                        required
-                                        value={formData.due_date}
-                                        onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    />
-                                </div>
-                                {formData.category === 'general' && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Expected Time of Completion *</label>
-                                        <input
-                                            type="time"
-                                            required
-                                            value={formData.due_time}
-                                            onChange={(e) => setFormData({ ...formData, due_time: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        />
-                                    </div>
-                                )}
-                            </div>
                             {formData.category === 'general' && (
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Task Completion Duration (HH:MM) *</label>

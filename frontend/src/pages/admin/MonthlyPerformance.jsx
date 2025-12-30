@@ -176,7 +176,7 @@ const MonthlyPerformance = () => {
                     {/* Charts */}
                     <div className="bg-white p-6 rounded-lg shadow">
                         <h3 className="text-lg font-semibold mb-6">Daily Work Duration</h3>
-                        <div className="h-80 min-h-[320px]">
+                        <div className="h-[300px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={graphData}>
                                     <CartesianGrid strokeDasharray="3 3" />

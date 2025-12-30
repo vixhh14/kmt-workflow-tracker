@@ -71,11 +71,13 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
             }
 
             const payload = {
-                ...formData,
-                machine_id: machineId,
-                task_type: type.toUpperCase(),
+                project_id: parseInt(formData.project_id),
+                work_order_number: formData.work_order_number,
+                part_item: formData.part_item,
                 quantity: parseInt(formData.quantity),
-                project_id: parseInt(formData.project_id)
+                due_date: formData.due_date,
+                priority: formData.priority,
+                remarks: formData.remarks
             };
 
             if (editingTask) {
