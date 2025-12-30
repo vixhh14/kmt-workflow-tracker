@@ -135,12 +135,15 @@ const Tasks = () => {
             setProjects(projectsData);
         } catch (error) {
             console.error('❌ Failed to fetch data:', error);
-            console.error('Error details:', error.response?.data || error.message);
-            // Set empty arrays on error to prevent crashes
-            setTasks([]);
-            setMachines([]);
-            setUsers([]);
-            setProjects([]);
+            const errorMsg = error.response?.data?.detail || error.message;
+
+            // If it's a CORS or Network error, alert the user explicitly
+            if (!error.response) {
+                alert('Connection Error: Failed to connect to backend server. Please check if the server is running and CORS is correctly configured.');
+                console.error('🚨 Network Error - Possible CORS issue or Server Down');
+            } else {
+                alert(`Data Fetch Error: ${error.response.status} - ${errorMsg}`);
+            }
         } finally {
             setLoading(false);
         }
@@ -538,18 +541,14 @@ const Tasks = () => {
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm"
                                     disabled={loading || projects.length === 0}
                                 >
-                                    <option value="">Select Project</option>
-                                    {projects.length > 0 ? (
-                                        projects.map((p) => (
-                                            <option key={p.project_id} value={p.project_id}>
-                                                {p.project_name} {p.project_code ? `(${p.project_code})` : ''}
-                                            </option>
-                                        ))
-                                    ) : (
-                                        <option disabled>No projects available</option>
-                                    )}
+                                    <option value="">{loading ? 'Loading projects...' : 'Select Project'}</option>
+                                    {projects.map((p) => (
+                                        <option key={p.project_id} value={p.project_id}>
+                                            {p.project_name} {p.project_code ? `(${p.project_code})` : ''}
+                                        </option>
+                                    ))}
                                 </select>
-                                {projects.length === 0 && !loading && (
+                                {!loading && projects.length === 0 && (
                                     <p className="text-xs text-red-600 mt-1">⚠️ No projects available. Please add projects first.</p>
                                 )}
                             </div>
@@ -595,11 +594,9 @@ const Tasks = () => {
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     disabled={loading || machines.length === 0}
                                 >
-                                    <option value="">
-                                        {loading ? 'Loading machines...' : machines.length === 0 ? 'No machines available' : 'Select Machine'}
-                                    </option>
-                                    {Array.isArray(machines) && machines.map((machine) => (
-                                        <option key={machine?.id || Math.random()} value={machine?.id || ''}>
+                                    <option value="">{loading ? 'Loading machines...' : 'Select Machine'}</option>
+                                    {machines.map((machine) => (
+                                        <option key={machine?.id} value={machine?.id}>
                                             {resolveMachineName(machine)}
                                         </option>
                                     ))}
@@ -616,14 +613,14 @@ const Tasks = () => {
                                     onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 >
-                                    <option value="">Select User</option>
+                                    <option value="">{loading ? 'Loading users...' : 'Select User'}</option>
                                     {users.filter(u => u?.role !== 'admin').map((user) => (
-                                        <option key={user?.user_id || Math.random()} value={user?.user_id || ''}>
+                                        <option key={user?.user_id} value={user?.user_id}>
                                             {user?.full_name || user?.username || 'Unknown User'} ({user?.role})
                                         </option>
                                     ))}
                                 </select>
-                                {users.filter(u => u?.role !== 'admin').length === 0 && !loading && (
+                                {!loading && users.filter(u => u?.role !== 'admin').length === 0 && (
                                     <p className="text-xs text-red-600 mt-1">⚠️ No available users to assign.</p>
                                 )}
                             </div>
@@ -636,20 +633,18 @@ const Tasks = () => {
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     disabled={loading || users.length === 0}
                                 >
-                                    <option value="">
-                                        {loading ? 'Loading users...' : users.filter(u => ['admin', 'supervisor', 'planning'].includes(u?.role)).length === 0 ? 'No assigners available' : 'Select User'}
-                                    </option>
-                                    {Array.isArray(users) && users
+                                    <option value="">{loading ? 'Loading users...' : 'Select User'}</option>
+                                    {users
                                         .filter(u => ['admin', 'supervisor', 'planning'].includes(u?.role))
                                         .map((user) => (
-                                            <option key={user?.user_id || Math.random()} value={user?.user_id || ''}>
+                                            <option key={user?.user_id} value={user?.user_id}>
                                                 {user?.full_name || user?.username || 'Unknown'} ({user?.role || 'unknown'})
                                             </option>
                                         ))}
-                                    {users.filter(u => ['admin', 'supervisor', 'planning'].includes(u?.role)).length === 0 && !loading && (
-                                        <p className="text-xs text-gray-500 mt-1">⚠️ No admin/supervisor/planning users available</p>
-                                    )}
                                 </select>
+                                {!loading && users.filter(u => ['admin', 'supervisor', 'planning'].includes(u?.role)).length === 0 && (
+                                    <p className="text-xs text-gray-500 mt-1">⚠️ No admin/supervisor/planning users available</p>
+                                )}
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
