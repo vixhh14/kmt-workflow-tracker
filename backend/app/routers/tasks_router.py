@@ -111,7 +111,7 @@ async def read_tasks(
         })
     return results
 
-@router.post("", response_model=dict)
+@router.post("", response_model=dict, status_code=201)
 async def create_task(
     task: TaskCreate, 
     db: Session = Depends(get_db),

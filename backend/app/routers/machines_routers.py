@@ -15,11 +15,17 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+from app.core.dependencies import get_current_user
+from app.models.models_db import Machine, Unit, MachineCategory, User
+
 # ----------------------------------------------------------------------
 # GET ALL MACHINES
 # ----------------------------------------------------------------------
 @router.get("", response_model=List[dict])
-async def read_machines(db: Session = Depends(get_db)):
+async def read_machines(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     machines = db.query(Machine).filter(or_(Machine.is_deleted == False, Machine.is_deleted == None)).all()
     
     # Pre-fetch units and categories for efficient lookup

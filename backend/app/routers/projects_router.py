@@ -21,8 +21,14 @@ from app.schemas.project_schema import ProjectCreate, ProjectOut
 # API Endpoints
 # ----------------------------------------------------------------------
 
+from app.core.dependencies import get_current_user
+from app.models.models_db import User
+
 @router.get("", response_model=List[ProjectOut])
-async def read_projects(db: Session = Depends(get_db)):
+async def read_projects(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
     Get all projects.
     """
