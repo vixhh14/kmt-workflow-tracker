@@ -4,8 +4,8 @@ import {
     createOperationalTask,
     updateOperationalTask,
     deleteOperationalTask,
-    getProjects,
-    getUsers
+    getProjectsDropdown,
+    getAssignableUsers
 } from '../api/services';
 import { Plus, Trash2, Edit2, CheckCircle, Clock, AlertCircle, User, MessageSquare, Hash, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -41,8 +41,8 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
             setLoading(true);
             const [tasksRes, projectsRes, usersRes] = await Promise.all([
                 getOperationalTasks(type),
-                getProjects(),
-                getUsers()
+                getProjectsDropdown(),
+                getAssignableUsers()
             ]);
 
             // Filter tasks by machineId if provided
@@ -52,8 +52,8 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
                 : allTasks;
 
             setTasks(filteredTasks);
-            setProjects(projectsRes.data || []);
-            setUsers(usersRes.data || []);
+            setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : []);
+            setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
         } catch (error) {
             console.error(`Failed to fetch ${type} tasks:`, error);
         } finally {

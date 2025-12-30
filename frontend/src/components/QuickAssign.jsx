@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, X, Clock, Play, CheckCircle, AlertCircle, Calendar } from 'lucide-react';
-import { getPendingTasks, assignTask, getOperators } from '../api/supervisor';
-import { getMachines, getUnits } from '../api/services';
+import { getPendingTasks, assignTask } from '../api/supervisor';
+import { getMachinesDropdown, getAssignableUsers, getUnits } from '../api/services';
 import { minutesToHHMM, hhmmToMinutes, validateHHMM } from '../utils/timeFormat';
 import { resolveMachineName } from '../utils/machineUtils';
 
@@ -32,12 +32,14 @@ const QuickAssign = ({ onAssignSuccess }) => {
             setLoading(true);
             const [tasksRes, operatorsRes, machinesRes, unitsRes] = await Promise.all([
                 getPendingTasks(),
-                getOperators(),
-                getMachines(),
+                getAssignableUsers(),
+                getMachinesDropdown(),
                 getUnits()
             ]);
             setPendingTasks(Array.isArray(tasksRes?.data) ? tasksRes.data : []);
-            setOperators(Array.isArray(operatorsRes?.data) ? operatorsRes.data : []);
+            // Filter only operators for assignment
+            const allAssignable = Array.isArray(operatorsRes?.data) ? operatorsRes.data : [];
+            setOperators(allAssignable.filter(u => u.role === 'operator'));
             setMachines(Array.isArray(machinesRes?.data) ? machinesRes.data : []);
             setUnits(Array.isArray(unitsRes?.data) ? unitsRes.data : []);
         } catch (err) {
