@@ -30,11 +30,11 @@ async def read_tasks(
     year: Optional[int] = None,
     assigned_to: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     # Role-based restriction: Operators only see their own tasks
-    if current_user.get("role") == "operator":
-        assigned_to = current_user.get("user_id")
+    if current_user.role == "operator":
+        assigned_to = current_user.user_id
 
     query = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None))
     
@@ -208,7 +208,7 @@ async def get_task_time_logs(task_id: str, db: Session = Depends(get_db)):
 async def start_task(
     task_id: str, 
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
@@ -252,7 +252,7 @@ async def start_task(
         
     # 2. User Work Log
     user_log = UserWorkLog(
-        user_id=current_user.get("user_id"),
+        user_id=current_user.user_id,
         task_id=task_id,
         machine_id=task.machine_id,
         start_time=now,
@@ -280,7 +280,7 @@ async def hold_task(
     task_id: str, 
     request: TaskActionRequest, 
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
@@ -325,7 +325,7 @@ async def hold_task(
     # Create TaskHold record
     hold = TaskHold(
         task_id=task_id,
-        user_id=current_user.get("user_id"),
+        user_id=current_user.user_id,
         hold_reason=request.reason,
         hold_started_at=now
     )
@@ -346,7 +346,7 @@ async def hold_task(
 async def resume_task(
     task_id: str, 
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     return await start_task(task_id, db, current_user)
 
@@ -354,7 +354,7 @@ async def resume_task(
 async def complete_task(
     task_id: str, 
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
@@ -435,7 +435,7 @@ async def request_reschedule(
     task_id: str, 
     request: RescheduleRequestModel, 
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
@@ -443,7 +443,7 @@ async def request_reschedule(
         
     reschedule = RescheduleRequest(
         task_id=task_id,
-        requested_by=current_user.get("user_id"),
+        requested_by=current_user.user_id,
         requested_for_date=request.requested_date,
         reason=request.reason,
         status="pending"
@@ -475,13 +475,13 @@ async def deny_task(task_id: str, request: TaskActionRequest, db: Session = Depe
 async def end_task(
     task_id: str, 
     db: Session = Depends(get_db),
-    admin_user: dict = Depends(get_current_user) # We will check role inside or via dependency if strict
+    admin_user: User = Depends(get_current_user) # We will check role inside or via dependency if strict
 ):
     """Admin action to force-end a task"""
     from app.models.models_db import User
     
     # Check if admin
-    user_id = admin_user.get("user_id")
+    user_id = admin_user.user_id
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user or user.role != 'admin':
         raise HTTPException(status_code=403, detail="Only admins can end tasks")
@@ -538,19 +538,19 @@ async def update_task(
     task_id: str, 
     task_update: TaskUpdate, 
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     from app.models.models_db import Project as DBProject
     db_task = db.query(Task).filter(Task.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
     
-    role = current_user.get("role")
+    role = current_user.role
     update_data = task_update.dict(exclude_unset=True)
 
     # Restriction: Operators can only update basic workflow fields if assigned
     if role == "operator":
-        if db_task.assigned_to != current_user.get("user_id"):
+        if db_task.assigned_to != current_user.user_id:
             raise HTTPException(status_code=403, detail="Not assigned to this task")
         # Allowed fields for operator: maybe just notes?
         # But status is changed via specialized endpoints.
@@ -601,9 +601,9 @@ async def update_task(
 async def delete_task(
     task_id: str, 
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
-    if current_user.get("role") not in ["admin", "supervisor", "planning"]:
+    if current_user.role not in ["admin", "supervisor", "planning"]:
         raise HTTPException(status_code=403, detail="Not authorized to delete tasks")
         
     db_task = db.query(Task).filter(Task.id == task_id).first()
