@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from pydantic import BaseModel
 from app.schemas.task_schema import TaskCreate, TaskUpdate, TaskOut
-from app.models.models_db import Task, TaskTimeLog, TaskHold, RescheduleRequest, MachineRuntimeLog, UserWorkLog
+from app.models.models_db import Task, TaskTimeLog, TaskHold, RescheduleRequest, MachineRuntimeLog, UserWorkLog, User
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.time_utils import get_current_time_ist, get_today_date_ist
@@ -115,7 +115,7 @@ async def read_tasks(
 async def create_task(
     task: TaskCreate, 
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     from app.models.models_db import User, Project as DBProject
     
@@ -149,7 +149,7 @@ async def create_task(
 
     # 4. Normalization
     priority_norm = (task.priority or "MEDIUM").upper()
-    assigned_by = current_user.get("user_id")
+    assigned_by = current_user.user_id
 
     try:
         new_task = Task(

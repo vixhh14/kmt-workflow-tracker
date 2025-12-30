@@ -44,6 +44,7 @@ app = FastAPI(
     title="Workflow Tracker API",
     description="Backend API for KMT Workflow Tracker",
     version="1.0.0",
+    redirect_slashes=False, # Prevent 307 redirects breaking CORS
 )
 
 # Register Exception Handlers
@@ -62,8 +63,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
     expose_headers=["*"],
 )
 
