@@ -99,6 +99,12 @@ const OperationalDashboard = ({ type }) => {
             });
         } catch (error) {
             console.error('Failed to fetch tasks:', error);
+            const errorMsg = error.response?.data?.detail || error.message;
+            if (!error.response) {
+                alert('Connection Error: Failed to connect to backend server. Please check CORS settings.');
+            } else {
+                alert(`Fetch Error: ${errorMsg}`);
+            }
         } finally {
             setLoading(false);
         }

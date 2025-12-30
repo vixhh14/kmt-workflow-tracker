@@ -26,7 +26,13 @@ const Projects = () => {
             setError(null);
         } catch (err) {
             console.error('Failed to fetch projects:', err);
-            setError('Failed to load projects');
+            const errorMsg = err.response?.data?.detail || err.message;
+            if (!err.response) {
+                alert('Connection Error: Failed to connect to backend server. Please check CORS settings.');
+            } else {
+                alert(`Fetch Error: ${errorMsg}`);
+            }
+            setError(errorMsg);
         } finally {
             setLoading(false);
         }
