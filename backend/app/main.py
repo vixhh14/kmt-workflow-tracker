@@ -51,7 +51,10 @@ app = FastAPI(
 # CORS configuration - MUST be defined immediately after app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://kmt-workflow-tracker.vercel.app"],
+    allow_origins=[
+        "https://kmt-workflow-tracker.vercel.app",
+        "http://localhost:5173"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
