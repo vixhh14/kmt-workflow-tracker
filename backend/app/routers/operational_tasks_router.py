@@ -83,9 +83,9 @@ async def create_operational_task(
     if current_user.role not in ["admin", "planning"]:
         raise HTTPException(status_code=403, detail="Only Admin or Planning can create operational tasks")
         
-    # Manual Validation
-    if not task.machine_id:
-        raise HTTPException(status_code=400, detail="machine_id is required")
+    # Manual Validation: machine_id is only optional for operational tasks if not general, 
+    # but since this router ONLY handles Filing/Fabrication, we follow the user requirement 
+    # to not require it at creation.
     
     # task_type validation
     if task.task_type:
