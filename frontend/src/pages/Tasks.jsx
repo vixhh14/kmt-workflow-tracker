@@ -95,12 +95,12 @@ const Tasks = () => {
                 getProjects()
             ]);
 
-            // Debug API responses
-            console.log('📡 API Responses:', {
-                tasks: tasksRes?.data?.length,
-                machines: machinesRes?.data?.length,
-                users: usersRes?.data?.length,
-                projects: projectsRes?.data?.length
+            // log stats
+            console.log('📊 Tasks Dashboard Data Loaded:', {
+                tasks: tasksRes?.data?.length || 0,
+                machines: machinesRes?.data?.length || 0,
+                users: usersRes?.data?.length || 0,
+                projects: projectsRes?.data?.length || 0
             });
 
             // Ensure data is always an array
@@ -109,25 +109,12 @@ const Tasks = () => {
             const usersData = Array.isArray(usersRes?.data) ? usersRes.data : [];
             const projectsData = Array.isArray(projectsRes?.data) ? projectsRes.data : [];
 
-            console.log('✅ Data loaded:', {
+            console.log('📊 Tasks Dashboard Data Loaded:', {
                 tasks: tasksData.length,
                 machines: machinesData.length,
                 users: usersData.length,
                 projects: projectsData.length
             });
-
-            // Log sample data for verification
-            if (machinesData.length > 0) {
-                console.log('Sample machine:', machinesData[0]);
-            } else {
-                console.warn('⚠️ No machines loaded');
-            }
-
-            if (usersData.length > 0) {
-                console.log('Sample user:', usersData[0]);
-            } else {
-                console.warn('⚠️ No users loaded');
-            }
 
             setTasks(tasksData);
             setMachines(machinesData);
@@ -137,10 +124,12 @@ const Tasks = () => {
             console.error('❌ Failed to fetch data:', error);
             const errorMsg = error.response?.data?.detail || error.message;
 
-            // If it's a CORS or Network error, alert the user explicitly
+            // Handle errors
             if (!error.response) {
-                alert('Connection Error: Failed to connect to backend server. Please check if the server is running and CORS is correctly configured.');
-                console.error('🚨 Network Error - Possible CORS issue or Server Down');
+                console.error('🚨 Network/CORS Error - Server unreachable');
+            } else if (error.response.status === 401) {
+                console.warn('🔒 Unauthorized - Redirecting...');
+                // axios interceptor handles redirect
             } else {
                 alert(`Data Fetch Error: ${error.response.status} - ${errorMsg}`);
             }
@@ -784,7 +773,7 @@ const Tasks = () => {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {users.find(u => u.user_id === task.assigned_to)?.username || 'Unassigned'}
+                                            {users.find(u => u.user_id === task.assigned_to || u.id === task.assigned_to || u.username === task.assigned_to)?.username || task.assigned_to || 'Unassigned'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-[11px] font-bold text-gray-700 bg-gray-50 px-2 py-1 rounded inline-block">
@@ -803,7 +792,7 @@ const Tasks = () => {
                                                         <span className="text-[10px] uppercase font-bold">End</span>
                                                     </button>
                                                 )}
-                                                {currentUser?.role !== 'operator' && (
+                                                {['admin', 'supervisor', 'planning'].includes(currentUser?.role?.toLowerCase()) && (
                                                     <button
                                                         onClick={() => handleDelete(task.id)}
                                                         className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
