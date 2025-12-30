@@ -28,29 +28,29 @@ async def read_operational_tasks(
     current_user: User = Depends(get_current_user)
 ):
     model = get_model(task_type)
-    query = db.query(model)
+    query = db.query(model).filter(or_(model.is_deleted == False, model.is_deleted == None))
     
     # Role-based filtering
-    role = current_user.role
+    role = (current_user.role or "").lower()
     user_id = current_user.user_id
     
     # Admin and Planning see all
     if role in ["admin", "planning"]:
         pass
     # Filing Master
-    elif role.lower() == "file_master":
+    elif role == "file_master":
         if task_type != "filing":
              raise HTTPException(status_code=403, detail="File Masters can only access filing tasks")
     # Fab Master
-    elif role.lower() == "fab_master":
+    elif role == "fab_master":
         if task_type != "fabrication":
              raise HTTPException(status_code=403, detail="Fab Masters can only access fabrication tasks")
     # Operators see only assigned to them or unassigned
-    elif role.lower() == "operator":
+    elif role == "operator":
         query = query.filter(or_(model.assigned_to == user_id, model.assigned_to == None))
     else:
         # Other roles might also be restricted
-        raise HTTPException(status_code=403, detail="Unauthorized role for operational tasks")
+        raise HTTPException(status_code=403, detail=f"Unauthorized role '{role}' for operational tasks")
         
     tasks = query.order_by(model.created_at.desc()).all()
     
@@ -231,6 +231,6 @@ async def delete_operational_task(
     db_task = db.query(model).filter(model.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
-    db.delete(db_task)
+    db_task.is_deleted = True
     db.commit()
     return {"message": "Task deleted successfully"}

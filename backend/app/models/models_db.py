@@ -285,6 +285,7 @@ class FilingTask(Base):
     machine_id = Column(String, ForeignKey("machines.id"), nullable=True)
     work_order_number = Column(String, nullable=True)
     assigned_by = Column(String, ForeignKey("users.user_id"), nullable=True)
+    is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
     updated_at = Column(DateTime(timezone=True), default=get_current_time_ist, onupdate=get_current_time_ist)
 
@@ -310,6 +311,7 @@ class FabricationTask(Base):
     machine_id = Column(String, ForeignKey("machines.id"), nullable=True)
     work_order_number = Column(String, nullable=True)
     assigned_by = Column(String, ForeignKey("users.user_id"), nullable=True)
+    is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
     updated_at = Column(DateTime(timezone=True), default=get_current_time_ist, onupdate=get_current_time_ist)
 
