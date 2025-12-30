@@ -25,14 +25,14 @@ def get_model(task_type: str):
 async def read_operational_tasks(
     task_type: str, 
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     model = get_model(task_type)
     query = db.query(model)
     
     # Role-based filtering
-    role = current_user.get("role")
-    user_id = current_user.get("user_id")
+    role = current_user.role
+    user_id = current_user.user_id
     
     # Admin and Planning see all
     if role in ["admin", "planning"]:
@@ -70,10 +70,10 @@ async def create_operational_task(
     task_type: str, 
     task: OperationalTaskCreate, 
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     # Only Admin (and maybe Planning) can create
-    if current_user.get("role") not in ["admin", "planning"]:
+    if current_user.role not in ["admin", "planning"]:
         raise HTTPException(status_code=403, detail="Only Admin or Planning can create operational tasks")
         
     # Manual Validation
@@ -111,7 +111,7 @@ async def create_operational_task(
         task_data["priority"] = "MEDIUM"
 
     # Set assigned_by from current user token
-    task_data["assigned_by"] = current_user.get("user_id")
+    task_data["assigned_by"] = current_user.user_id
 
     # Handle User Resolution
     assigned_to = task_data.get("assigned_to")
@@ -153,7 +153,7 @@ async def update_operational_task(
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
     
-    role = current_user.get("role")
+    role = current_user.role
     update_data = task_update.dict(exclude_unset=True)
     
     # Support username -> user_id conversion for assigned_to
@@ -178,7 +178,7 @@ async def update_operational_task(
         for key in execution_fields:
             if key in update_data:
                 setattr(db_task, key, update_data[key])
-    elif role == "operator" and db_task.assigned_to == current_user.get("user_id"):
+    elif role == "operator" and db_task.assigned_to == current_user.user_id:
         # Operators can only update their own progress
         execution_fields = ["completed_quantity", "remarks", "status"]
         for key in execution_fields:
@@ -215,9 +215,9 @@ async def delete_operational_task(
     task_type: str, 
     task_id: int, 
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
-    if current_user.get("role") != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only Admin can delete tasks")
         
     model = get_model(task_type)
