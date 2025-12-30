@@ -448,18 +448,20 @@ const SupervisorDashboard = () => {
                 <div className="bg-white rounded-lg shadow p-4 sm:p-6">
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">Operator Workload</h2>
                     {operatorStatus.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={operatorStatus}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="operator" angle={-45} textAnchor="end" height={80} />
-                                <YAxis />
-                                <Tooltip />
-                                <Legend />
-                                <Bar dataKey="completed" fill="#10b981" name="Completed" />
-                                <Bar dataKey="in_progress" fill="#3b82f6" name="In Progress" />
-                                <Bar dataKey="pending" fill="#6b7280" name="Pending" />
-                            </BarChart>
-                        </ResponsiveContainer>
+                        <div className="min-h-[300px]">
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={operatorStatus}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="operator" angle={-45} textAnchor="end" height={80} />
+                                    <YAxis />
+                                    <Tooltip />
+                                    <Legend />
+                                    <Bar dataKey="completed" fill="#10b981" name="Completed" />
+                                    <Bar dataKey="in_progress" fill="#3b82f6" name="In Progress" />
+                                    <Bar dataKey="pending" fill="#6b7280" name="Pending" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
                     ) : (
                         <div className="text-center py-12 text-gray-500">
                             <Users className="mx-auto mb-4" size={48} />
