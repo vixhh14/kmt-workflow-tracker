@@ -181,7 +181,7 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
                                     <option value="">Select Project / Asset</option>
                                     {projects.length > 0 ? (
                                         projects.map(p => (
-                                            <option key={p.project_id} value={p.project_id}>{p.project_name}</option>
+                                            <option key={p.id || p.project_id} value={p.id || p.project_id}>{p.name || p.project_name}</option>
                                         ))
                                     ) : (
                                         <option disabled>No projects available</option>
@@ -250,7 +250,7 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
                                     const targetRole = type === 'filing' ? 'file_master' : 'fab_master';
                                     return role === targetRole || role === 'operator';
                                 }).map(u => (
-                                    <option key={u.user_id} value={u.user_id}>{u.full_name || u.username}</option>
+                                    <option key={u.id || u.user_id} value={u.id || u.user_id}>{u.name || u.full_name || u.username}</option>
                                 ))}
                             </select>
                         </div>
