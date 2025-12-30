@@ -36,7 +36,6 @@ from app.routers import (
     unified_dashboard_router,
     operational_tasks_router,
 )
-from app.core.config import CORS_ORIGINS
 import uvicorn
 
 # Create FastAPI app with metadata
@@ -47,6 +46,18 @@ app = FastAPI(
     redirect_slashes=False, # Prevent 307 redirects breaking CORS
 )
 
+# CORS configuration - MUST be defined immediately after app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://kmt-workflow-tracker.vercel.app",
+        "http://localhost:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Register Exception Handlers
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(IntegrityError, integrity_error_handler)
@@ -55,18 +66,6 @@ app.add_exception_handler(OperationalError, operational_error_handler)
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(Exception, global_exception_handler)
 
-# CORS configuration - Use centralized config
-# Note: Wildcard patterns don't work with credentials, so we list all origins explicitly
-print(f"🔒 CORS Origins configured: {CORS_ORIGINS}")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
 
 
 # Startup event – create tables and demo users
