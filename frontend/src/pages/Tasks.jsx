@@ -134,12 +134,12 @@ const Tasks = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            if (!validateHHMM(formData.expected_completion_time)) {
-                alert('Invalid duration format. Please use HH:MM (e.g. 02:30)');
-                return;
-            }
-
             if (formData.category === 'general') {
+                if (!validateHHMM(formData.expected_completion_time)) {
+                    alert('Invalid duration format. Please use HH:MM (e.g. 02:30)');
+                    return;
+                }
+
                 const durationMinutes = hhmmToMinutes(formData.expected_completion_time);
                 if (durationMinutes <= 0) {
                     alert('Expected duration must be greater than 0');
@@ -161,17 +161,15 @@ const Tasks = () => {
 
                 await createTask(payload);
             } else {
-                // Filing or Fabrication
+                // Filing or Fabrication - Simplified Payload based on instructions
                 const payload = {
                     project_id: parseInt(formData.project_id),
-                    part_item: formData.title || formData.part_item, // Use title as part_item
-                    quantity: parseInt(formData.nos_unit) || 1,
+                    work_order_number: formData.work_order_number,
+                    part_item: formData.title || formData.part_item, // Map title to part_item
+                    quantity: parseInt(formData.nos_unit) || 1,      // Map nos_unit to quantity
                     due_date: formData.due_date,
                     priority: formData.priority,
-                    assigned_to: formData.assigned_to,
-                    machine_id: formData.machine_id,
-                    work_order_number: formData.work_order_number,
-                    remarks: formData.description,
+                    remarks: formData.description,                   // Map description to remarks
                     task_type: formData.category.toUpperCase()
                 };
 
