@@ -498,32 +498,10 @@ const Tasks = () => {
             {/* Add Task Form */}
             {showForm && (
                 <div className="bg-white rounded-lg shadow p-6">
-                    <h3 className="text-lg font-semibold mb-4">Add New Task</h3>
+                    <h3 className="text-lg font-semibold mb-4">Add General Task</h3>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Task Category *</label>
-                                <div className="flex gap-2">
-                                    {['general', 'filing', 'fabrication'].map(cat => (
-                                        <button
-                                            key={cat}
-                                            type="button"
-                                            onClick={() => setFormData({ ...formData, category: cat })}
-                                            className={`flex-1 py-2 px-4 rounded-lg border text-sm font-bold uppercase transition-all ${formData.category === cat
-                                                ? 'bg-blue-600 text-white border-blue-600 shadow-md'
-                                                : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                                                }`}
-                                        >
-                                            {cat}
-                                        </button>
-                                    ))}
-                                </div>
-                                <p className="text-[10px] text-gray-500 mt-1 uppercase">
-                                    {formData.category === 'general' && '🛠️ Standard operational workflow tasks'}
-                                    {formData.category === 'filing' && '🔹 specialized filing/polishing workflow'}
-                                    {formData.category === 'fabrication' && '🔸 specialized fabrication workflow'}
-                                </p>
-                            </div>
+
                             {/* 1. Project */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Project *</label>
@@ -564,35 +542,22 @@ const Tasks = () => {
                                 />
                             </div>
 
-                            {/* 3. Part / Item */}
-                            {formData.category === 'general' ? (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Title / Part Name *</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.title}
-                                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    />
-                                </div>
-                            ) : (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Part / Item *</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.part_item}
-                                        onChange={(e) => setFormData({ ...formData, part_item: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    />
-                                </div>
-                            )}
+                            {/* 3. Title */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Title / Task Name *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={formData.title}
+                                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                            </div>
 
-                            {/* 4. Quantity */}
+                            {/* 4. Nos / Unit */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    {formData.category === 'general' ? 'Nos / Unit *' : 'Quantity *'}
+                                    Nos / Unit *
                                 </label>
                                 <input
                                     type="text"
@@ -603,8 +568,8 @@ const Tasks = () => {
                                 />
                             </div>
 
-                            {/* 5. Due Date / Time & Duration (Mixed depending on category) */}
-                            <div className={`grid gap-2 ${formData.category === 'general' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                            {/* 5. Due Date / Time */}
+                            <div className="grid grid-cols-2 gap-2">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Due Date *</label>
                                     <input
@@ -615,18 +580,16 @@ const Tasks = () => {
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
                                 </div>
-                                {formData.category === 'general' && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Expected Time *</label>
-                                        <input
-                                            type="time"
-                                            required
-                                            value={formData.due_time}
-                                            onChange={(e) => setFormData({ ...formData, due_time: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        />
-                                    </div>
-                                )}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Expected Time *</label>
+                                    <input
+                                        type="time"
+                                        required
+                                        value={formData.due_time}
+                                        onChange={(e) => setFormData({ ...formData, due_time: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
                             </div>
 
                             {/* 6. Priority */}
@@ -644,87 +607,87 @@ const Tasks = () => {
                                     <option value="urgent">Urgent</option>
                                 </select>
                             </div>
-                            {formData.category === 'general' && (
-                                <>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Machine *</label>
-                                        <select
-                                            required
-                                            value={formData.machine_id}
-                                            onChange={(e) => setFormData({ ...formData, machine_id: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                            disabled={loading || machines.length === 0}
-                                        >
-                                            <option value="">{loading ? 'Loading machines...' : 'Select Machine'}</option>
-                                            {machines.map((machine) => (
-                                                <option key={machine?.id} value={machine?.id}>
-                                                    {resolveMachineName(machine)}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Assign To *</label>
-                                        <select
-                                            required
-                                            value={formData.assigned_to}
-                                            onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        >
-                                            <option value="">{loading ? 'Loading users...' : 'Select User'}</option>
-                                            {users.map((user) => (
-                                                <option key={user?.user_id} value={user?.user_id}>
-                                                    {user?.full_name || user?.username} ({user?.role})
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Assigned By *</label>
-                                        <select
-                                            required
-                                            value={formData.assigned_by}
-                                            onChange={(e) => setFormData({ ...formData, assigned_by: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                            disabled={loading || users.length === 0}
-                                        >
-                                            <option value="">{loading ? 'Loading users...' : 'Select User'}</option>
-                                            {users
-                                                .filter(u => ['admin', 'supervisor', 'planning'].includes(u?.role))
-                                                .map((user) => (
-                                                    <option key={user?.user_id} value={user?.user_id}>
-                                                        {user?.full_name || user?.username || 'Unknown'} ({user?.role || 'unknown'})
-                                                    </option>
-                                                ))}
-                                        </select>
-                                    </div>
-                                </>
-                            )}
-                            {formData.category === 'general' && (
+
+                            {/* General Task Specific Fields */}
+                            <>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Task Completion Duration (HH:MM) *</label>
-                                    <input
-                                        type="text"
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Machine *</label>
+                                    <select
                                         required
-                                        placeholder="e.g. 02:30"
-                                        value={formData.expected_completion_time}
-                                        onChange={(e) => setFormData({ ...formData, expected_completion_time: e.target.value })}
-                                        className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    />
-                                    <p className="text-xs text-gray-400 mt-1">Enter hours and minutes (e.g. 02:30 = 150 mins). Total: {hhmmToMinutes(formData.expected_completion_time)}m</p>
+                                        value={formData.machine_id}
+                                        onChange={(e) => setFormData({ ...formData, machine_id: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        disabled={loading || machines.length === 0}
+                                    >
+                                        <option value="">{loading ? 'Loading machines...' : 'Select Machine'}</option>
+                                        {machines.map((machine) => (
+                                            <option key={machine?.id} value={machine?.id}>
+                                                {resolveMachineName(machine)}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
-                            )}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Assign To *</label>
+                                    <select
+                                        required
+                                        value={formData.assigned_to}
+                                        onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    >
+                                        <option value="">{loading ? 'Loading users...' : 'Select User'}</option>
+                                        {users.map((user) => (
+                                            <option key={user?.user_id} value={user?.user_id}>
+                                                {user?.full_name || user?.username} ({user?.role})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Assigned By *</label>
+                                    <select
+                                        required
+                                        value={formData.assigned_by}
+                                        onChange={(e) => setFormData({ ...formData, assigned_by: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        disabled={loading || users.length === 0}
+                                    >
+                                        <option value="">{loading ? 'Loading users...' : 'Select User'}</option>
+                                        {users
+                                            .filter(u => ['admin', 'supervisor', 'planning'].includes(u?.role))
+                                            .map((user) => (
+                                                <option key={user?.user_id} value={user?.user_id}>
+                                                    {user?.full_name || user?.username || 'Unknown'} ({user?.role || 'unknown'})
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+                            </>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Task Completion Duration (HH:MM) *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="e.g. 02:30"
+                                    value={formData.expected_completion_time}
+                                    onChange={(e) => setFormData({ ...formData, expected_completion_time: e.target.value })}
+                                    className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                                <p className="text-xs text-gray-400 mt-1">Enter hours and minutes (e.g. 02:30 = 150 mins). Total: {hhmmToMinutes(formData.expected_completion_time)}m</p>
+                            </div>
+
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    {formData.category === 'general' ? 'Description *' : 'Remarks'}
+                                    Description *
                                 </label>
                                 <textarea
-                                    required={formData.category === 'general'}
+                                    required
                                     value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                     rows="3"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    placeholder={formData.category === 'general' ? "Detailed task instructions..." : "Any additional notes..."}
+                                    placeholder="Detailed task instructions..."
                                 />
                             </div>
                         </div>
@@ -746,7 +709,6 @@ const Tasks = () => {
                     </form>
                 </div >
             )}
-
             {/* Tasks Table */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
                 <div className="overflow-x-auto">

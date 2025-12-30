@@ -42,6 +42,19 @@ const OperationalDashboard = ({ type }) => {
         totalQty: 0,
         completedQty: 0
     });
+    const [createFormData, setCreateFormData] = useState({
+        project_id: '',
+        work_order_number: '',
+        part_item: '',
+        quantity: 1,
+        due_date: '',
+        priority: 'medium',
+        remarks: ''
+    });
+    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+
+    const canCreate = currentUser?.role === 'admin' || currentUser?.role === 'planning';
     const [projectFilter, setProjectFilter] = useState('all');
     const [projects, setProjects] = useState([]);
 
@@ -128,6 +141,42 @@ const OperationalDashboard = ({ type }) => {
         }
     };
 
+    const handleCreateTask = async (e) => {
+        e.preventDefault();
+        try {
+            setSubmitting(true);
+            const payload = {
+                project_id: parseInt(createFormData.project_id),
+                work_order_number: createFormData.work_order_number,
+                part_item: createFormData.part_item,
+                quantity: parseInt(createFormData.quantity),
+                due_date: createFormData.due_date,
+                priority: createFormData.priority,
+                remarks: createFormData.remarks
+            };
+
+            await import('../../api/services').then(mod => mod.createOperationalTask(type, payload));
+
+            setCreateFormData({
+                project_id: '',
+                work_order_number: '',
+                part_item: '',
+                quantity: 1,
+                due_date: '',
+                priority: 'medium',
+                remarks: ''
+            });
+            setShowCreateForm(false);
+            fetchTasks(); // Refresh tasks
+            alert('Task created successfully!');
+        } catch (error) {
+            console.error('Failed to create task:', error);
+            alert(error.response?.data?.detail || 'Failed to create task');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     const handleUpdateStatus = async (taskId, newStatus) => {
         try {
             await updateOperationalTask(type, taskId, { status: newStatus });
@@ -189,9 +238,20 @@ const OperationalDashboard = ({ type }) => {
                     </h1>
                     <p className="text-gray-500 mt-1 font-medium">Monitoring and executing {type} operations</p>
                 </div>
-                <div className="flex items-center bg-white rounded-xl shadow-sm border p-1 px-3 space-x-2">
-                    <div className={`w-2 h-2 rounded-full ${accentBg} animate-pulse`}></div>
-                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Live Updates</span>
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center bg-white rounded-xl shadow-sm border p-1 px-3 space-x-2">
+                        <div className={`w-2 h-2 rounded-full ${accentBg} animate-pulse`}></div>
+                        <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Live Updates</span>
+                    </div>
+                    {canCreate && (
+                        <button
+                            onClick={() => setShowCreateForm(!showCreateForm)}
+                            className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-white font-bold shadow-md transition-all hover:shadow-lg active:scale-95 ${accentBg}`}
+                        >
+                            <Plus size={18} />
+                            <span>Add Task</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -223,6 +283,123 @@ const OperationalDashboard = ({ type }) => {
                     color="bg-indigo-500"
                 />
             </div>
+
+            {/* Create Task Form */}
+            {showCreateForm && (
+                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 animate-fade-in mb-6">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 border-b pb-2">Create New Operational Task</h3>
+                    <form onSubmit={handleCreateTask} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* 1. Project */}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Project *</label>
+                            <select
+                                required
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                value={createFormData.project_id}
+                                onChange={e => setCreateFormData({ ...createFormData, project_id: e.target.value })}
+                            >
+                                <option value="">Select Project</option>
+                                {projects.map(p => (
+                                    <option key={p.id || p.project_id} value={p.id || p.project_id}>{p.name || p.project_name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* 2. Work Order Number */}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Work Order Number *</label>
+                            <input
+                                required
+                                type="text"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                value={createFormData.work_order_number}
+                                onChange={e => setCreateFormData({ ...createFormData, work_order_number: e.target.value })}
+                            />
+                        </div>
+
+                        {/* 3. Part / Item */}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Part / Item Name *</label>
+                            <input
+                                required
+                                type="text"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                value={createFormData.part_item}
+                                onChange={e => setCreateFormData({ ...createFormData, part_item: e.target.value })}
+                            />
+                        </div>
+
+                        {/* 4. Quantity */}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Quantity *</label>
+                            <input
+                                required
+                                type="number"
+                                min="1"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                value={createFormData.quantity}
+                                onChange={e => setCreateFormData({ ...createFormData, quantity: e.target.value })}
+                            />
+                        </div>
+
+                        {/* 5. Due Date */}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Due Date *</label>
+                            <input
+                                required
+                                type="date"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                value={createFormData.due_date}
+                                onChange={e => setCreateFormData({ ...createFormData, due_date: e.target.value })}
+                            />
+                        </div>
+
+                        {/* 6. Priority */}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Priority *</label>
+                            <select
+                                required
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                value={createFormData.priority}
+                                onChange={e => setCreateFormData({ ...createFormData, priority: e.target.value })}
+                            >
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                                <option value="urgent">Urgent</option>
+                            </select>
+                        </div>
+
+                        {/* 7. Remarks */}
+                        <div className="md:col-span-2">
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Remarks</label>
+                            <textarea
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                rows="2"
+                                value={createFormData.remarks}
+                                onChange={e => setCreateFormData({ ...createFormData, remarks: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="md:col-span-2 flex justify-end space-x-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowCreateForm(false)}
+                                className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={submitting}
+                                className={`px-6 py-2 text-white font-bold rounded-lg shadow transition hover:opacity-90 ${accentBg}`}
+                            >
+                                {submitting ? 'Creating...' : 'Create Task'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
 
             {error && (
                 <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg flex items-center justify-between">
