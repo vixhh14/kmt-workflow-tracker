@@ -11,6 +11,8 @@ class ProjectCreate(BaseModel):
 class ProjectOut(BaseModel):
     project_id: int
     project_name: str
+    id: Optional[int] = None
+    name: Optional[str] = None
     work_order_number: Optional[str] = None
     client_name: Optional[str] = None
     project_code: str

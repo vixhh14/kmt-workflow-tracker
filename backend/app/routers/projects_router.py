@@ -26,7 +26,11 @@ async def read_projects(db: Session = Depends(get_db)):
     """
     Get all projects.
     """
-    return db.query(Project).filter(or_(Project.is_deleted == False, Project.is_deleted == None)).all()
+    projects = db.query(Project).filter(or_(Project.is_deleted == False, Project.is_deleted == None)).all()
+    for p in projects:
+        p.id = p.project_id
+        p.name = p.project_name
+    return projects
 
 @router.post("", response_model=ProjectOut)
 async def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
