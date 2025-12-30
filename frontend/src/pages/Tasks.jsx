@@ -171,6 +171,7 @@ const Tasks = () => {
                     assigned_to: formData.assigned_to,
                     machine_id: formData.machine_id,
                     work_order_number: formData.work_order_number,
+                    remarks: formData.description,
                     task_type: formData.category.toUpperCase()
                 };
 
@@ -589,7 +590,9 @@ const Tasks = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Nos / Unit *</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    {formData.category === 'general' ? 'Nos / Unit *' : 'Quantity *'}
+                                </label>
                                 <input
                                     type="text"
                                     required
@@ -611,72 +614,63 @@ const Tasks = () => {
                                     <option value="high">High</option>
                                 </select>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Machine *</label>
-                                <select
-                                    required
-                                    value={formData.machine_id}
-                                    onChange={(e) => setFormData({ ...formData, machine_id: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    disabled={loading || machines.length === 0}
-                                >
-                                    <option value="">{loading ? 'Loading machines...' : 'Select Machine'}</option>
-                                    {machines.map((machine) => (
-                                        <option key={machine?.id} value={machine?.id}>
-                                            {resolveMachineName(machine)}
-                                        </option>
-                                    ))}
-                                </select>
-                                {apiError ? (
-                                    <p className="text-xs text-red-600 mt-1 font-bold">🚫 {apiError}</p>
-                                ) : (machines.length === 0 && !loading && (
-                                    <p className="text-xs text-red-600 mt-1">⚠️ No machines available. Please add machines in the Machines page.</p>
-                                ))}
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Assign To *</label>
-                                <select
-                                    required
-                                    value={formData.assigned_to}
-                                    onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                >
-                                    <option value="">{loading ? 'Loading users...' : 'Select User'}</option>
-                                    {users.map((user) => (
-                                        <option key={user?.user_id} value={user?.user_id}>
-                                            {user?.full_name || user?.username} ({user?.role})
-                                        </option>
-                                    ))}
-                                </select>
-                                {apiError ? (
-                                    <p className="text-xs text-red-600 mt-1 font-bold">🚫 {apiError}</p>
-                                ) : (!loading && users.length === 0 && (
-                                    <p className="text-xs text-red-600 mt-1">⚠️ No available users to assign.</p>
-                                ))}
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Assigned By *</label>
-                                <select
-                                    required
-                                    value={formData.assigned_by}
-                                    onChange={(e) => setFormData({ ...formData, assigned_by: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    disabled={loading || users.length === 0}
-                                >
-                                    <option value="">{loading ? 'Loading users...' : 'Select User'}</option>
-                                    {users
-                                        .filter(u => ['admin', 'supervisor', 'planning'].includes(u?.role))
-                                        .map((user) => (
-                                            <option key={user?.user_id} value={user?.user_id}>
-                                                {user?.full_name || user?.username || 'Unknown'} ({user?.role || 'unknown'})
-                                            </option>
-                                        ))}
-                                </select>
-                                {!loading && users.filter(u => ['admin', 'supervisor', 'planning'].includes(u?.role)).length === 0 && (
-                                    <p className="text-xs text-gray-500 mt-1">⚠️ No admin/supervisor/planning users available</p>
-                                )}
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
+                            {formData.category === 'general' && (
+                                <>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Machine *</label>
+                                        <select
+                                            required
+                                            value={formData.machine_id}
+                                            onChange={(e) => setFormData({ ...formData, machine_id: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            disabled={loading || machines.length === 0}
+                                        >
+                                            <option value="">{loading ? 'Loading machines...' : 'Select Machine'}</option>
+                                            {machines.map((machine) => (
+                                                <option key={machine?.id} value={machine?.id}>
+                                                    {resolveMachineName(machine)}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Assign To *</label>
+                                        <select
+                                            required
+                                            value={formData.assigned_to}
+                                            onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        >
+                                            <option value="">{loading ? 'Loading users...' : 'Select User'}</option>
+                                            {users.map((user) => (
+                                                <option key={user?.user_id} value={user?.user_id}>
+                                                    {user?.full_name || user?.username} ({user?.role})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Assigned By *</label>
+                                        <select
+                                            required
+                                            value={formData.assigned_by}
+                                            onChange={(e) => setFormData({ ...formData, assigned_by: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            disabled={loading || users.length === 0}
+                                        >
+                                            <option value="">{loading ? 'Loading users...' : 'Select User'}</option>
+                                            {users
+                                                .filter(u => ['admin', 'supervisor', 'planning'].includes(u?.role))
+                                                .map((user) => (
+                                                    <option key={user?.user_id} value={user?.user_id}>
+                                                        {user?.full_name || user?.username || 'Unknown'} ({user?.role || 'unknown'})
+                                                    </option>
+                                                ))}
+                                        </select>
+                                    </div>
+                                </>
+                            )}
+                            <div className={`grid gap-2 ${formData.category === 'general' ? 'grid-cols-2' : 'grid-cols-1'}`}>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Due Date *</label>
                                     <input
@@ -687,37 +681,44 @@ const Tasks = () => {
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
                                 </div>
+                                {formData.category === 'general' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Expected Time of Completion *</label>
+                                        <input
+                                            type="time"
+                                            required
+                                            value={formData.due_time}
+                                            onChange={(e) => setFormData({ ...formData, due_time: e.target.value })}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                            {formData.category === 'general' && (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Expected Time of Completion *</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Task Completion Duration (HH:MM) *</label>
                                     <input
-                                        type="time"
+                                        type="text"
                                         required
-                                        value={formData.due_time}
-                                        onChange={(e) => setFormData({ ...formData, due_time: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="e.g. 02:30"
+                                        value={formData.expected_completion_time}
+                                        onChange={(e) => setFormData({ ...formData, expected_completion_time: e.target.value })}
+                                        className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     />
+                                    <p className="text-xs text-gray-400 mt-1">Enter hours and minutes (e.g. 02:30 = 150 mins). Total: {hhmmToMinutes(formData.expected_completion_time)}m</p>
                                 </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Task Completion Duration (HH:MM) *</label>
-                                <input
-                                    type="text"
-                                    required
-                                    placeholder="e.g. 02:30"
-                                    value={formData.expected_completion_time}
-                                    onChange={(e) => setFormData({ ...formData, expected_completion_time: e.target.value })}
-                                    className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                                <p className="text-xs text-gray-400 mt-1">Enter hours and minutes (e.g. 02:30 = 150 mins). Total: {hhmmToMinutes(formData.expected_completion_time)}m</p>
-                            </div>
+                            )}
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    {formData.category === 'general' ? 'Description *' : 'Remarks'}
+                                </label>
                                 <textarea
-                                    required
+                                    required={formData.category === 'general'}
                                     value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                     rows="3"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder={formData.category === 'general' ? "Detailed task instructions..." : "Any additional notes..."}
                                 />
                             </div>
                         </div>
