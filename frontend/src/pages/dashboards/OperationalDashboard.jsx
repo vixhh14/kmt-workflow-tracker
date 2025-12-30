@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { getOperationalTasks, updateOperationalTask, getAssignableUsers } from '../../api/services';
 import {
     Plus, CheckCircle, Clock, AlertCircle, TrendingUp, ListTodo,
     Target, User, Hash, MessageSquare, Calendar, ChevronRight,
-    ArrowUpCircle, ArrowDownCircle, Info
+    ArrowUpCircle, ArrowDownCircle, Info, Play, Pause, Square, Filter
 } from 'lucide-react';
+import { getOperationalTasks, updateOperationalTask, getAssignableUsers, getProjects } from '../../api/services';
 import { useAuth } from '../../context/AuthContext';
 
 const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
@@ -41,6 +41,8 @@ const OperationalDashboard = ({ type }) => {
         totalQty: 0,
         completedQty: 0
     });
+    const [projectFilter, setProjectFilter] = useState('all');
+    const [projects, setProjects] = useState([]);
 
     // Masters can assign tasks
     const canAssign = currentUser?.role === 'admin' ||
@@ -49,10 +51,20 @@ const OperationalDashboard = ({ type }) => {
 
     useEffect(() => {
         fetchTasks();
+        fetchProjects();
         if (canAssign) fetchOperators();
         const interval = setInterval(fetchTasks, 15000);
         return () => clearInterval(interval);
     }, [type]);
+
+    const fetchProjects = async () => {
+        try {
+            const res = await getProjects();
+            setProjects(res.data || []);
+        } catch (e) {
+            console.error('Failed to fetch projects:', e);
+        }
+    };
 
     const fetchOperators = async () => {
         try {
@@ -74,9 +86,13 @@ const OperationalDashboard = ({ type }) => {
                 (type === 'filing' && (currentUser?.role === 'file_master' || currentUser?.role === 'FILE_MASTER')) ||
                 (type === 'fabrication' && (currentUser?.role === 'fab_master' || currentUser?.role === 'FAB_MASTER'));
 
-            const filteredData = canSeeAll
+            let filteredData = canSeeAll
                 ? data
                 : data.filter(t => t.assigned_to === currentUser?.user_id || t.assigned_to === null || t.assigned_to === '');
+
+            if (projectFilter !== 'all') {
+                filteredData = filteredData.filter(t => t.project_id === parseInt(projectFilter));
+            }
 
             setTasks(filteredData);
 
@@ -109,6 +125,16 @@ const OperationalDashboard = ({ type }) => {
         }
     };
 
+    const handleUpdateStatus = async (taskId, newStatus) => {
+        try {
+            await updateOperationalTask(type, taskId, { status: newStatus });
+            fetchTasks();
+        } catch (error) {
+            console.error('Failed to update status:', error);
+            alert(error.response?.data?.detail || 'Failed to update status');
+        }
+    };
+
     const handleAssignTask = async (taskId, userId) => {
         try {
             await updateOperationalTask(type, taskId, { assigned_to: userId });
@@ -119,9 +145,12 @@ const OperationalDashboard = ({ type }) => {
         }
     };
 
-    const handleUpdateQuantity = async (task, delta) => {
+    const handleUpdateQuantity = async (task, newValue) => {
         try {
-            const newQty = Math.max(0, Math.min(task.quantity, task.completed_quantity + delta));
+            const qty = parseInt(newValue);
+            if (isNaN(qty)) return;
+
+            const newQty = Math.max(0, Math.min(task.quantity, qty));
             if (newQty === task.completed_quantity) return;
 
             await updateOperationalTask(type, task.id, { completed_quantity: newQty });
@@ -194,14 +223,27 @@ const OperationalDashboard = ({ type }) => {
 
             {/* Tasks Section */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-4 sm:p-6 border-b border-gray-100 flex items-center justify-between">
+                <div className="p-4 sm:p-6 border-b border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <h2 className="text-lg font-bold text-gray-900 flex items-center">
                         <ListTodo className={`mr-2 ${accentText}`} size={20} />
                         Job Queue
                     </h2>
-                    <div className="flex space-x-2">
-                        <span className="text-xs font-bold bg-gray-100 text-gray-600 px-3 py-1 rounded-full border">
-                            {tasks.length} Total Jobs
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                        <div className="relative flex-1 sm:flex-initial">
+                            <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                            <select
+                                value={projectFilter}
+                                onChange={(e) => setProjectFilter(e.target.value)}
+                                className="pl-8 pr-4 py-1.5 text-xs border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 w-full"
+                            >
+                                <option value="all">All Projects</option>
+                                {projects.map(p => (
+                                    <option key={p.id || p.project_id} value={p.id || p.project_id}>{p.name || p.project_name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <span className="text-xs font-bold bg-gray-50 text-gray-600 px-3 py-1.5 rounded-lg border whitespace-nowrap">
+                            {tasks.length} Jobs
                         </span>
                     </div>
                 </div>
@@ -290,44 +332,96 @@ const OperationalDashboard = ({ type }) => {
                                     </div>
 
                                     {/* Task Execution / Progress */}
-                                    <div className="flex flex-col sm:flex-row items-center gap-6 shrink-0 lg:w-[350px]">
+                                    <div className="flex flex-col sm:flex-row items-center gap-4 shrink-0 lg:w-[450px]">
+                                        {/* Status Controls */}
+                                        <div className="flex items-center gap-2 pr-4 border-r border-gray-100">
+                                            {(task.status === 'Pending' || task.status === 'On Hold' || task.status === 'onhold') && (
+                                                <button
+                                                    onClick={() => handleUpdateStatus(task.id, 'In Progress')}
+                                                    className="flex items-center space-x-1.5 bg-green-500 text-white px-3 py-2 rounded-lg font-bold text-xs hover:bg-green-600 transition-all shadow-sm"
+                                                >
+                                                    <Play size={14} fill="currentColor" />
+                                                    <span>{task.status === 'Pending' ? 'START' : 'RESUME'}</span>
+                                                </button>
+                                            )}
+
+                                            {(task.status === 'In Progress' || task.status === 'inprogress') && (
+                                                <>
+                                                    <button
+                                                        onClick={() => handleUpdateStatus(task.id, 'On Hold')}
+                                                        className="flex items-center space-x-1.5 bg-orange-500 text-white px-3 py-2 rounded-lg font-bold text-xs hover:bg-orange-600 transition-all shadow-sm"
+                                                    >
+                                                        <Pause size={14} fill="currentColor" />
+                                                        <span>HOLD</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleUpdateStatus(task.id, 'Completed')}
+                                                        className="flex items-center space-x-1.5 bg-blue-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:bg-blue-700 transition-all shadow-sm"
+                                                    >
+                                                        <Square size={14} fill="currentColor" />
+                                                        <span>END</span>
+                                                    </button>
+                                                </>
+                                            )}
+
+                                            {task.status === 'Completed' && (
+                                                <div className="flex flex-col items-center text-green-600">
+                                                    <CheckCircle size={20} />
+                                                    <span className="text-[10px] font-black uppercase mt-1">Done</span>
+                                                </div>
+                                            )}
+                                        </div>
+
                                         <div className="w-full flex-1">
                                             <div className="flex items-center justify-between mb-2">
-                                                <span className="text-xs font-bold text-gray-500 uppercase tracking-tighter">Production Completion</span>
-                                                <span className="text-sm font-black text-gray-900">{task.completed_quantity} <span className="text-gray-400 font-medium">/ {task.quantity}</span></span>
+                                                <span className={`text-[10px] font-black uppercase tracking-wider ${task.status === 'In Progress' ? 'text-green-600' : 'text-gray-400'}`}>
+                                                    {task.status}
+                                                </span>
+                                                <div className="flex items-center space-x-2">
+                                                    <input
+                                                        type="number"
+                                                        value={task.completed_quantity}
+                                                        onChange={(e) => handleUpdateQuantity(task, e.target.value)}
+                                                        className="w-14 text-center text-sm font-black text-gray-900 border-gray-200 rounded-lg p-1 focus:ring-1 focus:ring-blue-500"
+                                                        min="0"
+                                                        max={task.quantity}
+                                                    />
+                                                    <span className="text-gray-400 font-medium">/ {task.quantity}</span>
+                                                </div>
                                             </div>
-                                            <div className="h-3 bg-gray-100 rounded-full overflow-hidden border border-gray-100 shadow-inner">
+                                            <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden border border-gray-100 shadow-inner">
                                                 <div
                                                     className={`h-full transition-all duration-500 ease-out shadow-sm ${accentBg}`}
                                                     style={{ width: `${(task.completed_quantity / task.quantity) * 100}%` }}
                                                 />
                                             </div>
+                                            {task.completed_at && (
+                                                <p className="text-[9px] text-gray-400 mt-1 font-medium italic">
+                                                    Finished: {new Date(task.completed_at).toLocaleString()}
+                                                </p>
+                                            )}
+                                            {task.total_active_duration > 0 && (
+                                                <p className="text-[10px] text-gray-500 mt-1 font-bold">
+                                                    ⏱ Active Time: {Math.floor(task.total_active_duration / 3600)}h {Math.floor((task.total_active_duration % 3600) / 60)}m {task.total_active_duration % 60}s
+                                                </p>
+                                            )}
                                         </div>
 
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex flex-col items-center justify-center gap-1 min-w-[60px]">
                                             <button
-                                                onClick={() => handleUpdateQuantity(task, -1)}
-                                                disabled={task.completed_quantity === 0 || !canAssign}
-                                                className="p-2 rounded-xl border border-gray-200 hover:border-red-500 hover:text-red-500 transition-all bg-white shadow-sm disabled:opacity-30 disabled:hover:border-gray-200 disabled:hover:text-gray-400"
+                                                onClick={() => handleUpdateQuantity(task, task.completed_quantity + 1)}
+                                                disabled={task.completed_quantity >= task.quantity}
+                                                className={`p-1.5 rounded-lg ${accentBg} text-white shadow-sm hover:scale-110 active:scale-90 transition-all disabled:opacity-30`}
                                             >
-                                                <ArrowDownCircle size={20} />
+                                                <ArrowUpCircle size={18} />
                                             </button>
                                             <button
-                                                onClick={() => handleUpdateQuantity(task, 1)}
-                                                disabled={task.completed_quantity >= task.quantity || !canAssign}
-                                                className={`p-3 rounded-2xl ${accentBg} text-white shadow-md hover:scale-105 active:scale-95 transition-all disabled:opacity-30 disabled:hover:scale-100`}
+                                                onClick={() => handleUpdateQuantity(task, task.completed_quantity - 1)}
+                                                disabled={task.completed_quantity === 0}
+                                                className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-red-500 transition-all bg-white disabled:opacity-30"
                                             >
-                                                <ArrowUpCircle size={24} />
+                                                <ArrowDownCircle size={18} />
                                             </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Machine Info */}
-                                    <div className="shrink-0 flex flex-col justify-center border-l border-gray-100 pl-6 hidden xl:flex">
-                                        <div className="text-[10px] font-bold text-gray-400 uppercase mb-1">Assigned Station</div>
-                                        <div className="flex items-center space-x-2 text-sm font-bold text-gray-800">
-                                            <Info size={14} className={accentText} />
-                                            <span>{task.machine_name || 'General Station'}</span>
                                         </div>
                                     </div>
                                 </div>
