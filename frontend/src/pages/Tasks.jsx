@@ -71,6 +71,7 @@ const Tasks = () => {
         nos_unit: '',
         status: 'pending',
         priority: 'medium',
+        category: 'general', // New: general, filing, fabrication
         assigned_to: '',
         assigned_by: '',
         machine_id: '',
@@ -146,27 +147,45 @@ const Tasks = () => {
                 return;
             }
 
-            const durationMinutes = hhmmToMinutes(formData.expected_completion_time);
-            if (durationMinutes <= 0) {
-                alert('Expected duration must be greater than 0');
-                return;
+            if (formData.category === 'general') {
+                const durationMinutes = hhmmToMinutes(formData.expected_completion_time);
+                if (durationMinutes <= 0) {
+                    alert('Expected duration must be greater than 0');
+                    return;
+                }
+
+                // Combine Date and Time for due_datetime
+                let due_datetime = null;
+                if (formData.due_date) {
+                    const timeStr = formData.due_time || '09:00';
+                    due_datetime = `${formData.due_date}T${timeStr}:00`;
+                }
+
+                const payload = {
+                    ...formData,
+                    due_datetime: due_datetime,
+                    expected_completion_time: durationMinutes
+                };
+
+                await createTask(payload);
+            } else {
+                // Filing or Fabrication
+                const payload = {
+                    project_id: parseInt(formData.project_id),
+                    part_item: formData.title || formData.part_item, // Use title as part_item
+                    quantity: parseInt(formData.nos_unit) || 1,
+                    due_date: formData.due_date,
+                    priority: formData.priority,
+                    assigned_to: formData.assigned_to,
+                    machine_id: formData.machine_id,
+                    work_order_number: formData.work_order_number,
+                    task_type: formData.category.toUpperCase()
+                };
+
+                await createOperationalTask(formData.category, payload);
             }
 
-            // Combine Date and Time for due_datetime
-            let due_datetime = null;
-            if (formData.due_date) {
-                // Use selected time or default to 09:00
-                const timeStr = formData.due_time || '09:00';
-                due_datetime = `${formData.due_date}T${timeStr}:00`;
-            }
-
-            const payload = {
-                ...formData,
-                due_datetime: due_datetime,
-                expected_completion_time: durationMinutes
-            };
-
-            await createTask(payload);
+            // Reset Form and Refetch
             setFormData({
                 title: '',
                 work_order_number: '',
@@ -177,6 +196,7 @@ const Tasks = () => {
                 nos_unit: '',
                 status: 'pending',
                 priority: 'medium',
+                category: 'general',
                 assigned_to: '',
                 assigned_by: '',
                 machine_id: '',
@@ -186,11 +206,11 @@ const Tasks = () => {
             });
             setShowForm(false);
             fetchData();
-            alert('Task created successfully!');
+            alert(`${formData.category.charAt(0).toUpperCase() + formData.category.slice(1)} task created successfully!`);
         } catch (error) {
-            console.error('Failed to create task:', error);
+            console.error(`Failed to create ${formData.category} task:`, error);
             const detail = error.response?.data?.detail;
-            const message = typeof detail === 'string' ? detail : 'Failed to create task';
+            const message = typeof detail === 'string' ? detail : `Failed to create ${formData.category} task`;
             alert(message);
         }
     };
@@ -491,8 +511,31 @@ const Tasks = () => {
                     <h3 className="text-lg font-semibold mb-4">Add New Task</h3>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Task Category *</label>
+                                <div className="flex gap-2">
+                                    {['general', 'filing', 'fabrication'].map(cat => (
+                                        <button
+                                            key={cat}
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, category: cat })}
+                                            className={`flex-1 py-2 px-4 rounded-lg border text-sm font-bold uppercase transition-all ${formData.category === cat
+                                                ? 'bg-blue-600 text-white border-blue-600 shadow-md'
+                                                : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                                                }`}
+                                        >
+                                            {cat}
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-[10px] text-gray-500 mt-1 uppercase">
+                                    {formData.category === 'general' && '🛠️ Standard operational workflow tasks'}
+                                    {formData.category === 'filing' && '🔹 specialized filing/polishing workflow'}
+                                    {formData.category === 'fabrication' && '🔸 specialized fabrication workflow'}
+                                </p>
+                            </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Title / Part Name *</label>
                                 <input
                                     type="text"
                                     required
