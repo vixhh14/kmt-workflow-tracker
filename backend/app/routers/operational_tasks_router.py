@@ -120,7 +120,13 @@ async def create_operational_task(
     # Set assigned_by from current user token
     task_data["assigned_by"] = current_user.user_id
 
-    # Handle User Resolution
+    # Automatic Assignment based on task_type
+    if task_type.lower() == "filing":
+        task_data["assigned_to"] = "FILE_MASTER"
+    elif task_type.lower() == "fabrication":
+        task_data["assigned_to"] = "FAB_MASTER"
+
+    # Handle User Resolution (Username -> ID)
     assigned_to = task_data.get("assigned_to")
     if not assigned_to:
         task_data["assigned_to"] = None
@@ -132,6 +138,10 @@ async def create_operational_task(
             if assignee:
                 task_data["assigned_to"] = assignee.user_id
             else:
+                 # Fallback: if master user doesn't exist by username, log warning or raise error
+                 # For auto-assignment, we expect these users to exist.
+                 if assigned_to in ["FILE_MASTER", "FAB_MASTER"]:
+                     raise HTTPException(status_code=400, detail=f"Required Master User '{assigned_to}' not found in database. Please ensure it exists.")
                  raise HTTPException(status_code=400, detail=f"Assigned user '{assigned_to}' does not exist")
 
     try:
@@ -186,8 +196,9 @@ async def update_operational_task(
             if key in update_data:
                 setattr(db_task, key, update_data[key])
     elif role == "operator" and db_task.assigned_to == current_user.user_id:
-        # Operators can only update their own progress
-        execution_fields = ["completed_quantity", "remarks", "status"]
+        # Operators can only update their own progress (status and remarks)
+        # They CANNOT change completed_quantity as per strict requirements
+        execution_fields = ["remarks", "status"]
         for key in execution_fields:
             if key in update_data:
                 setattr(db_task, key, update_data[key])
