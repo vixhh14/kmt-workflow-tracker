@@ -37,13 +37,20 @@ async def read_operational_tasks(
     # Admin and Planning see all
     if role in ["admin", "planning"]:
         pass
-    # Masters see all of their type
-    elif (task_type == "filing" and role.lower() == "file_master") or \
-         (task_type == "fabrication" and role.lower() == "fab_master"):
-        pass
+    # Filing Master
+    elif role.lower() == "file_master":
+        if task_type != "filing":
+             raise HTTPException(status_code=403, detail="File Masters can only access filing tasks")
+    # Fab Master
+    elif role.lower() == "fab_master":
+        if task_type != "fabrication":
+             raise HTTPException(status_code=403, detail="Fab Masters can only access fabrication tasks")
     # Operators see only assigned to them or unassigned
-    else:
+    elif role.lower() == "operator":
         query = query.filter(or_(model.assigned_to == user_id, model.assigned_to == None))
+    else:
+        # Other roles might also be restricted
+        raise HTTPException(status_code=403, detail="Unauthorized role for operational tasks")
         
     tasks = query.order_by(model.created_at.desc()).all()
     

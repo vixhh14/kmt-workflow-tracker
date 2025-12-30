@@ -30,6 +30,7 @@ async def read_machines(db: Session = Depends(get_db)):
         {
             "id": m.id,
             "machine_name": m.machine_name,
+            "name": m.machine_name,
             "status": m.status,
             "hourly_rate": m.hourly_rate,
             "last_maintenance": m.last_maintenance,
