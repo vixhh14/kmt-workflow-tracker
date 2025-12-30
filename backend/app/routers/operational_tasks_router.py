@@ -171,33 +171,76 @@ async def update_operational_task(
                  raise HTTPException(status_code=400, detail=f"Assigned user '{assigned_to}' does not exist")
 
     # Execution-level fields can be updated by Masters or Admin
+    current_status = db_task.status
+    new_status = update_data.get("status")
+    now = get_current_time_ist()
+
     if role == "admin":
         for key, value in update_data.items():
             setattr(db_task, key, value)
     elif (task_type == "filing" and role.lower() == "file_master") or \
-         (task_type == "fabrication" and role.lower() == "fab_master"):
-        # Masters can only update execution fields
-        execution_fields = ["assigned_to", "completed_quantity", "remarks", "status"]
-        for key in execution_fields:
-            if key in update_data:
-                setattr(db_task, key, update_data[key])
-    elif role == "operator" and db_task.assigned_to == current_user.user_id:
-        # Operators can only update their own progress (status and remarks)
-        # They CANNOT change completed_quantity as per strict requirements
-        execution_fields = ["remarks", "status"]
+         (task_type == "fabrication" and role.lower() == "fab_master") or \
+         (role == "operator" and db_task.assigned_to == current_user.user_id):
+        
+        # Masters and assigned Operators can update status and execute
+        execution_fields = ["assigned_to", "completed_quantity", "remarks", "status", "started_at", "on_hold_at", "resumed_at", "completed_at", "total_active_duration"]
         for key in execution_fields:
             if key in update_data:
                 setattr(db_task, key, update_data[key])
     else:
         raise HTTPException(status_code=403, detail="You do not have permission to update this task")
     
+    # --- STATUS FLOW & TIMESTAMP LOGIC ---
+    if new_status and new_status != current_status:
+        # PENDING -> IN PROGRESS
+        if new_status == "In Progress":
+            if not db_task.started_at:
+                db_task.started_at = now
+            db_task.resumed_at = now
+            db_task.on_hold_at = None
+        
+        # IN PROGRESS -> ON HOLD
+        elif new_status == "On Hold":
+            db_task.on_hold_at = now
+            # Calculate duration since last resume or start
+            start_ref = db_task.resumed_at or db_task.started_at
+            if start_ref:
+                duration = int((now - start_ref).total_seconds())
+                db_task.total_active_duration = (db_task.total_active_duration or 0) + duration
+            db_task.resumed_at = None
+
+        # IN PROGRESS -> COMPLETED
+        elif new_status == "Completed":
+            db_task.completed_at = now
+            # Final duration calculation
+            start_ref = db_task.resumed_at or db_task.started_at
+            if start_ref and current_status == "In Progress":
+                duration = int((now - start_ref).total_seconds())
+                db_task.total_active_duration = (db_task.total_active_duration or 0) + duration
+            db_task.resumed_at = None
+            db_task.on_hold_at = None
+            # Ensure quantity matches
+            db_task.completed_quantity = db_task.quantity
+
     # Auto status update: Completed (auto when quantity matches)
-    if db_task.completed_quantity >= db_task.quantity:
+    if db_task.completed_quantity >= db_task.quantity and db_task.status != "Completed":
         db_task.status = "Completed"
+        db_task.completed_at = now
+        # Also handle duration if it was in progress
+        if current_status == "In Progress":
+            start_ref = db_task.resumed_at or db_task.started_at
+            if start_ref:
+                duration = int((now - start_ref).total_seconds())
+                db_task.total_active_duration = (db_task.total_active_duration or 0) + duration
+        db_task.resumed_at = None
+        db_task.on_hold_at = None
     elif db_task.completed_quantity > 0 and db_task.status == "Pending":
          db_task.status = "In Progress"
+         if not db_task.started_at:
+             db_task.started_at = now
+         db_task.resumed_at = now
 
-    db_task.updated_at = get_current_time_ist()
+    db_task.updated_at = now
     db.commit()
     db.refresh(db_task)
     
@@ -206,7 +249,9 @@ async def update_operational_task(
     machine_name = db_task.machine.machine_name if db_task.machine else "Unknown Machine"
     assignee_name = db_task.assignee.full_name or db_task.assignee.username if db_task.assignee else None
     
+    # Construct response with new fields
     task_dict = {c.name: getattr(db_task, c.name) for c in db_task.__table__.columns}
+    # Ensure datetimes are serialized if they aren't already handled by Pydantic
     return OperationalTaskOut(
         **task_dict,
         project_name=project_name,

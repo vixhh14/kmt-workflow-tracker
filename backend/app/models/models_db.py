@@ -286,6 +286,11 @@ class FilingTask(Base):
     work_order_number = Column(String, nullable=True)
     assigned_by = Column(String, ForeignKey("users.user_id"), nullable=True)
     is_deleted = Column(Boolean, default=False)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    on_hold_at = Column(DateTime(timezone=True), nullable=True)
+    resumed_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    total_active_duration = Column(Integer, default=0) # in seconds
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
     updated_at = Column(DateTime(timezone=True), default=get_current_time_ist, onupdate=get_current_time_ist)
 
@@ -312,6 +317,11 @@ class FabricationTask(Base):
     work_order_number = Column(String, nullable=True)
     assigned_by = Column(String, ForeignKey("users.user_id"), nullable=True)
     is_deleted = Column(Boolean, default=False)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    on_hold_at = Column(DateTime(timezone=True), nullable=True)
+    resumed_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    total_active_duration = Column(Integer, default=0) # in seconds
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
     updated_at = Column(DateTime(timezone=True), default=get_current_time_ist, onupdate=get_current_time_ist)
 
