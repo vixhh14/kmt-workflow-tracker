@@ -11,7 +11,7 @@ import {
 import { Plus, Trash2, Edit2, CheckCircle, Clock, AlertCircle, User, MessageSquare, Hash, Calendar, Play, Pause, Square, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-const OperationalTaskSection = ({ type, machineId, machineName, userId, userName }) => {
+const OperationalTaskSection = ({ type, machineId, machineName, userId, userName, initialProjects, initialUsers }) => {
     const { user: currentUser } = useAuth();
     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'planning';
 
@@ -40,37 +40,58 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
     const fetchData = async () => {
         try {
             setLoading(true);
+            console.log(`🔄 Fetching operational data for ${type}...`);
 
             if (userId) {
-                // Fetch all operational tasks for this user
                 const [tasksRes, projectsRes, usersRes] = await Promise.all([
                     getUserOperationalTasks(userId),
-                    getProjectsDropdown(),
-                    getAssignableUsers()
-                ]);
-                setTasks(tasksRes.data || []);
-                setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : []);
-                setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
-            } else {
-                // Fetch tasks for a specific type and filter by machine
-                const [tasksRes, projectsRes, usersRes] = await Promise.all([
-                    getOperationalTasks(type),
-                    getProjectsDropdown(),
-                    getAssignableUsers()
+                    initialProjects ? Promise.resolve({ data: initialProjects }) : getProjectsDropdown(),
+                    initialUsers ? Promise.resolve({ data: initialUsers }) : getAssignableUsers()
                 ]);
 
+                const tasksData = Array.isArray(tasksRes?.data) ? tasksRes.data : [];
+                const projectsData = Array.isArray(projectsRes?.data) ? projectsRes.data : [];
+                const usersData = Array.isArray(usersRes?.data) ? usersRes.data : [];
+
+                console.log(`✅ Data loaded for user ${userId}:`, {
+                    tasks: tasksData.length,
+                    projects: projectsData.length,
+                    users: usersData.length,
+                    source: initialProjects ? 'props' : 'api'
+                });
+
+                setTasks(tasksData);
+                setProjects(projectsData);
+                setUsers(usersData);
+            } else {
+                const [tasksRes, projectsRes, usersRes] = await Promise.all([
+                    getOperationalTasks(type),
+                    initialProjects ? Promise.resolve({ data: initialProjects }) : getProjectsDropdown(),
+                    initialUsers ? Promise.resolve({ data: initialUsers }) : getAssignableUsers()
+                ]);
+
+                const allTasks = Array.isArray(tasksRes?.data) ? tasksRes.data : [];
+                const projectsData = Array.isArray(projectsRes?.data) ? projectsRes.data : [];
+                const usersData = Array.isArray(usersRes?.data) ? usersRes.data : [];
+
+                console.log(`✅ Data loaded for ${type}:`, {
+                    allTasks: allTasks.length,
+                    projects: projectsData.length,
+                    users: usersData.length,
+                    source: initialProjects ? 'props' : 'api'
+                });
+
                 // Filter tasks by machineId if provided
-                const allTasks = tasksRes.data || [];
                 const filteredTasks = machineId
-                    ? allTasks.filter(t => t.machine_id === machineId)
+                    ? allTasks.filter(t => String(t.machine_id) === String(machineId))
                     : allTasks;
 
                 setTasks(filteredTasks);
-                setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : []);
-                setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+                setProjects(projectsData);
+                setUsers(usersData);
             }
         } catch (error) {
-            console.error(`Failed to fetch tasks:`, error);
+            console.error(`❌ Failed to fetch operational data:`, error);
         } finally {
             setLoading(false);
         }
@@ -212,12 +233,16 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
                                         });
                                     }}
                                 >
-                                    <option value="" disabled hidden>-- Select Project --</option>
-                                    {projects.length > 0 ? (
+                                    <option value="" disabled hidden>
+                                        {loading ? '-- Loading Projects --' : projects.length === 0 ? '-- No Projects Available --' : '-- Select Project --'}
+                                    </option>
+                                    {Array.isArray(projects) && projects.length > 0 ? (
                                         projects.map(p => (
-                                            <option key={p.id || p.project_id} value={p.id || p.project_id}>{p.name || p.project_name}</option>
+                                            <option key={p?.id || p?.project_id || Math.random()} value={p?.id || p?.project_id || ''}>
+                                                {p?.name || p?.project_name || 'Unknown Project'}
+                                            </option>
                                         ))
-                                    ) : (
+                                    ) : !loading && (
                                         <option disabled>No projects available</option>
                                     )}
                                 </select>
@@ -297,14 +322,18 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
                                         value={formData.assigned_to}
                                         onChange={e => setFormData({ ...formData, assigned_to: e.target.value })}
                                     >
-                                        <option value="" disabled hidden>-- Select User --</option>
+                                        <option value="" disabled hidden>
+                                            {loading ? '-- Loading Users --' : users.length === 0 ? '-- No Users Available --' : '-- Select User --'}
+                                        </option>
                                         <option value="">Auto-Assign Later</option>
-                                        {users.filter(u => {
-                                            const role = (u.role || '').toLowerCase();
+                                        {Array.isArray(users) && users.filter(u => {
+                                            const role = (u?.role || '').toLowerCase();
                                             const targetRole = type === 'filing' ? 'file_master' : 'fab_master';
                                             return role === targetRole || role === 'operator';
                                         }).map(u => (
-                                            <option key={u.id || u.user_id} value={u.id || u.user_id}>{u.name || u.full_name || u.username}</option>
+                                            <option key={u?.id || u?.user_id || Math.random()} value={u?.id || u?.user_id || ''}>
+                                                {u?.name || u?.full_name || u?.username || 'Unknown User'} ({u?.role || 'operator'})
+                                            </option>
                                         ))}
                                     </select>
                                 </div>

@@ -500,14 +500,14 @@ const AdminDashboard = () => {
                         <span className="w-3 h-3 bg-blue-600 rounded-full mr-2"></span>
                         Filing Monitoring
                     </h2>
-                    <OperationalTaskSection type="filing" />
+                    <OperationalTaskSection type="filing" initialProjects={projects} />
                 </div>
                 <div className="bg-white rounded-lg shadow p-6">
                     <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
                         <span className="w-3 h-3 bg-orange-600 rounded-full mr-2"></span>
                         Fabrication Monitoring
                     </h2>
-                    <OperationalTaskSection type="fabrication" />
+                    <OperationalTaskSection type="fabrication" initialProjects={projects} />
                 </div>
             </div>
 
