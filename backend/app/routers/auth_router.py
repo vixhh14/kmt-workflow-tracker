@@ -18,6 +18,15 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     Authenticate user and return JWT token.
     """
     import time
+    from app.core.config import JWT_SECRET
+    
+    if not JWT_SECRET:
+        print("❌ CRITICAL: JWT_SECRET is not set in environment variables.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Server configuration error"
+        )
+
     start_time = time.time()
     print(f"Login request received for: {credentials.username}")
     
@@ -36,25 +45,43 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
             )
         
         # Check approval status
-        # Admin bypasses approval check (optional, but good for safety)
-        if user.role != 'admin':
-            if hasattr(user, 'approval_status'):
-                if user.approval_status == 'pending':
-                    print("User pending approval")
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Your account is awaiting approval by the admin.",
-                    )
-                elif user.approval_status == 'rejected':
-                    print("User rejected")
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Your account registration was rejected. Please contact admin.",
-                    )
+        # Admin bypasses approval check
+        user_role = (user.role or "").lower()
+        if user_role != 'admin':
+            # Safe access to approval_status
+            approval = getattr(user, 'approval_status', 'pending')
+            if approval == 'pending':
+                print("User pending approval")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Your account is awaiting approval by the admin.",
+                )
+            elif approval == 'rejected':
+                print("User rejected")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Your account registration was rejected. Please contact admin.",
+                )
         
         # Verify password
+        if not user.password_hash:
+            print(f"User {user.username} has no password hash set.")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
         t2 = time.time()
-        is_valid = verify_password(credentials.password, user.password_hash)
+        try:
+            is_valid = verify_password(credentials.password, user.password_hash)
+        except Exception as e:
+            print(f"Error during password verification for {credentials.username}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal authentication error"
+            )
+
         print(f"Password verification took: {time.time() - t2:.4f}s")
         
         if not is_valid:
@@ -67,31 +94,40 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
         
         # Create access token
         t3 = time.time()
-        access_token = create_access_token(
-            data={
-                "sub": user.username,
-                "user_id": user.user_id,
-                "role": user.role
+        try:
+            token_data = {
+                "sub": user.username or "",
+                "user_id": user.user_id or "",
+                "role": user_role
             }
-        )
+            access_token = create_access_token(data=token_data)
+        except Exception as e:
+            print(f"Error creating access token for {credentials.username}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not generate authentication token"
+            )
         print(f"Token creation took: {time.time() - t3:.4f}s")
         
         # Automatically mark user as present for today
         try:
             from app.services import attendance_service
             t4 = time.time()
-            attendance_result = attendance_service.mark_present(
-                db=db,
-                user_id=user.user_id,
-                ip_address=None  # Could get from request if needed
-            )
-            print(f"Attendance marking took: {time.time() - t4:.4f}s")
-            if attendance_result.get("success"):
-                print(f"✅ Attendance marked for {user.username}: {attendance_result.get('message')}")
+            if hasattr(attendance_service, 'mark_present'):
+                 attendance_result = attendance_service.mark_present(
+                    db=db,
+                    user_id=user.user_id,
+                    ip_address=None
+                )
+                 print(f"Attendance marking took: {time.time() - t4:.4f}s")
+                 if attendance_result.get("success"):
+                     print(f"✅ Attendance marked for {user.username}: {attendance_result.get('message')}")
+                 else:
+                     print(f"⚠️ Attendance marking failed: {attendance_result.get('message')}")
             else:
-                print(f"⚠️ Attendance marking failed: {attendance_result.get('message')}")
+                 print("⚠️ mark_present function not found in attendance_service")
         except Exception as e:
-            print(f"❌ Error marking attendance: {e}")
+            print(f"❌ Error marking attendance (non-blocking): {e}")
             # Don't fail login if attendance fails
         
         print(f"Total login time: {time.time() - start_time:.4f}s")
@@ -104,7 +140,7 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
                 "user_id": user.user_id,
                 "username": user.username,
                 "email": user.email,
-                "role": user.role,
+                "role": user_role,
                 "full_name": user.full_name
             }
         )
