@@ -92,7 +92,11 @@ def calculate_user_activity(db: Session, target_date: date) -> List[dict]:
     """
     Calculate user activity for a specific date (IST).
     """
-    users = db.query(User).filter(User.role.in_(['operator', 'supervisor'])).all()
+    users = db.query(User).filter(
+        User.role.in_(['operator', 'supervisor']),
+        or_(User.is_deleted == False, User.is_deleted == None),
+        User.approval_status == 'approved'
+    ).all()
     # user_id -> {work_time, completed_tasks, machines}
     user_stats = {u.user_id: {"work_time": 0, "completed_tasks": 0, "obj": u, "machines": set()} for u in users}
     
