@@ -20,7 +20,7 @@ async def get_admin_dashboard(db: Session = Depends(get_db)):
     try:
         # 1. Projects
         projects = db.query(Project).filter(or_(Project.is_deleted == False, Project.is_deleted == None)).all()
-        project_list = [{"id": p.project_id, "name": p.project_name, "code": p.project_code} for p in projects]
+        project_list = [{"id": p.project_id, "name": p.project_name, "code": p.project_code, "work_order": p.work_order_number} for p in projects]
         
         # 2. Tasks
         tasks = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None)).all()
@@ -32,7 +32,7 @@ async def get_admin_dashboard(db: Session = Depends(get_db)):
         
         # 4. Users (all)
         users = db.query(User).filter(User.is_deleted == False).all()
-        user_list = [{"id": u.user_id, "username": u.username, "role": u.role} for u in users]
+        user_list = [{"id": u.user_id, "username": u.username, "role": u.role, "full_name": u.full_name} for u in users]
         
         # 5. Operators only
         operators = db.query(User).filter(User.role == 'operator', User.is_deleted == False).all()
@@ -73,7 +73,7 @@ async def get_supervisor_dashboard(db: Session = Depends(get_db)):
     try:
         # 1. Projects
         projects = db.query(Project).filter(or_(Project.is_deleted == False, Project.is_deleted == None)).all()
-        project_list = [{"id": p.project_id, "name": p.project_name} for p in projects]
+        project_list = [{"id": p.project_id, "name": p.project_name, "code": p.project_code} for p in projects]
         
         # 2. Tasks
         tasks = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None)).all()
@@ -98,6 +98,7 @@ async def get_supervisor_dashboard(db: Session = Depends(get_db)):
             "operators": operator_list,
             "overview": {
                 "tasks": overview.get("tasks", {}),
+                "machines": overview.get("machines", {}),
                 "projects": project_stats
             }
         }
