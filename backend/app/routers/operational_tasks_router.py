@@ -112,22 +112,31 @@ async def create_operational_task(
     }
 
     # Automatic Assignment based on task_type
-    if task_type.lower() == "filing":
-        assigned_to_username = "FILE_MASTER"
-    elif task_type.lower() == "fabrication":
-        assigned_to_username = "FAB_MASTER"
-    else:
-        assigned_to_username = None
+    # Automatic Assignment based on task_type
+    target_role = None
+    target_username = None
 
-    if assigned_to_username:
-        # Resolve username to user_id
-        assignee = db.query(User).filter(User.username == assigned_to_username).first()
+    if task_type.lower() == "filing":
+        target_username = "FILE_MASTER"
+        target_role = "file_master"
+    elif task_type.lower() == "fabrication":
+        target_username = "FAB_MASTER"
+        target_role = "fab_master"
+    
+    if target_username:
+        # 1. Try by username (case-insensitive)
+        assignee = db.query(User).filter(User.username.ilike(target_username)).first()
+        
+        # 2. If not found, try by role
+        if not assignee and target_role:
+             assignee = db.query(User).filter(User.role == target_role).first()
+
         if assignee:
             task_data["assigned_to"] = assignee.user_id
         else:
-            # Fallback for masters: if they don't exist, we still create the task but warn (or just set to None)
-            # The UI expects these to exist.
-            print(f"Warning: Master user {assigned_to_username} not found for auto-assignment")
+            # Fallback: Create or Warn? 
+            # We warn but allow creation (assigned_to will be None)
+            print(f"Warning: Master user '{target_username}' or role '{target_role}' not found for auto-assignment")
             task_data["assigned_to"] = None
 
     try:
