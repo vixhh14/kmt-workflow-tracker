@@ -5,12 +5,13 @@ import {
     updateOperationalTask,
     deleteOperationalTask,
     getProjectsDropdown,
-    getAssignableUsers
+    getAssignableUsers,
+    getUserOperationalTasks
 } from '../api/services';
 import { Plus, Trash2, Edit2, CheckCircle, Clock, AlertCircle, User, MessageSquare, Hash, Calendar, Play, Pause, Square, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-const OperationalTaskSection = ({ type, machineId, machineName }) => {
+const OperationalTaskSection = ({ type, machineId, machineName, userId, userName }) => {
     const { user: currentUser } = useAuth();
     const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'planning';
 
@@ -34,28 +35,42 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
 
     useEffect(() => {
         fetchData();
-    }, [type, machineId]);
+    }, [type, machineId, userId]);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [tasksRes, projectsRes, usersRes] = await Promise.all([
-                getOperationalTasks(type),
-                getProjectsDropdown(),
-                getAssignableUsers()
-            ]);
 
-            // Filter tasks by machineId if provided
-            const allTasks = tasksRes.data || [];
-            const filteredTasks = machineId
-                ? allTasks.filter(t => t.machine_id === machineId)
-                : allTasks;
+            if (userId) {
+                // Fetch all operational tasks for this user
+                const [tasksRes, projectsRes, usersRes] = await Promise.all([
+                    getUserOperationalTasks(userId),
+                    getProjectsDropdown(),
+                    getAssignableUsers()
+                ]);
+                setTasks(tasksRes.data || []);
+                setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : []);
+                setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+            } else {
+                // Fetch tasks for a specific type and filter by machine
+                const [tasksRes, projectsRes, usersRes] = await Promise.all([
+                    getOperationalTasks(type),
+                    getProjectsDropdown(),
+                    getAssignableUsers()
+                ]);
 
-            setTasks(filteredTasks);
-            setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : []);
-            setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+                // Filter tasks by machineId if provided
+                const allTasks = tasksRes.data || [];
+                const filteredTasks = machineId
+                    ? allTasks.filter(t => t.machine_id === machineId)
+                    : allTasks;
+
+                setTasks(filteredTasks);
+                setProjects(Array.isArray(projectsRes.data) ? projectsRes.data : []);
+                setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+            }
         } catch (error) {
-            console.error(`Failed to fetch ${type} tasks:`, error);
+            console.error(`Failed to fetch tasks:`, error);
         } finally {
             setLoading(false);
         }
@@ -156,12 +171,15 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
         <div className="mt-4 space-y-4 border-t pt-4">
             <div className="flex items-center justify-between">
                 <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider flex items-center">
-                    {type === 'filing' ? '🔹 Filing Tasks' : '🔸 Fabrication Tasks'}
+                    {userId
+                        ? `👤 Tasks for ${userName || userId}`
+                        : (type === 'filing' ? '🔹 Filing Tasks' : '🔸 Fabrication Tasks')
+                    }
                     <span className="ml-2 bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full text-[10px]">
                         {tasks.length}
                     </span>
                 </h4>
-                {isAdmin && (
+                {isAdmin && !userId && (
                     <button
                         onClick={() => {
                             setEditingTask(null);
@@ -386,8 +404,8 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
                                             <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${getStatusColor(task.status)}`}>
                                                 {task.status}
                                             </span>
-                                            {/* Minimal Quick Status Controls for Admin */}
-                                            {isAdmin && (
+                                            {/* Minimal Quick Status Controls for Admin and Assignee */}
+                                            {(isAdmin || (task.assigned_to === currentUser?.user_id)) && (
                                                 <div className="flex items-center gap-1">
                                                     {(task.status === 'Pending' || task.status === 'On Hold') && (
                                                         <button onClick={() => handleUpdateStatus(task.id, 'In Progress')} className="p-0.5 text-green-600 hover:bg-green-50 rounded">
