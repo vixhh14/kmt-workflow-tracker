@@ -5,7 +5,7 @@ from datetime import datetime
 class TaskBase(BaseModel):
     title: str
     project: Optional[str] = None
-    project_id: Optional[int] = None
+    project_id: Optional[str] = None
     description: Optional[str] = None
     part_item: Optional[str] = None
     nos_unit: Optional[str] = None
@@ -57,7 +57,7 @@ class TaskOut(TaskBase):
 from datetime import date
 
 class OperationalTaskBase(BaseModel):
-    project_id: Optional[int] = None
+    project_id: Optional[str] = None # Changed to str to match model
     part_item: Optional[str] = None
     quantity: int = 1
     due_date: Optional[date] = None
@@ -80,7 +80,7 @@ class OperationalTaskUpdate(BaseModel):
     remarks: Optional[str] = None
     status: Optional[str] = None
     # For Admin edits
-    project_id: Optional[int] = None
+    project_id: Optional[str] = None
     part_item: Optional[str] = None
     quantity: Optional[int] = None
     due_date: Optional[date] = None

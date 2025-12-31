@@ -15,9 +15,9 @@ class ProjectUpdate(BaseModel):
     project_code: Optional[str] = None
 
 class ProjectOut(BaseModel):
-    project_id: int
+    project_id: str
     project_name: str
-    id: Optional[int] = None
+    id: Optional[str] = None
     name: Optional[str] = None
     work_order_number: Optional[str] = None
     client_name: Optional[str] = None
