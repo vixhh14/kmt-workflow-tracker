@@ -278,7 +278,7 @@ class FilingTask(Base):
     quantity = Column(Integer, default=1)
     due_date = Column(Date, nullable=True)
     priority = Column(String, default="medium")
-    assigned_to = Column(String, ForeignKey("users.user_id"), nullable=True)
+    assigned_to = Column(String, nullable=True) # Changed from ForeignKey to allow manual text assignment
     completed_quantity = Column(Integer, default=0)
     remarks = Column(String, nullable=True)
     status = Column(String, default="Pending") # Pending, In Progress, On Hold, Completed
@@ -309,7 +309,7 @@ class FabricationTask(Base):
     quantity = Column(Integer, default=1)
     due_date = Column(Date, nullable=True)
     priority = Column(String, default="medium")
-    assigned_to = Column(String, ForeignKey("users.user_id"), nullable=True)
+    assigned_to = Column(String, nullable=True) # Changed from ForeignKey to allow manual text assignment
     completed_quantity = Column(Integer, default=0)
     remarks = Column(String, nullable=True)
     status = Column(String, default="Pending") # Pending, In Progress, On Hold, Completed
