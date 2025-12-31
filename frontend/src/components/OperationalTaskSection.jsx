@@ -107,7 +107,7 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
             }
 
             const payload = {
-                project_id: parseInt(formData.project_id),
+                project_id: formData.project_id,
                 work_order_number: formData.work_order_number,
                 part_item: formData.part_item,
                 quantity: parseInt(formData.quantity),
@@ -234,7 +234,7 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
                                         const pId = e.target.value;
                                         setFormData({
                                             ...formData,
-                                            project_id: pId ? parseInt(pId) : ''
+                                            project_id: pId || ''
                                         });
                                     }}
                                 >

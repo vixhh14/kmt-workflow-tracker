@@ -107,7 +107,7 @@ const OperationalDashboard = ({ type }) => {
                 : data.filter(t => t.assigned_to === currentUser?.user_id || t.assigned_to === null || t.assigned_to === '');
 
             if (projectFilter !== 'all') {
-                filteredData = filteredData.filter(t => t.project_id === parseInt(projectFilter));
+                filteredData = filteredData.filter(t => String(t.project_id) === String(projectFilter));
             }
 
             setTasks(filteredData);
@@ -146,7 +146,7 @@ const OperationalDashboard = ({ type }) => {
         try {
             setSubmitting(true);
             const payload = {
-                project_id: parseInt(createFormData.project_id),
+                project_id: createFormData.project_id,
                 work_order_number: createFormData.work_order_number,
                 part_item: createFormData.part_item,
                 quantity: parseInt(createFormData.quantity),
