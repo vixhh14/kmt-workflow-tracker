@@ -8,6 +8,12 @@ class ProjectCreate(BaseModel):
     client_name: Optional[str] = None
     project_code: str
 
+class ProjectUpdate(BaseModel):
+    project_name: Optional[str] = None
+    work_order_number: Optional[str] = None
+    client_name: Optional[str] = None
+    project_code: Optional[str] = None
+
 class ProjectOut(BaseModel):
     project_id: int
     project_name: str

@@ -90,6 +90,8 @@ class OperationalTaskUpdate(BaseModel):
     resumed_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     total_active_duration: Optional[int] = None
+    machine_id: Optional[str] = None
+    work_order_number: Optional[str] = None
 
 class OperationalTaskOut(OperationalTaskBase):
     id: int

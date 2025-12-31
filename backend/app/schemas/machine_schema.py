@@ -21,6 +21,8 @@ class MachineUpdate(BaseModel):
     location: Optional[str] = None
     hourly_rate: Optional[float] = None
     current_operator: Optional[str] = None
+    unit_id: Optional[int] = None
+    category_id: Optional[int] = None
 
 class MachineOut(MachineBase):
     id: str
