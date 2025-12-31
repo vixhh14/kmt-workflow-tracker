@@ -60,6 +60,7 @@ const AdminDashboard = () => {
         records: []
     });
     const [runningTasks, setRunningTasks] = useState([]);
+    const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -100,6 +101,7 @@ const AdminDashboard = () => {
             const projectStatsData = overview.projects || { total: 0, yet_to_start: 0, in_progress: 0, completed: 0, held: 0 };
 
             setProjects(Array.isArray(projectsData) ? projectsData : []);
+            setUsers(Array.isArray(unified.users) ? unified.users : []);
 
             // 1. Task Stats (from Dashboard Overview)
             setTaskStats({
@@ -500,14 +502,14 @@ const AdminDashboard = () => {
                         <span className="w-3 h-3 bg-blue-600 rounded-full mr-2"></span>
                         Filing Monitoring
                     </h2>
-                    <OperationalTaskSection type="filing" initialProjects={projects} />
+                    <OperationalTaskSection type="filing" initialProjects={projects} initialUsers={users} />
                 </div>
                 <div className="bg-white rounded-lg shadow p-6">
                     <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
                         <span className="w-3 h-3 bg-orange-600 rounded-full mr-2"></span>
                         Fabrication Monitoring
                     </h2>
-                    <OperationalTaskSection type="fabrication" initialProjects={projects} />
+                    <OperationalTaskSection type="fabrication" initialProjects={projects} initialUsers={users} />
                 </div>
             </div>
 
