@@ -15,7 +15,7 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-from app.schemas.project_schema import ProjectCreate, ProjectOut
+from app.schemas.project_schema import ProjectCreate, ProjectOut, ProjectUpdate
 
 # ----------------------------------------------------------------------
 # API Endpoints
@@ -86,6 +86,57 @@ async def read_project(project_id: int, db: Session = Depends(get_db)):
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return project
+
+@router.put("/{project_id}", response_model=ProjectOut)
+async def update_project(
+    project_id: int, 
+    project_update: ProjectUpdate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Update an existing project.
+    """
+    db_project = db.query(Project).filter(Project.project_id == project_id).first()
+    if not db_project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    update_data = project_update.dict(exclude_unset=True)
+    
+    # Validation for project_code if provided
+    if "project_code" in update_data and update_data["project_code"]:
+        new_code = update_data["project_code"].strip()
+        existing = db.query(Project).filter(
+            Project.project_code == new_code,
+            Project.project_id != project_id,
+            or_(Project.is_deleted == False, Project.is_deleted == None)
+        ).first()
+        if existing:
+             raise HTTPException(status_code=409, detail=f"Project code '{new_code}' is already in use.")
+        update_data["project_code"] = new_code
+
+    if "project_name" in update_data:
+        update_data["project_name"] = update_data["project_name"].strip()
+
+    # Apply updates
+    for key, value in update_data.items():
+        setattr(db_project, key, value)
+    
+    try:
+        db.commit()
+        db.refresh(db_project)
+        
+        # Also sync project name in Tasks table for many tasks referencing this project
+        from app.models.models_db import Task
+        db.query(Task).filter(Task.project_id == project_id).update({"project": db_project.project_name})
+        db.commit()
+        
+        db_project.id = db_project.project_id
+        db_project.name = db_project.project_name
+        return db_project
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error while updating project: {str(e)}")
 
 @router.delete("/{project_id}")
 async def delete_project(project_id: int, db: Session = Depends(get_db)):

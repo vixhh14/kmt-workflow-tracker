@@ -123,6 +123,12 @@ async def update_machine(
         
     if machine_update.current_operator is not None:
         db_machine.current_operator = machine_update.current_operator
+
+    if hasattr(machine_update, 'unit_id') and machine_update.unit_id is not None:
+        db_machine.unit_id = machine_update.unit_id
+
+    if hasattr(machine_update, 'category_id') and machine_update.category_id is not None:
+        db_machine.category_id = machine_update.category_id
     
     # Always bump the updated_at timestamp
     db_machine.updated_at = get_current_time_ist().replace(tzinfo=None)
