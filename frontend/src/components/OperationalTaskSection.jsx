@@ -113,7 +113,7 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
                 quantity: parseInt(formData.quantity),
                 due_date: formData.due_date,
                 priority: formData.priority,
-                assigned_to: formData.assigned_to,
+                assigned_to: formData.assigned_to || null, // Ensure empty string becomes null
                 remarks: formData.remarks
             };
 
@@ -139,7 +139,11 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
         } catch (error) {
             console.error('Failed to save task:', error);
             const detail = error.response?.data?.detail;
-            alert(typeof detail === 'string' ? detail : 'Failed to save task. Please check all required fields.');
+            alert(
+                typeof detail === 'string'
+                    ? detail
+                    : (detail ? JSON.stringify(detail, null, 2) : 'Failed to save task. Please check all required fields.')
+            );
         }
     };
 
@@ -310,16 +314,22 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
                                 </select>
                             </div>
 
-                            {/* Assign To (Manual Entry) */}
+                            {/* Assign To (Dropdown) */}
                             <div className="sm:col-span-2">
-                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Assign To (Manual)</label>
-                                <input
-                                    placeholder="Enter operator name"
-                                    className="w-full text-sm border rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Assign To</label>
+                                <select
+                                    className="w-full text-sm border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 bg-white"
                                     value={formData.assigned_to}
                                     onChange={e => setFormData({ ...formData, assigned_to: e.target.value })}
-                                />
-                                <p className="text-[9px] text-gray-400 mt-1">Leave blank to auto-assign to Master</p>
+                                >
+                                    <option value="">-- Auto-assign to Master --</option>
+                                    {users.filter(u => u.role !== 'admin').map((u) => (
+                                        <option key={u.user_id || u.id} value={u.user_id || u.id}>
+                                            {u.full_name || u.username} ({u.role})
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-[9px] text-gray-400 mt-1">Select an operator or leave default for auto-assignment</p>
                             </div>
 
                             {/* Remarks Field */}
