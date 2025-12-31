@@ -297,7 +297,6 @@ class FilingTask(Base):
     # Relationships
     project = relationship("Project")
     machine = relationship("Machine")
-    assignee = relationship("User", foreign_keys=[assigned_to])
     assigner = relationship("User", foreign_keys=[assigned_by])
 
 class FabricationTask(Base):
@@ -328,5 +327,4 @@ class FabricationTask(Base):
     # Relationships
     project = relationship("Project")
     machine = relationship("Machine")
-    assignee = relationship("User", foreign_keys=[assigned_to])
     assigner = relationship("User", foreign_keys=[assigned_by])
