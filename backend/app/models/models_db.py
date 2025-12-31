@@ -86,8 +86,8 @@ class Machine(Base):
 class Project(Base):
     __tablename__ = "projects"
 
-    # Changed from String UUID to Integer Autoincrement
-    project_id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    # Changed back to string to match DB Varchar
+    project_id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     project_name = Column(String, index=True)
     work_order_number = Column(String, nullable=True)
     client_name = Column(String, nullable=True)
@@ -113,7 +113,7 @@ class Task(Base):
     machine_id = Column(String, ForeignKey("machines.id"), nullable=True)
     assigned_by = Column(String, nullable=True)
     due_date = Column(String, nullable=True)
-    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=True)
+    project_id = Column(String, ForeignKey("projects.project_id"), nullable=True)
     is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
     
@@ -273,7 +273,7 @@ class FilingTask(Base):
     __tablename__ = "filing_tasks"
     
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=True)
+    project_id = Column(String, ForeignKey("projects.project_id"), nullable=True)
     part_item = Column(String, nullable=True)  # Project / Item
     quantity = Column(Integer, default=1)
     due_date = Column(Date, nullable=True)
@@ -303,7 +303,7 @@ class FabricationTask(Base):
     __tablename__ = "fabrication_tasks"
     
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=True)
+    project_id = Column(String, ForeignKey("projects.project_id"), nullable=True)
     part_item = Column(String, nullable=True)  # Project / Item
     quantity = Column(Integer, default=1)
     due_date = Column(Date, nullable=True)

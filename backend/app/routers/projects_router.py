@@ -78,7 +78,7 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Internal database error while creating project: {str(e)}")
 
 @router.get("/{project_id}", response_model=ProjectOut)
-async def read_project(project_id: int, db: Session = Depends(get_db)):
+async def read_project(project_id: str, db: Session = Depends(get_db)):
     """
     Get a specific project by ID.
     """
@@ -89,7 +89,7 @@ async def read_project(project_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{project_id}", response_model=ProjectOut)
 async def update_project(
-    project_id: int, 
+    project_id: str, 
     project_update: ProjectUpdate, 
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -139,7 +139,7 @@ async def update_project(
         raise HTTPException(status_code=500, detail=f"Database error while updating project: {str(e)}")
 
 @router.delete("/{project_id}")
-async def delete_project(project_id: int, db: Session = Depends(get_db)):
+async def delete_project(project_id: str, db: Session = Depends(get_db)):
     """
     Delete a project.
     """
