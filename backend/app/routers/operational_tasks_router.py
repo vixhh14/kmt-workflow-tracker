@@ -107,7 +107,6 @@ async def create_operational_task(
     model = get_model(task_type)
     
     # Normalization & Defaults
-    # Pull ONLY the fields the user wants to avoid "extra field" issues
     task_data = {
         "project_id": task.project_id,
         "work_order_number": task.work_order_number,
@@ -117,36 +116,35 @@ async def create_operational_task(
         "priority": (task.priority or "MEDIUM").upper(),
         "remarks": task.remarks,
         "assigned_by": current_user.user_id,
+        "assigned_to": task.assigned_to, # Use provided value
         "status": "Pending"
     }
 
-    # Automatic Assignment based on task_type
-    # Automatic Assignment based on task_type
-    target_role = None
-    target_username = None
+    # Automatic Assignment based on task_type if NOT provided
+    if not task_data["assigned_to"]:
+        target_role = None
+        target_username = None
 
-    if task_type.lower() == "filing":
-        target_username = "FILE_MASTER"
-        target_role = "file_master"
-    elif task_type.lower() == "fabrication":
-        target_username = "FAB_MASTER"
-        target_role = "fab_master"
-    
-    if target_username:
-        # 1. Try by username (case-insensitive)
-        assignee = db.query(User).filter(User.username.ilike(target_username)).first()
+        if task_type.lower() == "filing":
+            target_username = "FILE_MASTER"
+            target_role = "file_master"
+        elif task_type.lower() == "fabrication":
+            target_username = "FAB_MASTER"
+            target_role = "fab_master"
         
-        # 2. If not found, try by role
-        if not assignee and target_role:
-             assignee = db.query(User).filter(User.role == target_role).first()
+        if target_username:
+            # 1. Try by username (case-insensitive)
+            assignee = db.query(User).filter(User.username.ilike(target_username)).first()
+            
+            # 2. If not found, try by role
+            if not assignee and target_role:
+                 assignee = db.query(User).filter(User.role == target_role).first()
 
-        if assignee:
-            task_data["assigned_to"] = assignee.user_id
-        else:
-            # Fallback: Create or Warn? 
-            # We warn but allow creation (assigned_to will be None)
-            print(f"Warning: Master user '{target_username}' or role '{target_role}' not found for auto-assignment")
-            task_data["assigned_to"] = None
+            if assignee:
+                task_data["assigned_to"] = assignee.user_id
+            else:
+                print(f"Warning: Master user '{target_username}' not found for auto-assignment")
+                task_data["assigned_to"] = None
 
     try:
         new_task = model(**task_data)
