@@ -113,6 +113,7 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
                 quantity: parseInt(formData.quantity),
                 due_date: formData.due_date,
                 priority: formData.priority,
+                assigned_to: formData.assigned_to,
                 remarks: formData.remarks
             };
 
@@ -309,31 +310,17 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
                                 </select>
                             </div>
 
-                            {/* Assign To (Only during edit) */}
-                            {editingTask && (
-                                <div className="sm:col-span-2">
-                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Assign To</label>
-                                    <select
-                                        className="w-full text-sm border rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
-                                        value={formData.assigned_to}
-                                        onChange={e => setFormData({ ...formData, assigned_to: e.target.value })}
-                                    >
-                                        <option value="" disabled hidden>
-                                            {loading ? '-- Loading Users --' : (initialUsers?.length || users.length) === 0 ? '-- No Users Available --' : '-- Select User --'}
-                                        </option>
-                                        <option value="">Auto-Assign Later</option>
-                                        {(initialUsers?.length > 0 ? initialUsers : users).filter(u => {
-                                            const role = (u?.role || '').toLowerCase();
-                                            const targetRole = type === 'filing' ? 'file_master' : 'fab_master';
-                                            return role === targetRole || role === 'operator';
-                                        }).map(u => (
-                                            <option key={u?.id || u?.user_id || Math.random()} value={u?.id || u?.user_id || ''}>
-                                                {u?.name || u?.full_name || u?.username || 'Unknown User'} ({u?.role || 'operator'})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
+                            {/* Assign To (Manual Entry) */}
+                            <div className="sm:col-span-2">
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Assign To (Manual)</label>
+                                <input
+                                    placeholder="Enter operator name"
+                                    className="w-full text-sm border rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                                    value={formData.assigned_to}
+                                    onChange={e => setFormData({ ...formData, assigned_to: e.target.value })}
+                                />
+                                <p className="text-[9px] text-gray-400 mt-1">Leave blank to auto-assign to Master</p>
+                            </div>
 
                             {/* Remarks Field */}
                             <div className="sm:col-span-2">
