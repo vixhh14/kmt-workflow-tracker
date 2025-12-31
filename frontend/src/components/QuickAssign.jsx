@@ -22,6 +22,7 @@ const QuickAssign = ({ onAssignSuccess }) => {
         expected_duration_hhmm: '00:00',
         due_date: ''
     });
+    const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -79,6 +80,7 @@ const QuickAssign = ({ onAssignSuccess }) => {
             return;
         }
 
+        setSubmitting(true);
         try {
             await assignTask(selectedTask.id, {
                 ...assigningData,
@@ -86,7 +88,7 @@ const QuickAssign = ({ onAssignSuccess }) => {
             });
 
             // Optimistic update: remove from local list before refresh
-            setTasks(prev => prev.filter(t => t.id !== selectedTask.id));
+            setPendingTasks(prev => prev.filter(t => t.id !== selectedTask.id));
 
             setShowModal(false);
             setSelectedTask(null);
@@ -95,7 +97,11 @@ const QuickAssign = ({ onAssignSuccess }) => {
             if (onAssignSuccess) onAssignSuccess();
             fetchData();
         } catch (err) {
-            alert(err.response?.data?.detail || 'Failed to assign task');
+            console.error('Failed to assign task:', err);
+            const msg = err.response?.data?.detail || 'Failed to assign task';
+            alert(msg);
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -188,6 +194,7 @@ const QuickAssign = ({ onAssignSuccess }) => {
                                         onChange={(e) => setAssigningData({ ...assigningData, operator_id: e.target.value })}
                                         className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                                     >
+                                        <option value="" disabled hidden>-- Select Operator --</option>
                                         <option value="">Auto-Assign Later</option>
                                         {operators.map(op => (
                                             <option key={op.user_id} value={op.user_id}>{op.full_name || op.username} ({op.role})</option>
@@ -201,7 +208,7 @@ const QuickAssign = ({ onAssignSuccess }) => {
                                         onChange={(e) => setAssigningData({ ...assigningData, machine_id: e.target.value })}
                                         className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                                     >
-                                        <option value="">-- Choose Machine --</option>
+                                        <option value="" disabled hidden>-- Choose Machine --</option>
                                         {machines.map(m => (
                                             <option key={m.id} value={m.id}>{resolveMachineName(m)}</option>
                                         ))}
@@ -245,21 +252,25 @@ const QuickAssign = ({ onAssignSuccess }) => {
                         <div className="bg-gray-50 px-6 py-4 flex gap-3">
                             <button
                                 onClick={() => setShowModal(false)}
-                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 text-gray-700 font-medium"
+                                disabled={submitting}
+                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 text-gray-700 font-medium disabled:opacity-50"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleSubmit}
-                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                                disabled={submitting}
+                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex justify-center items-center disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Confirm Assignment
+                                {submitting ? <Clock className="animate-spin mr-2" size={16} /> : null}
+                                {submitting ? 'Assigning...' : 'Confirm Assignment'}
                             </button>
                         </div>
                     </div>
                 </div>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 };
 

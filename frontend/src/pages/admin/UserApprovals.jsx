@@ -225,7 +225,7 @@ const UserApprovals = () => {
                                                     onChange={(e) => handleUnitChange(user.username, e.target.value)}
                                                     className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border"
                                                 >
-                                                    <option value="" disabled>Select Unit</option>
+                                                    <option value="" disabled hidden>-- Select Unit --</option>
                                                     {units.map((unit) => (
                                                         <option key={unit.id} value={unit.id}>
                                                             {unit.name}

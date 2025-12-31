@@ -194,7 +194,7 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
                                         });
                                     }}
                                 >
-                                    <option value="">Select Project / Asset</option>
+                                    <option value="" disabled hidden>-- Select Project --</option>
                                     {projects.length > 0 ? (
                                         projects.map(p => (
                                             <option key={p.id || p.project_id} value={p.id || p.project_id}>{p.name || p.project_name}</option>
@@ -279,6 +279,7 @@ const OperationalTaskSection = ({ type, machineId, machineName }) => {
                                         value={formData.assigned_to}
                                         onChange={e => setFormData({ ...formData, assigned_to: e.target.value })}
                                     >
+                                        <option value="" disabled hidden>-- Select User --</option>
                                         <option value="">Auto-Assign Later</option>
                                         {users.filter(u => {
                                             const role = (u.role || '').toLowerCase();
