@@ -118,6 +118,7 @@ export const getOperationalTasks = (type) => api.get(`/operational-tasks/${type}
 export const createOperationalTask = (type, data) => api.post(`/operational-tasks/${type}`, data);
 export const updateOperationalTask = (type, id, data) => api.put(`/operational-tasks/${type}/${id}`, data);
 export const deleteOperationalTask = (type, id) => api.delete(`/operational-tasks/${type}/${id}`);
+export const getUserOperationalTasks = (userId) => api.get(`/operational-tasks/user/${userId}`);
 
 /* -------------------- DROPDOWNS -------------------- */
 export const getProjectsDropdown = () => api.get('/dropdowns/projects');

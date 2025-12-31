@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { getUsers, createUser, deleteUser } from '../api/services';
-import { Plus, Trash2, User, Search, X, Eye, EyeOff, Shield, Mail, Briefcase } from 'lucide-react';
+import { Plus, Trash2, User, Search, X, Eye, EyeOff, Shield, Mail, Briefcase, ChevronRight } from 'lucide-react';
 import { validatePasswordFull } from '../utils/passwordValidation';
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 import { ROLE_LABELS } from '../constants/roles';
+import OperationalTaskSection from '../components/OperationalTaskSection.jsx';
 
 const Users = () => {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
+    const [expandedUser, setExpandedUser] = useState(null);
 
     // Search and Filter states
     const [searchQuery, setSearchQuery] = useState('');
@@ -402,6 +404,25 @@ const Users = () => {
                                             </span>
                                         ))}
                                     </div>
+                                </div>
+                            )}
+
+                            <div className="mt-4 pt-4 border-t">
+                                <button
+                                    onClick={() => setExpandedUser(expandedUser === user.user_id ? null : user.user_id)}
+                                    className="w-full text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center justify-center space-x-1"
+                                >
+                                    <span>{expandedUser === user.user_id ? 'Hide Tasks' : 'Show Operational Tasks'}</span>
+                                    <ChevronRight size={14} className={`transform transition-transform ${expandedUser === user.user_id ? 'rotate-90' : ''}`} />
+                                </button>
+                            </div>
+
+                            {expandedUser === user.user_id && (
+                                <div className="mt-2 animate-fade-in">
+                                    <OperationalTaskSection
+                                        userId={user.user_id}
+                                        userName={user.username}
+                                    />
                                 </div>
                             )}
                         </div>
