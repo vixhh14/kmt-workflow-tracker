@@ -4,6 +4,7 @@ from sqlalchemy import func, or_
 from typing import List, Optional
 from pydantic import BaseModel
 from app.core.database import get_db
+from app.core.dependencies import get_current_user
 from app.models.models_db import Task, User, Machine, TaskHold
 from app.utils.datetime_utils import utc_now, make_aware, safe_datetime_diff
 from datetime import datetime, timezone
@@ -244,7 +245,11 @@ async def get_task_stats(project: Optional[str] = None, db: Session = Depends(ge
 
 
 @router.post("/assign-task")
-async def assign_task(request: AssignTaskRequest, db: Session = Depends(get_db)):
+async def assign_task(
+    request: AssignTaskRequest, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """Assign a task to an operator"""
     try:
         task = db.query(Task).filter(Task.id == request.task_id).first()
@@ -255,9 +260,10 @@ async def assign_task(request: AssignTaskRequest, db: Session = Depends(get_db))
         if not operator:
             raise HTTPException(status_code=404, detail="Operator not found")
         
-        if operator.role != 'operator':
-            raise HTTPException(status_code=400, detail="User is not an operator")
+        if operator.role == 'admin' and current_user.role != 'admin':
+            raise HTTPException(status_code=403, detail="Only admins can assign tasks to other admins")
         
+        # Accept assignment to any valid user
         task.assigned_to = request.operator_id
         task.status = 'pending'
         

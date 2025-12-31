@@ -7,6 +7,7 @@ from app.models.models_db import FilingTask, FabricationTask, Project, User, Mac
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.time_utils import get_current_time_ist
+from app.utils.datetime_utils import safe_datetime_diff
 
 router = APIRouter(
     prefix="/operational-tasks",
@@ -59,7 +60,15 @@ async def read_operational_tasks(
         # Resolve names
         project_name = t.project.project_name if t.project else None
         machine_name = t.machine.machine_name if t.machine else "Unknown Machine"
-        assignee_name = (t.assignee.full_name or t.assignee.username) if t.assignee else t.assigned_to
+        
+        # Manually resolve assignee name since we removed the relationship
+        assignee_name = t.assigned_to
+        if t.assigned_to:
+            assignee_obj = db.query(User).filter(User.user_id == t.assigned_to).first()
+            if not assignee_obj:
+                assignee_obj = db.query(User).filter(User.username == t.assigned_to).first()
+            if assignee_obj:
+                assignee_name = assignee_obj.full_name or assignee_obj.username
         
         # Use t.__dict__ but carefully avoid internal SA state
         task_dict = {c.name: getattr(t, c.name) for c in t.__table__.columns}
@@ -146,10 +155,31 @@ async def create_operational_task(
         db.add(new_task)
         db.commit()
         db.refresh(new_task)
-        return new_task
+        
+        # Resolve names for response manually
+        project_name = new_task.project.project_name if new_task.project else None
+        machine_name = new_task.machine.machine_name if new_task.machine else "Unknown Machine"
+        
+        assignee_name = new_task.assigned_to
+        if new_task.assigned_to:
+            assignee_obj = db.query(User).filter(User.user_id == new_task.assigned_to).first()
+            if not assignee_obj:
+                 assignee_obj = db.query(User).filter(User.username == new_task.assigned_to).first()
+            if assignee_obj:
+                assignee_name = assignee_obj.full_name or assignee_obj.username
+
+        task_dict = {c.name: getattr(new_task, c.name) for c in new_task.__table__.columns}
+        return OperationalTaskOut(
+            **task_dict,
+            project_name=project_name,
+            machine_name=machine_name,
+            assignee_name=assignee_name
+        )
     except Exception as e:
         db.rollback()
         print(f"Error creating operational task: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Database error during creation: {str(e)}")
 
 @router.put("/{task_type}/{task_id}", response_model=OperationalTaskOut)
@@ -212,35 +242,31 @@ async def update_operational_task(
         # IN PROGRESS -> ON HOLD
         elif new_status == "On Hold":
             db_task.on_hold_at = now
-            # Calculate duration since last resume or start
             start_ref = db_task.resumed_at or db_task.started_at
             if start_ref:
-                duration = int((now - start_ref).total_seconds())
+                duration = safe_datetime_diff(now, start_ref)
                 db_task.total_active_duration = (db_task.total_active_duration or 0) + duration
             db_task.resumed_at = None
 
         # IN PROGRESS -> COMPLETED
         elif new_status == "Completed":
             db_task.completed_at = now
-            # Final duration calculation
             start_ref = db_task.resumed_at or db_task.started_at
             if start_ref and current_status == "In Progress":
-                duration = int((now - start_ref).total_seconds())
+                duration = safe_datetime_diff(now, start_ref)
                 db_task.total_active_duration = (db_task.total_active_duration or 0) + duration
             db_task.resumed_at = None
             db_task.on_hold_at = None
-            # Ensure quantity matches
             db_task.completed_quantity = db_task.quantity
 
-    # Auto status update: Completed (auto when quantity matches)
+    # Auto status update
     if db_task.completed_quantity >= db_task.quantity and db_task.status != "Completed":
         db_task.status = "Completed"
         db_task.completed_at = now
-        # Also handle duration if it was in progress
         if current_status == "In Progress":
             start_ref = db_task.resumed_at or db_task.started_at
             if start_ref:
-                duration = int((now - start_ref).total_seconds())
+                duration = safe_datetime_diff(now, start_ref)
                 db_task.total_active_duration = (db_task.total_active_duration or 0) + duration
         db_task.resumed_at = None
         db_task.on_hold_at = None
@@ -257,7 +283,15 @@ async def update_operational_task(
     # Resolve names for response
     project_name = db_task.project.project_name if db_task.project else None
     machine_name = db_task.machine.machine_name if db_task.machine else "Unknown Machine"
-    assignee_name = (db_task.assignee.full_name or db_task.assignee.username) if db_task.assignee else db_task.assigned_to
+    
+    # Manually resolve assignee name
+    assignee_name = db_task.assigned_to
+    if db_task.assigned_to:
+        assignee_obj = db.query(User).filter(User.user_id == db_task.assigned_to).first()
+        if not assignee_obj:
+            assignee_obj = db.query(User).filter(User.username == db_task.assigned_to).first()
+        if assignee_obj:
+            assignee_name = assignee_obj.full_name or assignee_obj.username
     
     # Construct response with new fields
     task_dict = {c.name: getattr(db_task, c.name) for c in db_task.__table__.columns}
@@ -268,6 +302,55 @@ async def update_operational_task(
         machine_name=machine_name,
         assignee_name=assignee_name
     )
+
+@router.get("/user/{user_id}", response_model=List[OperationalTaskOut])
+async def get_user_operational_tasks(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Fetch all operational tasks (filing & fabrication) assigned to a specific user"""
+    # Filtering and role check if needed, but usually admin/masters can see this
+    
+    filing_tasks = db.query(FilingTask).filter(
+        FilingTask.assigned_to == user_id,
+        or_(FilingTask.is_deleted == False, FilingTask.is_deleted == None)
+    ).all()
+    
+    fabrication_tasks = db.query(FabricationTask).filter(
+        FabricationTask.assigned_to == user_id,
+        or_(FabricationTask.is_deleted == False, FabricationTask.is_deleted == None)
+    ).all()
+    
+    all_tasks = filing_tasks + fabrication_tasks
+    # Sort by created_at desc
+    all_tasks.sort(key=lambda x: x.created_at, reverse=True)
+    
+    results = []
+    for t in all_tasks:
+        project_name = t.project.project_name if t.project else None
+        machine_name = t.machine.machine_name if t.machine else "Unknown Machine"
+        
+        # Manually resolve assignee name
+        assignee_name = t.assigned_to
+        if t.assigned_to:
+            assignee_obj = db.query(User).filter(User.user_id == t.assigned_to).first()
+            if not assignee_obj:
+                 assignee_obj = db.query(User).filter(User.username == t.assigned_to).first()
+            if assignee_obj:
+                assignee_name = assignee_obj.full_name or assignee_obj.username
+        
+        task_dict = {c.name: getattr(t, c.name) for c in t.__table__.columns}
+        # Add task_type since we are mixing them
+        task_dict["task_type"] = "FILING" if isinstance(t, FilingTask) else "FABRICATION"
+        
+        results.append(OperationalTaskOut(
+            **task_dict,
+            project_name=project_name,
+            machine_name=machine_name,
+            assignee_name=assignee_name
+        ))
+    return results
 
 @router.delete("/{task_type}/{task_id}")
 async def delete_operational_task(

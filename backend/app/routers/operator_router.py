@@ -152,7 +152,7 @@ async def complete_task(
     open_hold = db.query(TaskHold).filter(TaskHold.task_id == task_id, TaskHold.hold_ended_at == None).first()
     if open_hold:
         open_hold.hold_ended_at = now
-        task.total_held_seconds = (task.total_held_seconds or 0) + int(safe_datetime_diff(now, open_hold.hold_started_at))
+        task.total_held_seconds = (task.total_held_seconds or 0) + safe_datetime_diff(now, open_hold.hold_started_at)
 
     task.status = 'completed'
     task.completed_at = now
@@ -165,12 +165,13 @@ async def complete_task(
         task.total_duration_seconds = int(max(0, duration - (task.total_held_seconds or 0)))
 
     # Close logs
-    db.query(MachineRuntimeLog).filter(MachineRuntimeLog.task_id == task_id, MachineRuntimeLog.end_time == None).update({
-        "end_time": now, "duration_seconds": safe_datetime_diff(now, MachineRuntimeLog.start_time)
-    }, synchronize_session=False)
-    db.query(UserWorkLog).filter(UserWorkLog.task_id == task_id, UserWorkLog.end_time == None).update({
-        "end_time": now, "duration_seconds": safe_datetime_diff(now, UserWorkLog.start_time)
-    }, synchronize_session=False)
+    for m_log in db.query(MachineRuntimeLog).filter(MachineRuntimeLog.task_id == task_id, MachineRuntimeLog.end_time == None).all():
+        m_log.end_time = now
+        m_log.duration_seconds = safe_datetime_diff(now, m_log.start_time)
+        
+    for u_log in db.query(UserWorkLog).filter(UserWorkLog.task_id == task_id, UserWorkLog.end_time == None).all():
+        u_log.end_time = now
+        u_log.duration_seconds = safe_datetime_diff(now, u_log.start_time)
 
     db.add(TaskTimeLog(id=str(uuid4()), task_id=task_id, action='complete', timestamp=now))
     db.commit()
@@ -200,12 +201,13 @@ async def hold_task(
     db.add(TaskHold(task_id=task_id, user_id=task.assigned_to, hold_reason=task.hold_reason, hold_started_at=now))
     
     # Close logs
-    db.query(MachineRuntimeLog).filter(MachineRuntimeLog.task_id == task_id, MachineRuntimeLog.end_time == None).update({
-        "end_time": now, "duration_seconds": safe_datetime_diff(now, MachineRuntimeLog.start_time)
-    }, synchronize_session=False)
-    db.query(UserWorkLog).filter(UserWorkLog.task_id == task_id, UserWorkLog.end_time == None).update({
-        "end_time": now, "duration_seconds": safe_datetime_diff(now, UserWorkLog.start_time)
-    }, synchronize_session=False)
+    for m_log in db.query(MachineRuntimeLog).filter(MachineRuntimeLog.task_id == task_id, MachineRuntimeLog.end_time == None).all():
+        m_log.end_time = now
+        m_log.duration_seconds = safe_datetime_diff(now, m_log.start_time)
+        
+    for u_log in db.query(UserWorkLog).filter(UserWorkLog.task_id == task_id, UserWorkLog.end_time == None).all():
+        u_log.end_time = now
+        u_log.duration_seconds = safe_datetime_diff(now, u_log.start_time)
 
     db.add(TaskTimeLog(id=str(uuid4()), task_id=task_id, action='hold', timestamp=now, reason=hold_data.reason))
     db.commit()

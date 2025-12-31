@@ -8,6 +8,7 @@ from app.models.models_db import Task, TaskTimeLog, TaskHold, RescheduleRequest,
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.time_utils import get_current_time_ist, get_today_date_ist
+from app.utils.datetime_utils import safe_datetime_diff
 import uuid
 from datetime import datetime
 
@@ -174,7 +175,15 @@ async def create_task(
         db.add(new_task)
         db.commit()
         db.refresh(new_task)
-        return new_task
+        
+        # Return as dict to be safe with response_model=dict
+        task_dict = {c.name: getattr(new_task, c.name) for c in new_task.__table__.columns}
+        # Ensure datetimes are ISO strings for the dict
+        for key, value in task_dict.items():
+            if isinstance(value, datetime):
+                task_dict[key] = value.isoformat()
+        
+        return task_dict
     except Exception as e:
         db.rollback()
         print(f"❌ DB Error in create_task: {str(e)}")
@@ -232,8 +241,7 @@ async def start_task(
     open_hold = db.query(TaskHold).filter(TaskHold.task_id == task_id, TaskHold.hold_ended_at == None).first()
     if open_hold:
         open_hold.hold_ended_at = now
-        held_duration = (now - open_hold.hold_started_at).total_seconds()
-        task.total_held_seconds = (task.total_held_seconds or 0) + int(held_duration)
+        task.total_held_seconds = (task.total_held_seconds or 0) + safe_datetime_diff(now, open_hold.hold_started_at)
 
     task.status = "in_progress"
     task.started_at = now # Session start
@@ -295,8 +303,8 @@ async def hold_task(
     
     # If holding an in-progress task, calculate session duration
     if task.status == "in_progress" and task.started_at:
-        duration = (now - task.started_at).total_seconds()
-        task.total_duration_seconds = (task.total_duration_seconds or 0) + int(duration)
+        duration = safe_datetime_diff(now, task.started_at)
+        task.total_duration_seconds = (task.total_duration_seconds or 0) + duration
 
         # --- LOGGING CLOSE ---
         # Close open machine logs
@@ -306,7 +314,7 @@ async def hold_task(
         ).all()
         for m_log in open_machine_logs:
             m_log.end_time = now
-            m_log.duration_seconds = int((now - m_log.start_time).total_seconds())
+            m_log.duration_seconds = safe_datetime_diff(now, m_log.start_time)
             
         # Close open user logs
         open_user_logs = db.query(UserWorkLog).filter(
@@ -315,7 +323,7 @@ async def hold_task(
         ).all()
         for u_log in open_user_logs:
             u_log.end_time = now
-            u_log.duration_seconds = int((now - u_log.start_time).total_seconds())
+            u_log.duration_seconds = safe_datetime_diff(now, u_log.start_time)
         # --- LOGGING END ---
     
     task.status = "on_hold"
@@ -370,25 +378,24 @@ async def complete_task(
     open_hold = db.query(TaskHold).filter(TaskHold.task_id == task_id, TaskHold.hold_ended_at == None).first()
     if open_hold:
         open_hold.hold_ended_at = now
-        held_duration = (now - open_hold.hold_started_at).total_seconds()
-        task.total_held_seconds = (task.total_held_seconds or 0) + int(held_duration)
+        task.total_held_seconds = (task.total_held_seconds or 0) + safe_datetime_diff(now, open_hold.hold_started_at)
 
     # Calculate final duration
     # Logic: Total Time = (End Time - Start Time) - Total Held Time
     if task.actual_start_time:
-        total_elapsed = (task.actual_end_time - task.actual_start_time).total_seconds()
+        total_elapsed = safe_datetime_diff(task.actual_end_time, task.actual_start_time)
         held_time = task.total_held_seconds or 0
         task.total_duration_seconds = max(0, int(total_elapsed - held_time))
     else:
         # Fallback if actual_start_time is missing (legacy tasks)
         if task.started_at:
-             # If we have a session start time, add the current session to total
-            duration = (now - task.started_at).total_seconds()
-            task.total_duration_seconds = (task.total_duration_seconds or 0) + int(duration)
+            # If we have a session start time, add the current session to total
+            duration = safe_datetime_diff(now, task.started_at)
+            task.total_duration_seconds = (task.total_duration_seconds or 0) + duration
         elif task.created_at:
-             # Last resort: created_at
-            total_elapsed = (now - task.created_at).total_seconds()
-            task.total_duration_seconds = max(0, int(total_elapsed))
+            # Last resort: created_at
+            total_elapsed = safe_datetime_diff(now, task.created_at)
+            task.total_duration_seconds = max(0, total_elapsed)
 
     # --- LOGGING CLOSE ---
     # Close open machine logs
@@ -398,7 +405,7 @@ async def complete_task(
     ).all()
     for m_log in open_machine_logs:
         m_log.end_time = now
-        m_log.duration_seconds = int((now - m_log.start_time).total_seconds())
+        m_log.duration_seconds = safe_datetime_diff(now, m_log.start_time)
 
     # Close open user logs
     open_user_logs = db.query(UserWorkLog).filter(
@@ -407,7 +414,7 @@ async def complete_task(
     ).all()
     for u_log in open_user_logs:
         u_log.end_time = now
-        u_log.duration_seconds = int((now - u_log.start_time).total_seconds())
+        u_log.duration_seconds = safe_datetime_diff(now, u_log.start_time)
     # --- LOGGING END ---
 
     task.status = "completed"
@@ -496,26 +503,23 @@ async def end_task(
     if task.status == "in_progress":
         # Calculate duration
         if task.started_at:
-            duration = (now - task.started_at).total_seconds()
-            task.total_duration_seconds = (task.total_duration_seconds or 0) + int(duration)
+            duration = safe_datetime_diff(now, task.started_at)
+            task.total_duration_seconds = (task.total_duration_seconds or 0) + duration
         
         # Close logs
-        open_machine_logs = db.query(MachineRuntimeLog).filter(MachineRuntimeLog.task_id == task_id, MachineRuntimeLog.end_time == None).all()
-        for m_log in open_machine_logs:
+        for m_log in db.query(MachineRuntimeLog).filter(MachineRuntimeLog.task_id == task_id, MachineRuntimeLog.end_time == None).all():
             m_log.end_time = now
-            m_log.duration_seconds = int((now - m_log.start_time).total_seconds())
+            m_log.duration_seconds = safe_datetime_diff(now, m_log.start_time)
             
-        open_user_logs = db.query(UserWorkLog).filter(UserWorkLog.task_id == task_id, UserWorkLog.end_time == None).all()
-        for u_log in open_user_logs:
+        for u_log in db.query(UserWorkLog).filter(UserWorkLog.task_id == task_id, UserWorkLog.end_time == None).all():
             u_log.end_time = now
-            u_log.duration_seconds = int((now - u_log.start_time).total_seconds())
+            u_log.duration_seconds = safe_datetime_diff(now, u_log.start_time)
 
     # Close open hold
     open_hold = db.query(TaskHold).filter(TaskHold.task_id == task_id, TaskHold.hold_ended_at == None).first()
     if open_hold:
         open_hold.hold_ended_at = now
-        held_duration = (now - open_hold.hold_started_at).total_seconds()
-        task.total_held_seconds = (task.total_held_seconds or 0) + int(held_duration)
+        task.total_held_seconds = (task.total_held_seconds or 0) + safe_datetime_diff(now, open_hold.hold_started_at)
 
     task.status = "ended"
     if not task.actual_end_time:
