@@ -502,167 +502,168 @@ const Tasks = () => {
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Project *</label>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Project *</label>
+                                <select
+                                    required
+                                    value={formData.project_id}
+                                    onChange={(e) => {
+                                        const pId = e.target.value;
+                                        const selectedProject = projects.find(p => String(p.id) === String(pId));
+                                        setFormData({
+                                            ...formData,
+                                            project_id: pId ? parseInt(pId) : '',
+                                            project: selectedProject ? selectedProject.name : ''
+                                        });
+                                    }}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm"
+                                    disabled={loading || projects.length === 0}
+                                >
+                                    <option value="" disabled hidden>-- Select Project --</option>
+                                    {projects.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* 2. Work Order Number */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Work Order Number *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={formData.work_order_number}
+                                    onChange={(e) => setFormData({ ...formData, work_order_number: e.target.value })}
+                                    readOnly={currentUser?.role === 'supervisor'}
+                                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${currentUser?.role === 'supervisor' ? 'bg-gray-100' : ''}`}
+                                />
+                            </div>
+
+                            {/* 3. Title */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Title / Task Name *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={formData.title}
+                                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                            </div>
+
+                            {/* 4. Nos / Unit */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Nos / Unit *
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={formData.nos_unit}
+                                    onChange={(e) => setFormData({ ...formData, nos_unit: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                            </div>
+
+                            {/* 5. Due Date / Time */}
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Due Date *</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={formData.due_date}
+                                        onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Expected Time *</label>
+                                    <input
+                                        type="time"
+                                        required
+                                        value={formData.due_time}
+                                        onChange={(e) => setFormData({ ...formData, due_time: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* 6. Priority */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Priority *</label>
+                                <select
+                                    required
+                                    value={formData.priority}
+                                    onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                >
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                    <option value="urgent">Urgent</option>
+                                </select>
+                            </div>
+
+                            {/* General Task Specific Fields */}
+                            <>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Machine *</label>
                                     <select
                                         required
-                                        value={formData.project_id}
-                                        onChange={(e) => {
-                                            const pId = e.target.value;
-                                            const selectedProject = projects.find(p => String(p.id) === String(pId));
-                                            setFormData({
-                                                ...formData,
-                                                project_id: pId ? parseInt(pId) : '',
-                                                project: selectedProject ? selectedProject.name : ''
-                                            });
-                                        }}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm"
-                                        disabled={loading || projects.length === 0}
+                                        value={formData.machine_id}
+                                        onChange={(e) => setFormData({ ...formData, machine_id: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        disabled={loading || machines.length === 0}
                                     >
-                                        <option value="" disabled hidden>-- Select Project --</option>
-                                        {projects.map((p) => (
-                                            <option key={p.id} value={p.id}>
-                                                {p.name}
+                                        <option value="" disabled hidden>-- Select Machine --</option>
+                                        {machines.map((machine) => (
+                                            <option key={machine?.id} value={machine?.id}>
+                                                {resolveMachineName(machine)}
                                             </option>
                                         ))}
                                     </select>
                                 </div>
-
-                                {/* 2. Work Order Number */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Work Order Number *</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.work_order_number}
-                                        onChange={(e) => setFormData({ ...formData, work_order_number: e.target.value })}
-                                        readOnly={currentUser?.role === 'supervisor'}
-                                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${currentUser?.role === 'supervisor' ? 'bg-gray-100' : ''}`}
-                                    />
-                                </div>
-
-                                {/* 3. Title */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Title / Task Name *</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.title}
-                                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    />
-                                </div>
-
-                                {/* 4. Nos / Unit */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Nos / Unit *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.nos_unit}
-                                        onChange={(e) => setFormData({ ...formData, nos_unit: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    />
-                                </div>
-
-                                {/* 5. Due Date / Time */}
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Due Date *</label>
-                                        <input
-                                            type="date"
-                                            required
-                                            value={formData.due_date}
-                                            onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Expected Time *</label>
-                                        <input
-                                            type="time"
-                                            required
-                                            value={formData.due_time}
-                                            onChange={(e) => setFormData({ ...formData, due_time: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* 6. Priority */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Priority *</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Assign To *</label>
                                     <select
                                         required
-                                        value={formData.priority}
-                                        onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                                        value={formData.assigned_to}
+                                        onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     >
-                                        <option value="low">Low</option>
-                                        <option value="medium">Medium</option>
-                                        <option value="high">High</option>
-                                        <option value="urgent">Urgent</option>
-                                    </select>
-                                </div>
-
-                                {/* General Task Specific Fields */}
-                                <>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Machine *</label>
-                                        <select
-                                            required
-                                            value={formData.machine_id}
-                                            onChange={(e) => setFormData({ ...formData, machine_id: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                            disabled={loading || machines.length === 0}
-                                        >
-                                            <option value="" disabled hidden>-- Select Machine --</option>
-                                            {machines.map((machine) => (
-                                                <option key={machine?.id} value={machine?.id}>
-                                                    {resolveMachineName(machine)}
+                                        <option value="" disabled hidden>-- Select User --</option>
+                                        {users
+                                            .filter(u => ['operator', 'supervisor', 'fab_master', 'file_master'].includes(u?.role))
+                                            .map((user) => (
+                                                <option key={user?.user_id} value={user?.user_id}>
+                                                    {user?.full_name || user?.username} ({user?.role})
                                                 </option>
                                             ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Assign To *</label>
-                                        <select
-                                            required
-                                            value={formData.assigned_to}
-                                            onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        >
-                                            <option value="" disabled hidden>-- Select User --</option>
-                                            {users
-                                                .filter(u => ['operator', 'supervisor', 'fab_master', 'file_master'].includes(u?.role))
-                                                .map((user) => (
-                                                    <option key={user?.user_id} value={user?.user_id}>
-                                                        {user?.full_name || user?.username} ({user?.role})
-                                                    </option>
-                                                ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Assigned By *</label>
-                                        <select
-                                            required
-                                            value={formData.assigned_by}
-                                            onChange={(e) => setFormData({ ...formData, assigned_by: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                            disabled={loading || users.length === 0}
-                                        >
-                                            <option value="" disabled hidden>-- Select User --</option>
-                                            {users
-                                                .filter(u => ['admin', 'supervisor', 'planning'].includes(u?.role))
-                                                .map((user) => (
-                                                    <option key={user?.user_id} value={user?.user_id}>
-                                                        {user?.full_name || user?.username || 'Unknown'} ({user?.role || 'unknown'})
-                                                    </option>
-                                                ))}
-                                        </select>
-                                    </div>
-                                </>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Assigned By *</label>
+                                    <select
+                                        required
+                                        value={formData.assigned_by}
+                                        onChange={(e) => setFormData({ ...formData, assigned_by: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        disabled={loading || users.length === 0}
+                                    >
+                                        <option value="" disabled hidden>-- Select User --</option>
+                                        {users
+                                            .filter(u => ['admin', 'supervisor', 'planning'].includes(u?.role))
+                                            .map((user) => (
+                                                <option key={user?.user_id} value={user?.user_id}>
+                                                    {user?.full_name || user?.username || 'Unknown'} ({user?.role || 'unknown'})
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+                            </>
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Task Completion Duration (HH:MM) *</label>
@@ -707,289 +708,289 @@ const Tasks = () => {
                             </button>
                         </div>
                     </form>
-                </div >
+                </div>
             )}
-{/* Tasks Table */ }
-<div className="bg-white rounded-lg shadow overflow-hidden">
-    <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-                <tr>
-                    <th className="px-2 sm:px-4 py-3 text-left">
-                        {currentUser?.role !== 'operator' && (
-                            <input
-                                type="checkbox"
-                                checked={selectedTasks.length === paginatedTasks.length && paginatedTasks.length > 0}
-                                onChange={handleSelectAll}
-                                className="rounded border-gray-300"
-                            />
-                        )}
-                    </th>
-                    <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title / WO</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Project</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Part/Item</th>
-                    <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Priority</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Assigned To</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Deadline</th>
-                    <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-                {paginatedTasks.map((task) => (
-                    <React.Fragment key={task.id}>
-                        <tr className="hover:bg-gray-50">
-                            <td className="px-2 sm:px-4 py-3 sm:py-4">
-                                {currentUser?.role !== 'operator' && (
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedTasks.includes(task.id)}
-                                        onChange={() => handleSelectTask(task.id)}
-                                        className="rounded border-gray-300"
-                                    />
-                                )}
-                            </td>
-                            <td className="px-2 sm:px-6 py-3 sm:py-4">
-                                <div className="flex items-center">
-                                    <button
-                                        onClick={() => toggleExpand(task.id)}
-                                        className="mr-1 sm:mr-2 text-gray-400 hover:text-gray-600 flex-shrink-0"
-                                    >
-                                        {expandedTaskId === task.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                    </button>
-                                    <div className="min-w-0">
-                                        <div className="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[100px] sm:max-w-[200px]">{task.title}</div>
-                                        {task.work_order_number && (
-                                            <div className="text-[10px] text-blue-600 font-bold uppercase">WO: {task.work_order_number}</div>
-                                        )}
-                                    </div>
-                                </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900 truncate max-w-[150px]">{task.project || '-'}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">{task.part_item || '-'}</div>
-                                {task.nos_unit && <div className="text-xs text-gray-500">({task.nos_unit})</div>}
-                            </td>
-                            <td className="px-2 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                                <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(task.status)}`}>
-                                    {task.status.replace('_', ' ')}
-                                </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getPriorityColor(task.priority)}`}>
-                                    {task.priority}
-                                </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {users.find(u => u.user_id === task.assigned_to || u.id === task.assigned_to || u.username === task.assigned_to)?.username || task.assigned_to || 'Unassigned'}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-[11px] font-bold text-gray-700 bg-gray-50 px-2 py-1 rounded inline-block">
-                                    {formatDueDateTime(task.due_datetime, task.due_date)}
-                                </div>
-                            </td>
-                            <td className="px-2 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium">
-                                <div className="flex items-center space-x-2">
-                                    {currentUser?.role === 'admin' && task.status !== 'ended' && task.status !== 'completed' && (
-                                        <button
-                                            onClick={() => handleEndTask(task.id)}
-                                            className="text-purple-600 hover:text-purple-900 p-1 flex items-center space-x-1 border border-purple-200 rounded hover:bg-purple-50"
-                                            title="End Task (Admin Only)"
-                                        >
-                                            <Square size={14} fill="currentColor" />
-                                            <span className="text-[10px] uppercase font-bold">End</span>
-                                        </button>
-                                    )}
-                                    {['admin', 'supervisor', 'planning'].includes(currentUser?.role?.toLowerCase()) && (
-                                        <button
-                                            onClick={() => handleDelete(task.id)}
-                                            className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
-                                            title="Delete Task"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    )}
-                                </div>
-                            </td>
-                        </tr>
-                        {expandedTaskId === task.id && (
+            {/* Tasks Table */}
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
                             <tr>
-                                <td colSpan="8" className="px-3 sm:px-6 py-4 bg-gray-50 border-t border-gray-200">
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        {/* Subtasks Section */}
-                                        <div>
-                                            <Subtask taskId={task.id} taskAssigneeId={task.assigned_to} />
-                                        </div>
-
-                                        {/* Timing Analytics Section */}
-                                        <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                                            <h4 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide flex items-center">
-                                                <Clock size={16} className="mr-2 text-blue-600" />
-                                                Timing Analytics
-                                            </h4>
-
-                                            <div className="space-y-4">
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div className="bg-blue-50 p-3 rounded-lg">
-                                                        <p className="text-[10px] text-blue-600 font-bold uppercase mb-1">Task Lifecycle</p>
-                                                        <div className="space-y-1 text-xs">
-                                                            <p className="flex justify-between">
-                                                                <span className="text-gray-500">Started:</span>
-                                                                <span className="font-medium text-gray-900">{task.actual_start_time ? new Date(task.actual_start_time).toLocaleString('en-IN') : 'N/A'}</span>
-                                                            </p>
-                                                            <p className="flex justify-between">
-                                                                <span className="text-gray-500">Completed:</span>
-                                                                <span className="font-medium text-gray-900">{task.actual_end_time ? new Date(task.actual_end_time).toLocaleString('en-IN') : 'N/A'}</span>
-                                                            </p>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="bg-purple-50 p-3 rounded-lg">
-                                                        <p className="text-[10px] text-purple-600 font-bold uppercase mb-1">Duration Analysis</p>
-                                                        <div className="space-y-1 text-xs">
-                                                            <p className="flex justify-between">
-                                                                <span className="text-gray-500">Deadline:</span>
-                                                                <span className="font-bold text-red-600">{formatDueDateTime(task.due_datetime, task.due_date)}</span>
-                                                            </p>
-                                                            <p className="flex justify-between">
-                                                                <span className="text-gray-500">Task Completion Duration:</span>
-                                                                <span className="font-medium text-gray-900">{minutesToHHMM(task.expected_completion_time)} ({task.expected_completion_time || '0'}m)</span>
-                                                            </p>
-                                                            <p className="flex justify-between">
-                                                                <span className="text-gray-500">Actual (Net):</span>
-                                                                <span className={`font-bold ${task.expected_completion_time && (task.total_duration_seconds / 60) > task.expected_completion_time
-                                                                    ? 'text-red-600'
-                                                                    : 'text-green-600'
-                                                                    }`}>
-                                                                    {Math.floor(task.total_duration_seconds / 60)} mins
-                                                                </span>
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="border-t pt-3">
-                                                    <p className="text-[10px] text-gray-400 font-bold uppercase mb-2 flex justify-between items-center">
-                                                        <span>Hold History</span>
-                                                        <span className="text-amber-600">Total Held: {Math.floor((task.total_held_seconds || 0) / 60)} mins</span>
-                                                    </p>
-
-                                                    {task.holds && task.holds.length > 0 ? (
-                                                        <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                                                            {task.holds.map((hold, idx) => (
-                                                                <div key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded text-[11px] border-l-2 border-amber-400">
-                                                                    <div>
-                                                                        <div className="flex items-center text-gray-700 font-medium">
-                                                                            <span>{new Date(hold.start).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
-                                                                            <span className="mx-1">→</span>
-                                                                            <span>{hold.end ? new Date(hold.end).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Present'}</span>
-                                                                        </div>
-                                                                        {hold.reason && <p className="text-[10px] text-gray-500 italic mt-0.5">Reason: {hold.reason}</p>}
-                                                                    </div>
-                                                                    <span className="font-bold text-gray-900 bg-white px-1.5 py-0.5 rounded border border-gray-100">
-                                                                        {Math.ceil(hold.duration_seconds / 60)}m
-                                                                    </span>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-xs text-gray-400 italic py-2">No hold intervals recorded for this task.</p>
+                                <th className="px-2 sm:px-4 py-3 text-left">
+                                    {currentUser?.role !== 'operator' && (
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedTasks.length === paginatedTasks.length && paginatedTasks.length > 0}
+                                            onChange={handleSelectAll}
+                                            className="rounded border-gray-300"
+                                        />
+                                    )}
+                                </th>
+                                <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title / WO</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Project</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Part/Item</th>
+                                <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Priority</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Assigned To</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Deadline</th>
+                                <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {paginatedTasks.map((task) => (
+                                <React.Fragment key={task.id}>
+                                    <tr className="hover:bg-gray-50">
+                                        <td className="px-2 sm:px-4 py-3 sm:py-4">
+                                            {currentUser?.role !== 'operator' && (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedTasks.includes(task.id)}
+                                                    onChange={() => handleSelectTask(task.id)}
+                                                    className="rounded border-gray-300"
+                                                />
+                                            )}
+                                        </td>
+                                        <td className="px-2 sm:px-6 py-3 sm:py-4">
+                                            <div className="flex items-center">
+                                                <button
+                                                    onClick={() => toggleExpand(task.id)}
+                                                    className="mr-1 sm:mr-2 text-gray-400 hover:text-gray-600 flex-shrink-0"
+                                                >
+                                                    {expandedTaskId === task.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                                </button>
+                                                <div className="min-w-0">
+                                                    <div className="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[100px] sm:max-w-[200px]">{task.title}</div>
+                                                    {task.work_order_number && (
+                                                        <div className="text-[10px] text-blue-600 font-bold uppercase">WO: {task.work_order_number}</div>
                                                     )}
                                                 </div>
                                             </div>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                        )}
-                    </React.Fragment>
-                ))}
-            </tbody>
-        </table>
-    </div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm text-gray-900 truncate max-w-[150px]">{task.project || '-'}</div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm text-gray-900">{task.part_item || '-'}</div>
+                                            {task.nos_unit && <div className="text-xs text-gray-500">({task.nos_unit})</div>}
+                                        </td>
+                                        <td className="px-2 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                                            <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(task.status)}`}>
+                                                {task.status.replace('_', ' ')}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getPriorityColor(task.priority)}`}>
+                                                {task.priority}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            {users.find(u => u.user_id === task.assigned_to || u.id === task.assigned_to || u.username === task.assigned_to)?.username || task.assigned_to || 'Unassigned'}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-[11px] font-bold text-gray-700 bg-gray-50 px-2 py-1 rounded inline-block">
+                                                {formatDueDateTime(task.due_datetime, task.due_date)}
+                                            </div>
+                                        </td>
+                                        <td className="px-2 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium">
+                                            <div className="flex items-center space-x-2">
+                                                {currentUser?.role === 'admin' && task.status !== 'ended' && task.status !== 'completed' && (
+                                                    <button
+                                                        onClick={() => handleEndTask(task.id)}
+                                                        className="text-purple-600 hover:text-purple-900 p-1 flex items-center space-x-1 border border-purple-200 rounded hover:bg-purple-50"
+                                                        title="End Task (Admin Only)"
+                                                    >
+                                                        <Square size={14} fill="currentColor" />
+                                                        <span className="text-[10px] uppercase font-bold">End</span>
+                                                    </button>
+                                                )}
+                                                {['admin', 'supervisor', 'planning'].includes(currentUser?.role?.toLowerCase()) && (
+                                                    <button
+                                                        onClick={() => handleDelete(task.id)}
+                                                        className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
+                                                        title="Delete Task"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {expandedTaskId === task.id && (
+                                        <tr>
+                                            <td colSpan="8" className="px-3 sm:px-6 py-4 bg-gray-50 border-t border-gray-200">
+                                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                                    {/* Subtasks Section */}
+                                                    <div>
+                                                        <Subtask taskId={task.id} taskAssigneeId={task.assigned_to} />
+                                                    </div>
 
-    {/* Pagination */}
-    {filteredTasks.length > 0 && (
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-            <div className="flex-1 flex justify-between sm:hidden">
-                <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                >
-                    Previous
-                </button>
-                <button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                >
-                    Next
-                </button>
-            </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div className="flex items-center space-x-4">
-                    <p className="text-sm text-gray-700">
-                        Showing <span className="font-medium">{startIndex + 1}</span> to <span className="font-medium">{Math.min(endIndex, filteredTasks.length)}</span> of{' '}
-                        <span className="font-medium">{filteredTasks.length}</span> results
-                    </p>
-                    <select
-                        value={itemsPerPage}
-                        onChange={(e) => {
-                            setItemsPerPage(Number(e.target.value));
-                            setCurrentPage(1);
-                        }}
-                        className="px-3 py-1 border border-gray-300 rounded-md text-sm"
-                    >
-                        <option value={10}>10 per page</option>
-                        <option value={25}>25 per page</option>
-                        <option value={50}>50 per page</option>
-                        <option value={100}>100 per page</option>
-                    </select>
+                                                    {/* Timing Analytics Section */}
+                                                    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                                                        <h4 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide flex items-center">
+                                                            <Clock size={16} className="mr-2 text-blue-600" />
+                                                            Timing Analytics
+                                                        </h4>
+
+                                                        <div className="space-y-4">
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div className="bg-blue-50 p-3 rounded-lg">
+                                                                    <p className="text-[10px] text-blue-600 font-bold uppercase mb-1">Task Lifecycle</p>
+                                                                    <div className="space-y-1 text-xs">
+                                                                        <p className="flex justify-between">
+                                                                            <span className="text-gray-500">Started:</span>
+                                                                            <span className="font-medium text-gray-900">{task.actual_start_time ? new Date(task.actual_start_time).toLocaleString('en-IN') : 'N/A'}</span>
+                                                                        </p>
+                                                                        <p className="flex justify-between">
+                                                                            <span className="text-gray-500">Completed:</span>
+                                                                            <span className="font-medium text-gray-900">{task.actual_end_time ? new Date(task.actual_end_time).toLocaleString('en-IN') : 'N/A'}</span>
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="bg-purple-50 p-3 rounded-lg">
+                                                                    <p className="text-[10px] text-purple-600 font-bold uppercase mb-1">Duration Analysis</p>
+                                                                    <div className="space-y-1 text-xs">
+                                                                        <p className="flex justify-between">
+                                                                            <span className="text-gray-500">Deadline:</span>
+                                                                            <span className="font-bold text-red-600">{formatDueDateTime(task.due_datetime, task.due_date)}</span>
+                                                                        </p>
+                                                                        <p className="flex justify-between">
+                                                                            <span className="text-gray-500">Task Completion Duration:</span>
+                                                                            <span className="font-medium text-gray-900">{minutesToHHMM(task.expected_completion_time)} ({task.expected_completion_time || '0'}m)</span>
+                                                                        </p>
+                                                                        <p className="flex justify-between">
+                                                                            <span className="text-gray-500">Actual (Net):</span>
+                                                                            <span className={`font-bold ${task.expected_completion_time && (task.total_duration_seconds / 60) > task.expected_completion_time
+                                                                                ? 'text-red-600'
+                                                                                : 'text-green-600'
+                                                                                }`}>
+                                                                                {Math.floor(task.total_duration_seconds / 60)} mins
+                                                                            </span>
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="border-t pt-3">
+                                                                <p className="text-[10px] text-gray-400 font-bold uppercase mb-2 flex justify-between items-center">
+                                                                    <span>Hold History</span>
+                                                                    <span className="text-amber-600">Total Held: {Math.floor((task.total_held_seconds || 0) / 60)} mins</span>
+                                                                </p>
+
+                                                                {task.holds && task.holds.length > 0 ? (
+                                                                    <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                                                                        {task.holds.map((hold, idx) => (
+                                                                            <div key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded text-[11px] border-l-2 border-amber-400">
+                                                                                <div>
+                                                                                    <div className="flex items-center text-gray-700 font-medium">
+                                                                                        <span>{new Date(hold.start).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                                        <span className="mx-1">→</span>
+                                                                                        <span>{hold.end ? new Date(hold.end).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Present'}</span>
+                                                                                    </div>
+                                                                                    {hold.reason && <p className="text-[10px] text-gray-500 italic mt-0.5">Reason: {hold.reason}</p>}
+                                                                                </div>
+                                                                                <span className="font-bold text-gray-900 bg-white px-1.5 py-0.5 rounded border border-gray-100">
+                                                                                    {Math.ceil(hold.duration_seconds / 60)}m
+                                                                                </span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <p className="text-xs text-gray-400 italic py-2">No hold intervals recorded for this task.</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
-                <div>
-                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                            disabled={currentPage === 1}
-                            className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-                        >
-                            <ChevronLeft size={20} />
-                        </button>
-                        {[...Array(totalPages)].map((_, i) => (
+
+                {/* Pagination */}
+                {filteredTasks.length > 0 && (
+                    <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                        <div className="flex-1 flex justify-between sm:hidden">
                             <button
-                                key={i + 1}
-                                onClick={() => setCurrentPage(i + 1)}
-                                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === i + 1
-                                    ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                                    : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                                    }`}
+                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                disabled={currentPage === 1}
+                                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
                             >
-                                {i + 1}
+                                Previous
                             </button>
-                        ))}
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                            disabled={currentPage === totalPages}
-                            className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-                        >
-                            <ChevronRight size={20} />
-                        </button>
-                    </nav>
-                </div>
-            </div>
-        </div>
-    )}
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                disabled={currentPage === totalPages}
+                                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                            >
+                                Next
+                            </button>
+                        </div>
+                        <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                            <div className="flex items-center space-x-4">
+                                <p className="text-sm text-gray-700">
+                                    Showing <span className="font-medium">{startIndex + 1}</span> to <span className="font-medium">{Math.min(endIndex, filteredTasks.length)}</span> of{' '}
+                                    <span className="font-medium">{filteredTasks.length}</span> results
+                                </p>
+                                <select
+                                    value={itemsPerPage}
+                                    onChange={(e) => {
+                                        setItemsPerPage(Number(e.target.value));
+                                        setCurrentPage(1);
+                                    }}
+                                    className="px-3 py-1 border border-gray-300 rounded-md text-sm"
+                                >
+                                    <option value={10}>10 per page</option>
+                                    <option value={25}>25 per page</option>
+                                    <option value={50}>50 per page</option>
+                                    <option value={100}>100 per page</option>
+                                </select>
+                            </div>
+                            <div>
+                                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                        disabled={currentPage === 1}
+                                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                                    >
+                                        <ChevronLeft size={20} />
+                                    </button>
+                                    {[...Array(totalPages)].map((_, i) => (
+                                        <button
+                                            key={i + 1}
+                                            onClick={() => setCurrentPage(i + 1)}
+                                            className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === i + 1
+                                                ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                                                : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            {i + 1}
+                                        </button>
+                                    ))}
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                        disabled={currentPage === totalPages}
+                                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                                    >
+                                        <ChevronRight size={20} />
+                                    </button>
+                                </nav>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
-    {filteredTasks.length === 0 && (
-        <div className="text-center py-12">
-            <CheckSquare className="mx-auto text-gray-400 mb-4" size={48} />
-            <p className="text-gray-500">No tasks found matching your filters.</p>
-        </div>
-    )}
-</div>
+                {filteredTasks.length === 0 && (
+                    <div className="text-center py-12">
+                        <CheckSquare className="mx-auto text-gray-400 mb-4" size={48} />
+                        <p className="text-gray-500">No tasks found matching your filters.</p>
+                    </div>
+                )}
+            </div>
         </div >
     );
 };
