@@ -59,7 +59,7 @@ async def read_operational_tasks(
         # Resolve names
         project_name = t.project.project_name if t.project else None
         machine_name = t.machine.machine_name if t.machine else "Unknown Machine"
-        assignee_name = t.assignee.full_name or t.assignee.username if t.assignee else None
+        assignee_name = (t.assignee.full_name or t.assignee.username) if t.assignee else t.assigned_to
         
         # Use t.__dict__ but carefully avoid internal SA state
         task_dict = {c.name: getattr(t, c.name) for c in t.__table__.columns}
@@ -177,7 +177,8 @@ async def update_operational_task(
             if assignee:
                 update_data["assigned_to"] = assignee.user_id
             else:
-                 raise HTTPException(status_code=400, detail=f"Assigned user '{assigned_to}' does not exist")
+                 # Allow manual string assignment if user not found
+                 update_data["assigned_to"] = assigned_to
 
     # Execution-level fields can be updated by Masters or Admin
     current_status = db_task.status
@@ -256,7 +257,7 @@ async def update_operational_task(
     # Resolve names for response
     project_name = db_task.project.project_name if db_task.project else None
     machine_name = db_task.machine.machine_name if db_task.machine else "Unknown Machine"
-    assignee_name = db_task.assignee.full_name or db_task.assignee.username if db_task.assignee else None
+    assignee_name = (db_task.assignee.full_name or db_task.assignee.username) if db_task.assignee else db_task.assigned_to
     
     # Construct response with new fields
     task_dict = {c.name: getattr(db_task, c.name) for c in db_task.__table__.columns}

@@ -176,10 +176,12 @@ async def complete_task(
     db.commit()
     return {"message": "Task completed", "status": "completed"}
 
+from app.schemas.hold_schema import HoldRequest
+
 @router.put("/tasks/{task_id}/hold")
 async def hold_task(
     task_id: str, 
-    reason: str = "", 
+    hold_data: HoldRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -193,7 +195,7 @@ async def hold_task(
 
     now = get_current_time_ist()
     task.status = 'on_hold'
-    task.hold_reason = reason or "On hold"
+    task.hold_reason = hold_data.reason or "On hold"
     
     db.add(TaskHold(task_id=task_id, user_id=task.assigned_to, hold_reason=task.hold_reason, hold_started_at=now))
     
@@ -205,7 +207,7 @@ async def hold_task(
         "end_time": now, "duration_seconds": safe_datetime_diff(now, UserWorkLog.start_time)
     }, synchronize_session=False)
 
-    db.add(TaskTimeLog(id=str(uuid4()), task_id=task_id, action='hold', timestamp=now, reason=reason))
+    db.add(TaskTimeLog(id=str(uuid4()), task_id=task_id, action='hold', timestamp=now, reason=hold_data.reason))
     db.commit()
     return {"message": "Task on hold", "status": "on_hold"}
 
