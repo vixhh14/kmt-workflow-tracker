@@ -6,8 +6,8 @@ UPDATE projects SET is_deleted = false WHERE is_deleted IS NULL;
 UPDATE machines SET is_deleted = false WHERE is_deleted IS NULL;
 UPDATE users SET is_deleted = false WHERE is_deleted IS NULL;
 
--- 2. Activate all machines
-UPDATE machines SET is_active = true WHERE is_active IS NULL OR is_active = false;
+-- 2. Activate all machines (default to active if status is null)
+UPDATE machines SET status = 'active' WHERE status IS NULL;
 
 -- 3. Normalize roles to lowercase
 UPDATE users SET role = LOWER(role);
