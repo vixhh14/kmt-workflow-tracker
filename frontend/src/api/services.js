@@ -84,7 +84,7 @@ export const getUnits = () => api.get('/api/units');
 export const getOperatorTasks = (userId) => api.get('/operator/tasks', { params: { user_id: userId } });
 export const operatorStartTask = (taskId) => api.put(`/operator/tasks/${taskId}/start`);
 export const operatorCompleteTask = (taskId) => api.put(`/operator/tasks/${taskId}/complete`);
-export const operatorHoldTask = (taskId, reason = '') => api.put(`/operator/tasks/${taskId}/hold`, null, { params: { reason } });
+export const operatorHoldTask = (taskId, reason = '') => api.put(`/operator/tasks/${taskId}/hold`, { reason });
 export const operatorResumeTask = (taskId) => api.put(`/operator/tasks/${taskId}/resume`);
 
 /* -------------------- PROJECTS -------------------- */

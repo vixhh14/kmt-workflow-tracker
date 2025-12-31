@@ -343,7 +343,7 @@ const Machines = () => {
                                     onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 >
-                                    <option value="">Select Unit</option>
+                                    <option value="" disabled hidden>-- Select Unit --</option>
                                     {Object.entries(unitMap).map(([name, id]) => (
                                         <option key={id} value={id}>{name}</option>
                                     ))}
@@ -357,7 +357,7 @@ const Machines = () => {
                                     onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 >
-                                    <option value="">Select Category</option>
+                                    <option value="" disabled hidden>-- Select Category --</option>
                                     {Object.entries(categoryMap).map(([name, id]) => (
                                         <option key={id} value={id}>{name}</option>
                                     ))}

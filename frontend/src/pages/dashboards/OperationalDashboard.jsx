@@ -298,7 +298,7 @@ const OperationalDashboard = ({ type }) => {
                                 value={createFormData.project_id}
                                 onChange={e => setCreateFormData({ ...createFormData, project_id: e.target.value })}
                             >
-                                <option value="">Select Project</option>
+                                <option value="" disabled hidden>-- Select Project --</option>
                                 {projects.map(p => (
                                     <option key={p.id || p.project_id} value={p.id || p.project_id}>{p.name || p.project_name}</option>
                                 ))}
@@ -499,27 +499,27 @@ const OperationalDashboard = ({ type }) => {
 
                                             {canAssign && (
                                                 <div className="sm:w-48">
-                                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Assign To</label>
-                                                    <select
-                                                        value={task.assigned_to || ''}
-                                                        onChange={(e) => handleAssignTask(task.id, e.target.value)}
-                                                        className="w-full text-xs border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 py-1.5"
-                                                    >
-                                                        <option value="">Unassigned</option>
-                                                        {operators.map(op => (
-                                                            <option key={op.id || op.user_id} value={op.user_id}>
-                                                                {op.full_name || op.username}
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Assign To (Manual)</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Enter Name or ID"
+                                                        defaultValue={task.assignee_name || task.assigned_to || ''}
+                                                        onBlur={(e) => {
+                                                            const val = e.target.value;
+                                                            if (val !== (task.assignee_name || task.assigned_to)) {
+                                                                handleAssignTask(task.id, val);
+                                                            }
+                                                        }}
+                                                        className="w-full text-xs border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 py-1.5 px-2"
+                                                    />
                                                 </div>
                                             )}
 
-                                            {!canAssign && task.assignee_name && (
+                                            {!canAssign && (task.assignee_name || task.assigned_to) && (
                                                 <div className="sm:w-48">
                                                     <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Assigned To</label>
                                                     <div className="text-xs font-semibold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
-                                                        {task.assignee_name}
+                                                        {task.assignee_name || task.assigned_to}
                                                     </div>
                                                 </div>
                                             )}
