@@ -35,7 +35,7 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
 
     useEffect(() => {
         fetchData();
-    }, [type, machineId, userId]);
+    }, [type, machineId, userId, initialProjects, initialUsers]);
 
     const fetchData = async () => {
         try {
@@ -45,8 +45,8 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
             if (userId) {
                 const [tasksRes, projectsRes, usersRes] = await Promise.all([
                     getUserOperationalTasks(userId),
-                    initialProjects ? Promise.resolve({ data: initialProjects }) : getProjectsDropdown(),
-                    initialUsers ? Promise.resolve({ data: initialUsers }) : getAssignableUsers()
+                    (Array.isArray(initialProjects) && initialProjects.length > 0) ? Promise.resolve({ data: initialProjects }) : getProjectsDropdown(),
+                    (Array.isArray(initialUsers) && initialUsers.length > 0) ? Promise.resolve({ data: initialUsers }) : getAssignableUsers()
                 ]);
 
                 const tasksData = Array.isArray(tasksRes?.data) ? tasksRes.data : [];
@@ -66,8 +66,8 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
             } else {
                 const [tasksRes, projectsRes, usersRes] = await Promise.all([
                     getOperationalTasks(type),
-                    initialProjects ? Promise.resolve({ data: initialProjects }) : getProjectsDropdown(),
-                    initialUsers ? Promise.resolve({ data: initialUsers }) : getAssignableUsers()
+                    (Array.isArray(initialProjects) && initialProjects.length > 0) ? Promise.resolve({ data: initialProjects }) : getProjectsDropdown(),
+                    (Array.isArray(initialUsers) && initialUsers.length > 0) ? Promise.resolve({ data: initialUsers }) : getAssignableUsers()
                 ]);
 
                 const allTasks = Array.isArray(tasksRes?.data) ? tasksRes.data : [];
@@ -234,17 +234,13 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
                                     }}
                                 >
                                     <option value="" disabled hidden>
-                                        {loading ? '-- Loading Projects --' : projects.length === 0 ? '-- No Projects Available --' : '-- Select Project --'}
+                                        {loading ? '-- Loading Projects --' : (initialProjects?.length || projects.length) === 0 ? '-- No Projects Available --' : '-- Select Project --'}
                                     </option>
-                                    {Array.isArray(projects) && projects.length > 0 ? (
-                                        projects.map(p => (
-                                            <option key={p?.id || p?.project_id || Math.random()} value={p?.id || p?.project_id || ''}>
-                                                {p?.name || p?.project_name || 'Unknown Project'}
-                                            </option>
-                                        ))
-                                    ) : !loading && (
-                                        <option disabled>No projects available</option>
-                                    )}
+                                    {(initialProjects?.length > 0 ? initialProjects : projects).map(p => (
+                                        <option key={p?.id || p?.project_id || Math.random()} value={p?.id || p?.project_id || ''}>
+                                            {p?.name || p?.project_name || 'Unknown Project'}
+                                        </option>
+                                    ))}
                                 </select>
                             </div>
 
@@ -323,10 +319,10 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
                                         onChange={e => setFormData({ ...formData, assigned_to: e.target.value })}
                                     >
                                         <option value="" disabled hidden>
-                                            {loading ? '-- Loading Users --' : users.length === 0 ? '-- No Users Available --' : '-- Select User --'}
+                                            {loading ? '-- Loading Users --' : (initialUsers?.length || users.length) === 0 ? '-- No Users Available --' : '-- Select User --'}
                                         </option>
                                         <option value="">Auto-Assign Later</option>
-                                        {Array.isArray(users) && users.filter(u => {
+                                        {(initialUsers?.length > 0 ? initialUsers : users).filter(u => {
                                             const role = (u?.role || '').toLowerCase();
                                             const targetRole = type === 'filing' ? 'file_master' : 'fab_master';
                                             return role === targetRole || role === 'operator';
@@ -390,8 +386,8 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
                     <tbody className="bg-white divide-y divide-gray-200">
                         {tasks.length === 0 ? (
                             <tr>
-                                <td colSpan="5" className="px-3 py-4 text-center text-xs text-gray-400 italic">
-                                    No {type} tasks assigned to this machine.
+                                <td colSpan="5" className="px-3 py-10 text-center text-xs text-gray-500 italic">
+                                    {userId ? "No tasks found for this user." : (machineId ? `No ${type} tasks assigned to this machine.` : `No ${type} tasks found.`)}
                                 </td>
                             </tr>
                         ) : (
