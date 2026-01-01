@@ -64,11 +64,39 @@ const OperationalDashboard = ({ type }) => {
         (type === 'fabrication' && (currentUser?.role === 'fab_master' || currentUser?.role === 'FAB_MASTER'));
 
     useEffect(() => {
-        fetchTasks();
+        let isMounted = true;
+        let timeoutId = null;
+        let consecutiveErrors = 0;
+
         fetchProjects();
         if (canAssign) fetchOperators();
-        const interval = setInterval(fetchTasks, 15000);
-        return () => clearInterval(interval);
+
+        const pollTasks = async () => {
+            if (!isMounted) return;
+            if (document.hidden) {
+                // If tab hidden, wait longer (30s)
+                timeoutId = setTimeout(pollTasks, 30000);
+                return;
+            }
+
+            try {
+                await fetchTasks();
+                consecutiveErrors = 0; // Reset on success
+                timeoutId = setTimeout(pollTasks, 15000); // 15s normal poll
+            } catch (err) {
+                consecutiveErrors++;
+                const backoff = Math.min(60000, 15000 * Math.pow(1.5, consecutiveErrors));
+                console.warn(`Polling failed (${consecutiveErrors}). Retrying in ${Math.round(backoff / 1000)}s...`);
+                timeoutId = setTimeout(pollTasks, backoff);
+            }
+        };
+
+        pollTasks();
+
+        return () => {
+            isMounted = false;
+            if (timeoutId) clearTimeout(timeoutId);
+        };
     }, [type]);
 
     const fetchProjects = async () => {
