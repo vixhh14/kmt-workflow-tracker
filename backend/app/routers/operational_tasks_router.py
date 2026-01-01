@@ -57,28 +57,50 @@ async def read_operational_tasks(
     
     results = []
     for t in tasks:
-        # Resolve names
-        project_name = t.project.project_name if t.project else None
-        machine_name = t.machine.machine_name if t.machine else "Unknown Machine"
-        
-        # Manually resolve assignee name since we removed the relationship
-        assignee_name = t.assigned_to
-        if t.assigned_to:
-            assignee_obj = db.query(User).filter(User.user_id == t.assigned_to).first()
-            if not assignee_obj:
-                assignee_obj = db.query(User).filter(User.username == t.assigned_to).first()
-            if assignee_obj:
-                assignee_name = assignee_obj.full_name or assignee_obj.username
-        
-        # Use t.__dict__ but carefully avoid internal SA state
-        task_dict = {c.name: getattr(t, c.name) for c in t.__table__.columns}
-        
-        results.append(OperationalTaskOut(
-            **task_dict,
-            project_name=project_name,
-            machine_name=machine_name,
-            assignee_name=assignee_name
-        ))
+        try:
+            # Resolve names
+            project_name = t.project.project_name if t.project else None
+            machine_name = t.machine.machine_name if t.machine else "Unknown Machine"
+            
+            # Manually resolve assignee name since we removed the relationship
+            assignee_name = t.assigned_to
+            if t.assigned_to:
+                assignee_obj = db.query(User).filter(User.user_id == t.assigned_to).first()
+                if not assignee_obj:
+                    assignee_obj = db.query(User).filter(User.username == t.assigned_to).first()
+                if assignee_obj:
+                    assignee_name = assignee_obj.full_name or assignee_obj.username
+            
+            # Use t.__dict__ but carefully avoid internal SA state
+            task_dict = {c.name: getattr(t, c.name) for c in t.__table__.columns}
+            
+            # 🛡️ DEFENSIVE DATA NORMALIZATION 🛡️
+            # Ensure IDs are strings to satisfy Pydantic strictness if validators miss edge cases
+            if task_dict.get("project_id") is not None:
+                task_dict["project_id"] = str(task_dict["project_id"])
+            if task_dict.get("machine_id") is not None:
+                task_dict["machine_id"] = str(task_dict["machine_id"])
+            
+            # Ensure safe string defaults for optional text fields
+            if task_dict.get("remarks") is None:
+                 task_dict["remarks"] = ""
+            if task_dict.get("status") is None:
+                 task_dict["status"] = "Pending"
+
+            # Validate via Pydantic model
+            serialized_task = OperationalTaskOut(
+                **task_dict,
+                project_name=project_name,
+                machine_name=machine_name,
+                assignee_name=assignee_name
+            )
+            results.append(serialized_task)
+            
+        except Exception as e:
+            # 🛡️ FAIL-SAFE: Log error and skip bad row, do NOT crash endpoint 🛡️
+            print(f"⚠️ Skipping corrupted task {getattr(t, 'id', 'unknown')} in {task_type}: {str(e)}")
+            continue
+
     return results
 
 @router.post("/{task_type}", response_model=OperationalTaskOut)
@@ -167,6 +189,13 @@ async def create_operational_task(
                 assignee_name = assignee_obj.full_name or assignee_obj.username
 
         task_dict = {c.name: getattr(new_task, c.name) for c in new_task.__table__.columns}
+        
+        # 🛡️ DEFENSIVE Serialization 🛡️
+        if task_dict.get("project_id") is not None:
+             task_dict["project_id"] = str(task_dict["project_id"])
+        if task_dict.get("machine_id") is not None:
+             task_dict["machine_id"] = str(task_dict["machine_id"])
+
         return OperationalTaskOut(
             **task_dict,
             project_name=project_name,
@@ -293,6 +322,13 @@ async def update_operational_task(
     
     # Construct response with new fields
     task_dict = {c.name: getattr(db_task, c.name) for c in db_task.__table__.columns}
+    
+    # 🛡️ DEFENSIVE Serialization 🛡️
+    if task_dict.get("project_id") is not None:
+         task_dict["project_id"] = str(task_dict["project_id"])
+    if task_dict.get("machine_id") is not None:
+         task_dict["machine_id"] = str(task_dict["machine_id"])
+
     # Ensure datetimes are serialized if they aren't already handled by Pydantic
     return OperationalTaskOut(
         **task_dict,
@@ -326,28 +362,41 @@ async def get_user_operational_tasks(
     
     results = []
     for t in all_tasks:
-        project_name = t.project.project_name if t.project else None
-        machine_name = t.machine.machine_name if t.machine else "Unknown Machine"
-        
-        # Manually resolve assignee name
-        assignee_name = t.assigned_to
-        if t.assigned_to:
-            assignee_obj = db.query(User).filter(User.user_id == t.assigned_to).first()
-            if not assignee_obj:
-                 assignee_obj = db.query(User).filter(User.username == t.assigned_to).first()
-            if assignee_obj:
-                assignee_name = assignee_obj.full_name or assignee_obj.username
-        
-        task_dict = {c.name: getattr(t, c.name) for c in t.__table__.columns}
-        # Add task_type since we are mixing them
-        task_dict["task_type"] = "FILING" if isinstance(t, FilingTask) else "FABRICATION"
-        
-        results.append(OperationalTaskOut(
-            **task_dict,
-            project_name=project_name,
-            machine_name=machine_name,
-            assignee_name=assignee_name
-        ))
+        try:
+            project_name = t.project.project_name if t.project else None
+            machine_name = t.machine.machine_name if t.machine else "Unknown Machine"
+            
+            # Manually resolve assignee name
+            assignee_name = t.assigned_to
+            if t.assigned_to:
+                assignee_obj = db.query(User).filter(User.user_id == t.assigned_to).first()
+                if not assignee_obj:
+                    assignee_obj = db.query(User).filter(User.username == t.assigned_to).first()
+                if assignee_obj:
+                    assignee_name = assignee_obj.full_name or assignee_obj.username
+            
+            task_dict = {c.name: getattr(t, c.name) for c in t.__table__.columns}
+            # Add task_type since we are mixing them
+            task_dict["task_type"] = "FILING" if isinstance(t, FilingTask) else "FABRICATION"
+            
+             # 🛡️ DEFENSIVE DATA NORMALIZATION 🛡️
+            if task_dict.get("project_id") is not None:
+                task_dict["project_id"] = str(task_dict["project_id"])
+            if task_dict.get("machine_id") is not None:
+                task_dict["machine_id"] = str(task_dict["machine_id"])
+            if task_dict.get("remarks") is None:
+                 task_dict["remarks"] = ""
+
+            results.append(OperationalTaskOut(
+                **task_dict,
+                project_name=project_name,
+                machine_name=machine_name,
+                assignee_name=assignee_name
+            ))
+        except Exception as e:
+            print(f"⚠️ Skipping corrupted task {getattr(t, 'id', 'unknown')} for user {user_id}: {str(e)}")
+            continue
+
     return results
 
 @router.delete("/{task_type}/{task_id}")
