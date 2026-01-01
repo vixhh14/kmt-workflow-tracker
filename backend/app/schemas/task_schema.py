@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Optional, Union
-from datetime import datetime
+from datetime import datetime, date
 
 class TaskBase(BaseModel):
     title: str
@@ -82,8 +82,6 @@ class TaskOut(TaskBase):
     model_config = ConfigDict(from_attributes=True)
 
 # Operational Tasks (Filing/Fabrication)
-from datetime import date
-from typing import Union
 
 class OperationalTaskBase(BaseModel):
     project_id: Optional[Union[str, int]] = None # Safe for both str/int
