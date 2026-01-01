@@ -25,7 +25,7 @@ class TaskCreate(TaskBase):
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
     project: Optional[str] = None
-    project_id: Optional[int] = None
+    project_id: Optional[str] = None # Relaxed to str/int via coercion
     description: Optional[str] = None
     part_item: Optional[str] = None
     nos_unit: Optional[str] = None
@@ -55,9 +55,10 @@ class TaskOut(TaskBase):
 
 # Operational Tasks (Filing/Fabrication)
 from datetime import date
+from typing import Union
 
 class OperationalTaskBase(BaseModel):
-    project_id: Optional[str] = None # Changed to str to match model
+    project_id: Optional[Union[str, int]] = None # Safe for both str/int
     part_item: Optional[str] = None
     quantity: int = 1
     due_date: Optional[date] = None
@@ -66,7 +67,7 @@ class OperationalTaskBase(BaseModel):
     completed_quantity: int = 0
     remarks: Optional[str] = None
     status: str = "Pending"
-    machine_id: Optional[str] = None
+    machine_id: Optional[Union[str, int]] = None # Safe
     work_order_number: Optional[str] = None
     assigned_by: Optional[str] = None
     task_type: Optional[str] = None # FILING or FABRICATION
@@ -80,7 +81,7 @@ class OperationalTaskUpdate(BaseModel):
     remarks: Optional[str] = None
     status: Optional[str] = None
     # For Admin edits
-    project_id: Optional[str] = None
+    project_id: Optional[Union[str, int]] = None
     part_item: Optional[str] = None
     quantity: Optional[int] = None
     due_date: Optional[date] = None
@@ -90,7 +91,7 @@ class OperationalTaskUpdate(BaseModel):
     resumed_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     total_active_duration: Optional[int] = None
-    machine_id: Optional[str] = None
+    machine_id: Optional[Union[str, int]] = None
     work_order_number: Optional[str] = None
 
 class OperationalTaskOut(OperationalTaskBase):

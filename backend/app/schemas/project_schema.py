@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Optional
+from typing import Optional, Union
 from datetime import datetime
 
 class ProjectCreate(BaseModel):
@@ -15,9 +15,9 @@ class ProjectUpdate(BaseModel):
     project_code: Optional[str] = None
 
 class ProjectOut(BaseModel):
-    project_id: str
+    project_id: Union[str, int]
     project_name: str
-    id: Optional[str] = None
+    id: Optional[Union[str, int]] = None
     name: Optional[str] = None
     work_order_number: Optional[str] = None
     client_name: Optional[str] = None
