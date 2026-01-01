@@ -150,14 +150,16 @@ def init_db_data():
                     UPDATE machines 
                     SET category_id = :cat_id, status = 'active', updated_at = :now, is_deleted = FALSE
                     WHERE id = :id
-                """), {"cat_id": category_id, "now": get_current_time_ist().replace(tzinfo=None), "id": existing.id})
+                """), {"cat_id": category_id, "now": get_current_time_ist(), "id": existing.id})
             else:
+                # Insert new
+                machine_id = str(uuid.uuid4())
                 # Insert new
                 machine_id = str(uuid.uuid4())
                 session.execute(text("""
                     INSERT INTO machines (id, machine_name, status, hourly_rate, unit_id, category_id, created_at, updated_at, is_deleted)
                     VALUES (:id, :name, 'active', 0.0, :uid, :cat_id, :now, :now, FALSE)
-                """), {"id": machine_id, "name": name, "uid": unit_id, "cat_id": category_id, "now": get_current_time_ist().replace(tzinfo=None)})
+                """), {"id": machine_id, "name": name, "uid": unit_id, "cat_id": category_id, "now": get_current_time_ist()})
 
         for name, cat in unit2_machines:
             upsert_machine(name, cat, "Unit 2")

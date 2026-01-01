@@ -71,62 +71,38 @@ app.add_exception_handler(Exception, global_exception_handler)
 # Startup event – create tables and demo users
 @app.on_event("startup")
 async def startup_event():
+    import asyncio
+    from fastapi.concurrency import run_in_threadpool
     from app.core.database import Base, engine
-    from app.models.models_db import Subtask  # Import to ensure table is registered
+    from app.models.models_db import Subtask
     from create_demo_users import create_demo_users
+    from app.core.init_data import init_db_data
     
-    try:
-        print("🚀 Running startup tasks...")
-        
-        # 1. Log Database Path
-        # from app.core.database import DEFAULT_DB_PATH
-        # print(f"📂 Database Path: {DEFAULT_DB_PATH}")
-        print("📂 Database: Using configured DATABASE_URL")
-        
-        # 2. Create all database tables
-        print("📊 Creating database tables...")
-        Base.metadata.create_all(bind=engine)
-        print("✅ Database tables created/verified")
-        
-        # 3. Verify Data Integrity
-        from sqlalchemy.orm import Session
-        session = Session(bind=engine)
+    async def run_init_tasks():
         try:
-            from app.models.models_db import Machine, User, Project
-            machine_count = session.query(Machine).count()
-            user_count = session.query(User).count()
-            # Project might not exist in models_db yet if it's in planning_model, check safely
-            try:
-                project_count = session.query(Project).count()
-            except Exception:
-                project_count = "Error querying"
-
-            print(f"📈 Data Status:")
-            print(f"   - Machines: {machine_count}")
-            print(f"   - Users:    {user_count}")
-            print(f"   - Projects: {project_count}")
+            print("🚀 Running startup tasks in background...")
             
-            if machine_count == 0:
-                print("⚠️ WARNING: Machine table is empty! You may need to run seed_machines.py")
+            # 1. Create tables (Sync blocking I/O)
+            print("📊 Creating database tables...")
+            await run_in_threadpool(Base.metadata.create_all, bind=engine)
+            print("✅ Database tables created/verified")
+            
+            # 2. Demo Users
+            print("👥 Creating demo users...")
+            await run_in_threadpool(create_demo_users)
+            
+            # 3. Init Data (Schema Check + Seeding)
+            print("🌱 Initializing data...")
+            await run_in_threadpool(init_db_data)
+            print("✅ Startup tasks complete")
+            
         except Exception as e:
-            print(f"⚠️ Error checking data counts: {e}")
-        finally:
-            session.close()
-        
-        # 4. Create demo users
-        print("👥 Creating demo users...")
-        create_demo_users()
-        print("✅ Demo users created/verified")
-        
-        # 5. Initialize Data (Migrations + Seeding)
-        from app.core.init_data import init_db_data
-        print("🌱 Initializing data...")
-        init_db_data()
-        print("✅ Data initialization complete")
-        
-        print("✅ Startup complete")
-    except Exception as e:
-        print(f"❌ Error during startup: {e}")
+            print(f"❌ Error during background startup: {e}")
+            import traceback
+            traceback.print_exc()
+
+    # Create task to run in background so API is responsive immediately
+    asyncio.create_task(run_init_tasks())
 
 
 # Root endpoint
