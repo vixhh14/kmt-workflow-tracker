@@ -35,7 +35,7 @@ async def get_machines_dropdown(
 ):
     """Return machines where is_deleted = false"""
     machines = db.query(Machine).filter(or_(Machine.is_deleted == False, Machine.is_deleted == None)).all()
-    return [{"id": m.id, "name": m.machine_name} for m in machines]
+    return [{"id": str(m.id), "name": m.machine_name} for m in machines]
 
 @router.get("/users/assignable", response_model=List[UserDropdownItem])
 async def get_assignable_users(
