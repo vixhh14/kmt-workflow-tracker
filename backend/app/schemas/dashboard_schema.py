@@ -1,32 +1,61 @@
-from pydantic import BaseModel, ConfigDict, field_serializer
+from pydantic import BaseModel, Field, field_serializer, ConfigDict
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+from uuid import UUID
 
 class DashboardProject(BaseModel):
-    id: str
-    name: Optional[str] = None
-    code: Optional[str] = None
-    work_order: Optional[str] = None
+    # Map project_id to id for frontend
+    id: str = Field(alias="project_id")
+    name: Optional[str] = Field(default=None, alias="project_name")
+    code: Optional[str] = Field(default=None, alias="project_code")
+    work_order: Optional[str] = Field(default=None, alias="work_order_number")
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True
+    )
 
 class DashboardTask(BaseModel):
     id: str
     title: str
     status: str
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True
+    )
 
 class DashboardMachine(BaseModel):
     id: str
     machine_name: str
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True
+    )
 
 class DashboardUser(BaseModel):
-    id: str
+    # Map user_id to id for frontend
+    id: str = Field(alias="user_id")
     username: str
     role: str
     full_name: Optional[str] = None
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True
+    )
 
 class DashboardOperator(BaseModel):
-    id: str
+    # Map user_id to id for frontend
+    id: str = Field(alias="user_id")
     username: str
-    name: Optional[str] = None
+    name: Optional[str] = Field(default=None, alias="full_name")
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True
+    )
 
 class DashboardOverviewCounts(BaseModel):
     total: int = 0
@@ -60,7 +89,10 @@ class AdminDashboardOut(BaseModel):
     operators: List[DashboardOperator]
     overview: DashboardOverview
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True
+    )
 
 class SupervisorDashboardOut(BaseModel):
     projects: List[DashboardProject]
@@ -69,7 +101,10 @@ class SupervisorDashboardOut(BaseModel):
     operators: List[DashboardOperator]
     overview: DashboardOverview
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True
+    )
 
 class PerformanceMetrics(BaseModel):
     total_tasks: int

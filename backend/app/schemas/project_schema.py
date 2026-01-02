@@ -16,15 +16,15 @@ class ProjectUpdate(BaseModel):
     project_code: Optional[str] = None
 
 class ProjectOut(BaseModel):
-    # Accept UUID from ORM, serialize to string for JSON
-    project_id: UUID
+    # Map database project_id to frontend id
+    id: UUID = Field(alias="project_id")
     project_name: str = "Unknown Project"
     work_order_number: Optional[str] = None
     client_name: Optional[str] = None
     project_code: Optional[str] = None
     created_at: Optional[datetime] = None
 
-    @field_serializer('project_id')
+    @field_serializer('id')
     def serialize_uuid(self, v: UUID, _info):
         """Serialize UUID to string for JSON response"""
         return str(v) if v else None

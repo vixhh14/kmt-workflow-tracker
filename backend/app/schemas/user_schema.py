@@ -1,5 +1,5 @@
-from pydantic import BaseModel, ConfigDict, field_serializer
-from typing import Optional, Union
+from pydantic import BaseModel, Field, field_serializer, ConfigDict
+from typing import Optional
 from datetime import datetime
 
 class UserBase(BaseModel):
@@ -19,24 +19,20 @@ class UserUpdate(BaseModel):
     unit_id: Optional[int] = None
 
 class UserOut(UserBase):
-    user_id: str
+    # Map database user_id to frontend id
+    id: str = Field(alias="user_id")
     machine_types: Optional[str] = None
-    updated_at: Optional[Union[datetime, str]] = None
-    id: Optional[str] = None
-    name: Optional[str] = None
-
-    model_config = ConfigDict(from_attributes=True)
+    updated_at: Optional[datetime] = None
 
     @field_serializer('updated_at')
-    def serialize_dt(self, dt: datetime, _info):
+    def serialize_dt(self, dt: Optional[datetime], _info):
         if dt is None:
             return None
         if isinstance(dt, str):
             return dt
         return dt.isoformat()
 
-    @field_serializer('user_id', 'id')
-    def serialize_id(self, v, _info):
-        if v is None:
-            return None
-        return str(v)
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True
+    )
