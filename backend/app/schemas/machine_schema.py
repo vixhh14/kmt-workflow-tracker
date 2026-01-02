@@ -3,8 +3,8 @@ from typing import Optional, List
 from datetime import datetime
 
 class MachineBase(BaseModel):
-    machine_name: str
-    type: str # Note: 'type' might be legacy as schema has category_id
+    machine_name: Optional[str] = "Unknown Machine"
+    type: Optional[str] = None # Legacy/Frontend compatibility
     status: str = "active" # active, maintenance, inactive
     location: Optional[str] = None
     current_operator: Optional[str] = None
@@ -29,7 +29,7 @@ class MachineOut(MachineBase):
     unit_id: Optional[int] = None
     category_id: Optional[int] = None
     hourly_rate: Optional[float] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

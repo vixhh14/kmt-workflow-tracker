@@ -86,7 +86,7 @@ class TaskOut(TaskBase):
 class OperationalTaskBase(BaseModel):
     project_id: Optional[Union[str, int]] = None # Safe for both str/int
     part_item: Optional[str] = None
-    quantity: int = 1
+    quantity: Optional[int] = 1
     due_date: Optional[date] = None
     priority: str = "medium"
     assigned_to: Optional[str] = None
@@ -161,6 +161,6 @@ class OperationalTaskOut(OperationalTaskBase):
     on_hold_at: Optional[datetime] = None
     resumed_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-    total_active_duration: int = 0
+    total_active_duration: Optional[int] = 0
 
     model_config = ConfigDict(from_attributes=True)
