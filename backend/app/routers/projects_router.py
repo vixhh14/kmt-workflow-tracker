@@ -10,20 +10,15 @@ from app.models.models_db import Project
 from app.core.database import get_db
 from app.core.time_utils import get_current_time_ist
 
+from app.schemas.project_schema import ProjectCreate, ProjectOut, ProjectUpdate
+from app.core.dependencies import get_current_user
+from app.models.models_db import User
+
 router = APIRouter(
     prefix="/projects",
     tags=["projects"],
     responses={404: {"description": "Not found"}},
 )
-
-from app.schemas.project_schema import ProjectCreate, ProjectOut, ProjectUpdate
-
-# ----------------------------------------------------------------------
-# API Endpoints
-# ----------------------------------------------------------------------
-
-from app.core.dependencies import get_current_user
-from app.models.models_db import User
 
 @router.get("", response_model=List[ProjectOut])
 async def read_projects(
@@ -72,6 +67,11 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
         db.add(new_project)
         db.commit()
         db.refresh(new_project)
+        
+        # Set convenience attributes for the response model
+        new_project.id = new_project.project_id
+        new_project.name = new_project.project_name
+        
         return new_project
     except IntegrityError as e:
         db.rollback()

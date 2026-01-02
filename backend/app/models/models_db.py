@@ -2,6 +2,7 @@ from sqlalchemy import Column, String, Integer, BigInteger, Float, ForeignKey, D
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from app.core.time_utils import get_current_time_ist
+import uuid
 
 # NOTE: All DateTime columns are now timezone-aware (TIMESTAMPTZ in Postgres)
 # Default values use get_current_time_ist to ensure all timestamps are generated in IST context.
@@ -95,7 +96,6 @@ class Project(Base):
     is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=get_current_time_ist)
 
-import uuid
 
 class Task(Base):
     __tablename__ = "tasks"
