@@ -63,7 +63,9 @@ async def check_out(
         raise HTTPException(status_code=500, detail=f"Failed to mark check-out: {str(e)}")
 
 
-@router.get("/summary")
+from app.schemas.dashboard_schema import AttendanceSummaryOut
+
+@router.get("/summary", response_model=AttendanceSummaryOut)
 async def get_summary(db: Session = Depends(get_db)):
     """Get attendance summary for today"""
     try:

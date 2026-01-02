@@ -25,7 +25,7 @@ class RescheduleRequestModel(BaseModel):
     requested_date: datetime
     reason: str
 
-@router.get("", response_model=List[dict])
+@router.get("", response_model=List[TaskOut])
 async def read_tasks(
     month: Optional[int] = None,
     year: Optional[int] = None,
@@ -71,52 +71,42 @@ async def read_tasks(
                     t.project = resolved_project
                     db.commit()
 
-            # Fetch holds
-            hold_history = db.query(TaskHold).filter(TaskHold.task_id == t.id).order_by(TaskHold.hold_started_at.asc()).all()
-            holds = [
-                {
-                    "start": h.hold_started_at.isoformat() if h.hold_started_at else None,
-                    "end": h.hold_ended_at.isoformat() if h.hold_ended_at else None,
-                    "duration_seconds": int((h.hold_ended_at - h.hold_started_at).total_seconds()) if h.hold_ended_at and h.hold_started_at else 0,
-                    "reason": h.hold_reason or ""
-                }
-                for h in hold_history
-            ]
-            
-            results.append({
-                "id": t.id,
+            # Construct dictionary for TaskOut
+            task_data = {
+                "id": str(t.id),
                 "title": t.title,
                 "description": t.description,
                 "project": resolved_project or "-",
-                "project_id": t.project_id,
+                "project_id": str(t.project_id) if t.project_id else None,
                 "part_item": t.part_item,
                 "nos_unit": t.nos_unit,
                 "status": t.status,
                 "priority": t.priority,
                 "assigned_by": t.assigned_by,
                 "assigned_to": t.assigned_to,
-                "machine_id": t.machine_id,
+                "machine_id": str(t.machine_id) if t.machine_id else None,
                 "due_date": t.due_date,
-                "due_datetime": t.due_datetime.isoformat() if t.due_datetime else None,
+                "due_datetime": t.due_datetime, # Pydantic will serialize this
                 "expected_completion_time": t.expected_completion_time,
-                "created_at": t.created_at.isoformat() if t.created_at else None,
-                "started_at": t.started_at.isoformat() if t.started_at else None,
-                "completed_at": t.completed_at.isoformat() if t.completed_at else None,
-                "total_duration_seconds": t.total_duration_seconds,
+                "created_at": t.created_at,
+                "started_at": t.started_at,
+                "completed_at": t.completed_at,
+                "total_duration_seconds": t.total_duration_seconds or 0,
                 "hold_reason": t.hold_reason,
                 "denial_reason": t.denial_reason,
-                "actual_start_time": t.actual_start_time.isoformat() if t.actual_start_time else None,
-                "actual_end_time": t.actual_end_time.isoformat() if t.actual_end_time else None,
-                "total_held_seconds": t.total_held_seconds,
-                "work_order_number": t.work_order_number,
-                "holds": holds
-            })
+                "actual_start_time": t.actual_start_time,
+                "actual_end_time": t.actual_end_time,
+                "total_held_seconds": t.total_held_seconds or 0,
+                "work_order_number": t.work_order_number
+            }
+            
+            results.append(task_data)
         except Exception as e:
-            print(f"⚠️ Skipping corrupted task {t.id}: {e}")
+            print(f"⚠️ Skipping corrupted task {getattr(t, 'id', 'unknown')}: {e}")
             continue
     return results
 
-@router.post("", response_model=dict, status_code=201)
+@router.post("", response_model=TaskOut, status_code=201)
 async def create_task(
     task: TaskCreate, 
     db: Session = Depends(get_db),
@@ -541,7 +531,7 @@ async def end_task(
     db.commit()
     return {"message": "Task ended successfully by admin", "status": "ended"}
 
-@router.put("/{task_id}", response_model=dict)
+@router.put("/{task_id}", response_model=TaskOut)
 async def update_task(
     task_id: str, 
     task_update: TaskUpdate, 

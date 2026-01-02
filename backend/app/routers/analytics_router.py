@@ -12,9 +12,14 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-from app.services.dashboard_analytics_service import get_dashboard_overview
+from app.schemas.dashboard_schema import (
+    DashboardOverview, 
+    OperatorPerformanceOut, 
+    DashboardProjectOverview, 
+    TaskSummaryOut
+)
 
-@router.get("/overview")
+@router.get("/overview", response_model=DashboardOverview)
 async def dashboard_overview(db: Session = Depends(get_db)):
     """
     Unified dashboard overview for Admin, Supervisor, and Planning.
@@ -22,7 +27,7 @@ async def dashboard_overview(db: Session = Depends(get_db)):
     return get_dashboard_overview(db)
 
 
-@router.get("/operator-performance")
+@router.get("/operator-performance", response_model=OperatorPerformanceOut)
 async def get_operator_performance(
     month: int,
     year: int,
@@ -49,14 +54,6 @@ async def get_operator_performance(
     completed_count = len(completed_tasks)
     
     on_hold_count = len([t for t in tasks if t.status == 'on_hold'])
-    # Rescheduled count - this might need a separate query if we track reschedule requests separately
-    # For now, let's assume if due_date was changed or if there are reschedule requests.
-    # But the prompt asks for "Rescheduled tasks". 
-    # Let's check RescheduleRequest table or just count tasks where due_date != original? 
-    # We don't track original due date easily unless we look at history.
-    # Let's use a placeholder or check if we can join with RescheduleRequest.
-    # For simplicity, let's count tasks that have a 'reschedule' log in time logs? 
-    # Or just return 0 for now if not easily available, or check if we can query RescheduleRequest.
     
     # Calculate total duration
     total_duration_seconds = 0
@@ -74,8 +71,7 @@ async def get_operator_performance(
     # Completion Percentage Formula: ((completed / total) * 100) - 2
     if total_tasks > 0:
         raw_percentage = (completed_count / total_tasks) * 100
-        completion_percentage = max(0, raw_percentage - 2) # Ensure not negative? Or just apply -2.
-        # "− 2% (apply -2% rule)"
+        completion_percentage = max(0, raw_percentage - 2) 
         completion_percentage = round(completion_percentage, 2)
     else:
         completion_percentage = 0
@@ -86,7 +82,7 @@ async def get_operator_performance(
     for t in completed_tasks:
         if t.completed_at:
             date_str = t.completed_at.strftime('%Y-%m-%d')
-            duration_by_date[date_str] = duration_by_date.get(date_str, 0) + t.total_duration_seconds
+            duration_by_date[date_str] = duration_by_date.get(date_str, 0) + (t.total_duration_seconds or 0)
 
     graph_data = [
         {"date": date, "duration": duration}
@@ -98,17 +94,17 @@ async def get_operator_performance(
             "total_tasks": total_tasks,
             "completed_tasks": completed_count,
             "on_hold_tasks": on_hold_count,
-            "rescheduled_tasks": 0, # Placeholder until we link RescheduleRequest
+            "rescheduled_tasks": 0, 
             "avg_time_per_task_seconds": avg_time_per_task,
-            "total_working_duration_seconds": total_duration_seconds,
-            "completion_percentage": completion_percentage
+            "total_working_duration_seconds": int(total_duration_seconds),
+            "completion_percentage": float(completion_percentage)
         },
         "graph_data": graph_data
     }
 
 from app.services.project_overview_service import get_project_overview_stats
 
-@router.get("/project-overview")
+@router.get("/project-overview", response_model=DashboardProjectOverview)
 async def project_overview(db: Session = Depends(get_db)):
     """
     Get unified project overview statistics.
@@ -116,7 +112,7 @@ async def project_overview(db: Session = Depends(get_db)):
     """
     return get_project_overview_stats(db)
 
-@router.get("/task-summary")
+@router.get("/task-summary", response_model=TaskSummaryOut)
 async def get_task_summary(db: Session = Depends(get_db)):
     """
     Legacy endpoint - kept for backward compatibility if needed, 
@@ -130,7 +126,7 @@ async def get_task_summary(db: Session = Depends(get_db)):
         Task.status, func.count(Task.id)
     ).group_by(Task.status).all()
     
-    status_map = {status: count for status, count in status_counts}
+    status_map = {str(status): int(count) for status, count in status_counts if status}
 
     return {
         "project_stats": project_stats,

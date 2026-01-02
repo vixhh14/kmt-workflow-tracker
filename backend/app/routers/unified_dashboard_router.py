@@ -6,13 +6,14 @@ from app.core.database import get_db
 from app.models.models_db import Task, User, Machine, Project
 from app.services.dashboard_analytics_service import get_dashboard_overview
 from app.services.project_overview_service import get_project_overview_stats
+from app.schemas.dashboard_schema import AdminDashboardOut, SupervisorDashboardOut
 
 router = APIRouter(
     prefix="/dashboard",
     tags=["unified-dashboard"]
 )
 
-@router.get("/admin")
+@router.get("/admin", response_model=AdminDashboardOut)
 async def get_admin_dashboard(db: Session = Depends(get_db)):
     """
     Unified dashboard for Admin as per requirements.
@@ -20,23 +21,30 @@ async def get_admin_dashboard(db: Session = Depends(get_db)):
     try:
         # 1. Projects
         projects = db.query(Project).filter(or_(Project.is_deleted == False, Project.is_deleted == None)).all()
-        project_list = [{"id": p.project_id, "name": p.project_name, "code": p.project_code, "work_order": p.work_order_number} for p in projects]
+        project_list = [
+            {
+                "id": str(p.project_id), 
+                "name": p.project_name, 
+                "code": p.project_code, 
+                "work_order": p.work_order_number
+            } for p in projects
+        ]
         
         # 2. Tasks
         tasks = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None)).all()
-        task_list = [{"id": t.id, "title": t.title, "status": t.status} for t in tasks]
+        task_list = [{"id": str(t.id), "title": t.title, "status": t.status} for t in tasks]
         
         # 3. Machines
         machines = db.query(Machine).filter(or_(Machine.is_deleted == False, Machine.is_deleted == None)).all()
-        machine_list = [{"id": m.id, "machine_name": m.machine_name} for m in machines]
+        machine_list = [{"id": str(m.id), "machine_name": m.machine_name} for m in machines]
         
         # 4. Users (all)
         users = db.query(User).filter(User.is_deleted == False).all()
-        user_list = [{"id": u.user_id, "username": u.username, "role": u.role, "full_name": u.full_name} for u in users]
+        user_list = [{"id": str(u.user_id), "username": u.username, "role": u.role, "full_name": u.full_name} for u in users]
         
         # 5. Operators only
         operators = db.query(User).filter(User.role == 'operator', User.is_deleted == False).all()
-        operator_list = [{"id": u.user_id, "username": u.username, "name": u.full_name} for u in operators]
+        operator_list = [{"id": str(u.user_id), "username": u.username, "name": u.full_name} for u in operators]
         
         # 6. Global Overview (Unified logic)
         overview = get_dashboard_overview(db)
@@ -56,16 +64,21 @@ async def get_admin_dashboard(db: Session = Depends(get_db)):
         }
     except Exception as e:
         print(f"Error in /dashboard/admin: {e}")
+        # Return empty but structured response to satisfy response_model
         return {
             "projects": [],
             "tasks": [],
             "machines": [],
             "users": [],
             "operators": [],
-            "overview": {}
+            "overview": {
+                "tasks": {"total": 0, "pending": 0, "in_progress": 0, "completed": 0, "ended": 0, "on_hold": 0},
+                "machines": {"active": 0, "total": 0},
+                "projects": {"total": 0, "completed": 0, "in_progress": 0, "yet_to_start": 0, "held": 0}
+            }
         }
 
-@router.get("/supervisor")
+@router.get("/supervisor", response_model=SupervisorDashboardOut)
 async def get_supervisor_dashboard(db: Session = Depends(get_db)):
     """
     Unified dashboard for Supervisor as per requirements.
@@ -73,19 +86,19 @@ async def get_supervisor_dashboard(db: Session = Depends(get_db)):
     try:
         # 1. Projects
         projects = db.query(Project).filter(or_(Project.is_deleted == False, Project.is_deleted == None)).all()
-        project_list = [{"id": p.project_id, "name": p.project_name, "code": p.project_code} for p in projects]
+        project_list = [{"id": str(p.project_id), "name": p.project_name, "code": p.project_code} for p in projects]
         
         # 2. Tasks
         tasks = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None)).all()
-        task_list = [{"id": t.id, "title": t.title, "status": t.status} for t in tasks]
+        task_list = [{"id": str(t.id), "title": t.title, "status": t.status} for t in tasks]
         
         # 3. Machines
         machines = db.query(Machine).filter(or_(Machine.is_deleted == False, Machine.is_deleted == None)).all()
-        machine_list = [{"id": m.id, "machine_name": m.machine_name} for m in machines]
+        machine_list = [{"id": str(m.id), "machine_name": m.machine_name} for m in machines]
         
         # 4. Operators
         operators = db.query(User).filter(User.role == 'operator', User.is_deleted == False).all()
-        operator_list = [{"id": u.user_id, "username": u.username, "name": u.full_name} for u in operators]
+        operator_list = [{"id": str(u.user_id), "username": u.username, "name": u.full_name} for u in operators]
         
         # 5. Global Overview
         overview = get_dashboard_overview(db)
@@ -109,5 +122,9 @@ async def get_supervisor_dashboard(db: Session = Depends(get_db)):
             "tasks": [],
             "machines": [],
             "operators": [],
-            "overview": {}
+            "overview": {
+                "tasks": {"total": 0, "pending": 0, "in_progress": 0, "completed": 0, "ended": 0, "on_hold": 0},
+                "machines": {"active": 0, "total": 0},
+                "projects": {"total": 0, "completed": 0, "in_progress": 0, "yet_to_start": 0, "held": 0}
+            }
         }
