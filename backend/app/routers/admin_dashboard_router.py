@@ -18,13 +18,16 @@ async def get_projects(db: Session = Depends(get_db)):
     """Get list of all unique project names"""
     try:
         # Get projects from new table
-        db_projects = db.query(Project.project_name).all()
+        db_projects = db.query(Project.project_name).filter(
+            or_(Project.is_deleted == False, Project.is_deleted == None)
+        ).all()
         new_project_names = [p[0] for p in db_projects if p[0]]
         
         # Get legacy projects from tasks
         legacy_projects = db.query(Task.project).filter(
             Task.project != None,
-            Task.project != ''
+            Task.project != '',
+            or_(Task.is_deleted == False, Task.is_deleted == None)
         ).distinct().all()
         legacy_project_names = [p[0] for p in legacy_projects if p[0]]
         
