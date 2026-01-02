@@ -90,7 +90,10 @@ async def get_attendance_summary(db: Session = Depends(get_db)):
         
         if not result.get("success"):
             # Return safe fallback data
-            all_users = db.query(User).filter(User.role.in_(['operator', 'supervisor', 'planning'])).all()
+            all_users = db.query(User).filter(
+                func.lower(User.role).in_(['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master']),
+                or_(User.is_deleted == False, User.is_deleted == None)
+            ).all()
             user_list = [
                 {
                     "id": u.user_id,
@@ -125,7 +128,10 @@ async def get_attendance_summary(db: Session = Depends(get_db)):
     except Exception as e:
         # Return safe fallback data on error
         try:
-            all_users = db.query(User).filter(User.role.in_(['operator', 'supervisor', 'planning'])).all()
+            all_users = db.query(User).filter(
+                func.lower(User.role).in_(['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master']),
+                or_(User.is_deleted == False, User.is_deleted == None)
+            ).all()
             user_list = [
                 {
                     "id": u.user_id,

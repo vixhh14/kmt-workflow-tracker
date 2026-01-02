@@ -143,7 +143,8 @@ def get_attendance_summary(db: Session, target_date: Optional[date] = None) -> d
             target_date = get_today_date_ist()
             
         # Join User and Attendance
-        # We want ALL relevant users (operators, etc) and their attendance for the target date
+        # We want ALL relevant active users and their attendance for the target date.
+        # Enforcing is_deleted = False strictly.
         results = db.query(User, Attendance).outerjoin(
             Attendance, 
             and_(
@@ -151,9 +152,11 @@ def get_attendance_summary(db: Session, target_date: Optional[date] = None) -> d
                 Attendance.date == target_date
             )
         ).filter(
-            User.role.in_(['operator', 'supervisor', 'planning', 'admin']),
-            or_(User.is_deleted == False, User.is_deleted == None)
+            or_(User.is_deleted == False, User.is_deleted == None),
+            func.lower(User.role).in_(['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master'])
         ).all()
+        
+        print(f"📊 Attendance Scan for {target_date}: Found {len(results)} active users in tracked roles.")
         
         present_users = []
         absent_users = []
