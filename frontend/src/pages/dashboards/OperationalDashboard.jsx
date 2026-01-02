@@ -106,7 +106,8 @@ const OperationalDashboard = ({ type }) => {
             setError(null);
         } catch (e) {
             console.error('Failed to fetch projects:', e);
-            if (!e.response) setError('Connection Error: Could not load projects.');
+            const msg = e.response?.data?.detail || 'Failed to load projects.';
+            setError(msg);
         }
     };
 
