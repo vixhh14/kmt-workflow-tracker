@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, aliased
-from sqlalchemy import and_, func
+from sqlalchemy import and_, or_, func
 from datetime import datetime, date
 from app.models.models_db import Attendance, User
 from typing import Optional
@@ -163,8 +163,14 @@ def get_attendance_summary(db: Session, target_date: Optional[date] = None) -> d
         records = []
         
         present_count = 0
+        seen_user_ids = set()
         
         for user, attendance in results:
+            # Prevent duplicate counting/listing if join returns multiple rows for same user
+            if user.user_id in seen_user_ids:
+                continue
+            seen_user_ids.add(user.user_id)
+            
             user_info = {
                 "id": user.user_id,
                 "name": user.full_name if user.full_name else user.username,
@@ -173,7 +179,7 @@ def get_attendance_summary(db: Session, target_date: Optional[date] = None) -> d
                 "unit_id": user.unit_id
             }
             
-            if attendance and attendance.status == 'Present':
+            if attendance and attendance.status == 'Present' and attendance.date == target_date:
                 # User is present
                 att_data = {
                     "status": attendance.status,
@@ -203,12 +209,14 @@ def get_attendance_summary(db: Session, target_date: Optional[date] = None) -> d
                 # User is absent
                 absent_users.append(user_info)
         
+        total_active_users = len(seen_user_ids)
+        
         return {
             "success": True,
             "date": target_date.isoformat(),
             "present": present_count,
             "absent": len(absent_users),
-            "total_users": len(results),
+            "total_users": total_active_users,
             "present_users": present_users,
             "absent_users": absent_users,
             "records": records

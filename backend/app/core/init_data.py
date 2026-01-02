@@ -16,6 +16,7 @@ def sync_schema():
     session = SessionLocal()
     
     try:
+        # 1. New Columns Sync
         tables = ["filing_tasks", "fabrication_tasks"]
         new_cols = [
             ("started_at", "TIMESTAMPTZ"),
@@ -39,6 +40,22 @@ def sync_schema():
                 except Exception as col_err:
                     print(f"⚠️ Could not add {col_name} to {table}: {col_err}")
                     session.rollback()
+
+        # 2. project_id Type Sync (INTEGER -> VARCHAR)
+        # This is critical for preventing 500 errors on project creation
+        tables_to_fix = ["tasks", "filing_tasks", "fabrication_tasks", "projects"]
+        for table in tables_to_fix:
+            try:
+                query = text(f"SELECT data_type FROM information_schema.columns WHERE table_name='{table}' AND column_name='project_id'")
+                result = session.execute(query).fetchone()
+                if result and 'int' in result[0].lower():
+                    print(f"🛠 Converting {table}.project_id to VARCHAR...")
+                    session.execute(text(f"ALTER TABLE {table} ALTER COLUMN project_id TYPE VARCHAR USING project_id::VARCHAR"))
+                    session.commit()
+            except Exception as type_err:
+                print(f"⚠️ Could not convert project_id in {table}: {type_err}")
+                session.rollback()
+
     except Exception as e:
         print(f"❌ sync_schema error: {e}")
     finally:
