@@ -45,14 +45,14 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
     if not project.project_code or not project.project_code.strip():
         raise HTTPException(status_code=400, detail="Project code is required")
     
-    # 2. Check if project code already exists (Ignoring soft-deleted ones)
+    # 2. Check if project code already exists (Including soft-deleted ones due to DB UNIQUE constraint)
     existing = db.query(Project).filter(
-        Project.project_code == project.project_code.strip(),
-        or_(Project.is_deleted == False, Project.is_deleted == None)
+        Project.project_code == project.project_code.strip()
     ).first()
     
     if existing:
-        raise HTTPException(status_code=409, detail=f"Project code '{project.project_code}' is already in use by an active project.")
+        status_msg = "active" if not existing.is_deleted else "deleted/archived"
+        raise HTTPException(status_code=409, detail=f"Project code '{project.project_code}' already exists in the system (Status: {status_msg}). Please use a unique code.")
     
     try:
         new_project = Project(

@@ -12,13 +12,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={
             "error_code": "VALIDATION_ERROR",
             "message": "Validation error in request data",
+            "detail": str(exc.errors()),
             "details": exc.errors()
         }
     )
 
 async def response_validation_exception_handler(request: Request, exc: ResponseValidationError):
     """Handles Pydantic validation errors (500) during RESPONSE serialization"""
-    # This prevents the server from crashing or returning empty body when output schema doesn't match data
     print(f"⚠️ RESPONSE VALIDATION ERROR: {exc.errors()}")
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -36,7 +36,6 @@ async def response_validation_exception_handler(request: Request, exc: ResponseV
 
 async def integrity_error_handler(request: Request, exc: IntegrityError):
     """Handles Database Integrity Constraints (409 Conflict)"""
-    # Parse generic integrity error message to be more user friendly if possible
     error_msg = str(exc.orig) if exc.orig else str(exc)
     
     if "unique constraint" in error_msg.lower():
@@ -54,7 +53,7 @@ async def integrity_error_handler(request: Request, exc: IntegrityError):
         content={
             "error_code": code,
             "message": msg,
-            "detail": error_msg  # Keep full detail for debugging, maybe omit in prod
+            "detail": error_msg
         }
     )
 
@@ -71,12 +70,12 @@ async def data_error_handler(request: Request, exc: DataError):
 
 async def operational_error_handler(request: Request, exc: OperationalError):
     """Handles Connection/Operational errors (503 Service Unavailable)"""
-    # This might catch connection refused, etc.
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content={
             "error_code": "DB_CONNECTION_ERROR",
-            "message": "Database connection failed. Please try again later."
+            "message": "Database connection failed. Please try again later.",
+            "detail": "Database connection failed."
         }
     )
 
@@ -86,11 +85,12 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         status_code=exc.status_code,
         content={
             "error_code": f"HTTP_{exc.status_code}",
-            "message": exc.detail
+            "message": exc.detail,
+            "detail": exc.detail
         },
         headers={
             "Access-Control-Allow-Origin": "*",
-             "Access-Control-Allow-Methods": "*"
+            "Access-Control-Allow-Methods": "*"
         }
     )
 
@@ -98,13 +98,13 @@ async def global_exception_handler(request: Request, exc: Exception):
     """Catch-all for 500 errors"""
     error_msg = str(exc)
     trace = traceback.format_exc()
-    print(f"❌ UNHANDLED EXCEPTION: {trace}")  # Log to console
+    print(f"❌ UNHANDLED EXCEPTION: {trace}")
     
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "error_code": "INTERNAL_SERVER_ERROR",
-            "message": "An unexpected error occurred.",
+            "message": "An unexpected server error occurred.",
             "detail": error_msg 
         },
         headers={

@@ -33,7 +33,11 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     try:
         # Find user by username in SQLite
         t1 = time.time()
-        user = db.query(User).filter(User.username == credentials.username, User.is_deleted == False).first()
+        from sqlalchemy import or_
+        user = db.query(User).filter(
+            User.username == credentials.username, 
+            or_(User.is_deleted == False, User.is_deleted == None)
+        ).first()
         print(f"Database query took: {time.time() - t1:.4f}s")
         
         if not user:
