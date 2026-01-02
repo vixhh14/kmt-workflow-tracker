@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel
 from datetime import datetime
 import uuid
@@ -72,10 +73,15 @@ async def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(new_project)
         return new_project
+    except IntegrityError as e:
+        db.rollback()
+        print(f"Integrity Error creating project: {str(e)}")
+        raise HTTPException(status_code=409, detail=f"Project with this code or name already exists.")
     except Exception as e:
         db.rollback()
         print(f"Error creating project: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal database error while creating project: {str(e)}")
+        # Return the actual error message for debugging purposes
+        raise HTTPException(status_code=500, detail=f"Internal Database Error: {str(e)}")
 
 @router.get("/{project_id}", response_model=ProjectOut)
 async def read_project(project_id: str, db: Session = Depends(get_db)):
