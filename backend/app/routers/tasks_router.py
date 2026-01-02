@@ -59,57 +59,61 @@ async def read_tasks(
     tasks = query.all()
     results = []
     for t in tasks:
-        # Resolve Project Name if missing (Backward compatibility)
-        resolved_project = t.project
-        if (not resolved_project or resolved_project == '-') and t.project_id:
-            from app.models.models_db import Project as DBProject
-            p_obj = db.query(DBProject).filter(DBProject.project_id == t.project_id).first()
-            if p_obj:
-                resolved_project = p_obj.project_name
-                # Optional: Sync it back to DB if missing
-                t.project = resolved_project
-                db.commit()
+        try:
+            # Resolve Project Name if missing (Backward compatibility)
+            resolved_project = t.project
+            if (not resolved_project or resolved_project == '-') and t.project_id:
+                from app.models.models_db import Project as DBProject
+                p_obj = db.query(DBProject).filter(DBProject.project_id == t.project_id).first()
+                if p_obj:
+                    resolved_project = p_obj.project_name
+                    # Optional: Sync it back to DB if missing
+                    t.project = resolved_project
+                    db.commit()
 
-        # Fetch holds
-        hold_history = db.query(TaskHold).filter(TaskHold.task_id == t.id).order_by(TaskHold.hold_started_at.asc()).all()
-        holds = [
-            {
-                "start": h.hold_started_at.isoformat() if h.hold_started_at else None,
-                "end": h.hold_ended_at.isoformat() if h.hold_ended_at else None,
-                "duration_seconds": int((h.hold_ended_at - h.hold_started_at).total_seconds()) if h.hold_ended_at and h.hold_started_at else 0,
-                "reason": h.hold_reason or ""
-            }
-            for h in hold_history
-        ]
-        
-        results.append({
-            "id": t.id,
-            "title": t.title,
-            "description": t.description,
-            "project": resolved_project or "-",
-            "project_id": t.project_id,
-            "part_item": t.part_item,
-            "nos_unit": t.nos_unit,
-            "status": t.status,
-            "priority": t.priority,
-            "assigned_by": t.assigned_by,
-            "assigned_to": t.assigned_to,
-            "machine_id": t.machine_id,
-            "due_date": t.due_date,
-            "due_datetime": t.due_datetime.isoformat() if t.due_datetime else None,
-            "expected_completion_time": t.expected_completion_time,
-            "created_at": t.created_at.isoformat() if t.created_at else None,
-            "started_at": t.started_at.isoformat() if t.started_at else None,
-            "completed_at": t.completed_at.isoformat() if t.completed_at else None,
-            "total_duration_seconds": t.total_duration_seconds,
-            "hold_reason": t.hold_reason,
-            "denial_reason": t.denial_reason,
-            "actual_start_time": t.actual_start_time.isoformat() if t.actual_start_time else None,
-            "actual_end_time": t.actual_end_time.isoformat() if t.actual_end_time else None,
-            "total_held_seconds": t.total_held_seconds,
-            "work_order_number": t.work_order_number,
-            "holds": holds
-        })
+            # Fetch holds
+            hold_history = db.query(TaskHold).filter(TaskHold.task_id == t.id).order_by(TaskHold.hold_started_at.asc()).all()
+            holds = [
+                {
+                    "start": h.hold_started_at.isoformat() if h.hold_started_at else None,
+                    "end": h.hold_ended_at.isoformat() if h.hold_ended_at else None,
+                    "duration_seconds": int((h.hold_ended_at - h.hold_started_at).total_seconds()) if h.hold_ended_at and h.hold_started_at else 0,
+                    "reason": h.hold_reason or ""
+                }
+                for h in hold_history
+            ]
+            
+            results.append({
+                "id": t.id,
+                "title": t.title,
+                "description": t.description,
+                "project": resolved_project or "-",
+                "project_id": t.project_id,
+                "part_item": t.part_item,
+                "nos_unit": t.nos_unit,
+                "status": t.status,
+                "priority": t.priority,
+                "assigned_by": t.assigned_by,
+                "assigned_to": t.assigned_to,
+                "machine_id": t.machine_id,
+                "due_date": t.due_date,
+                "due_datetime": t.due_datetime.isoformat() if t.due_datetime else None,
+                "expected_completion_time": t.expected_completion_time,
+                "created_at": t.created_at.isoformat() if t.created_at else None,
+                "started_at": t.started_at.isoformat() if t.started_at else None,
+                "completed_at": t.completed_at.isoformat() if t.completed_at else None,
+                "total_duration_seconds": t.total_duration_seconds,
+                "hold_reason": t.hold_reason,
+                "denial_reason": t.denial_reason,
+                "actual_start_time": t.actual_start_time.isoformat() if t.actual_start_time else None,
+                "actual_end_time": t.actual_end_time.isoformat() if t.actual_end_time else None,
+                "total_held_seconds": t.total_held_seconds,
+                "work_order_number": t.work_order_number,
+                "holds": holds
+            })
+        except Exception as e:
+            print(f"⚠️ Skipping corrupted task {t.id}: {e}")
+            continue
     return results
 
 @router.post("", response_model=dict, status_code=201)
