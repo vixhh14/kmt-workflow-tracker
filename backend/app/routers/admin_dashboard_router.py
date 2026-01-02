@@ -38,7 +38,9 @@ async def get_projects(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to fetch projects: {str(e)}")
 
 
-@router.get("/project-analytics")
+from app.schemas.dashboard_schema import ProjectAnalyticsOut
+
+@router.get("/project-analytics", response_model=ProjectAnalyticsOut)
 async def get_project_analytics(project: Optional[str] = None, db: Session = Depends(get_db)):
     """Get comprehensive project analytics including stats and chart data"""
     try:

@@ -1,5 +1,5 @@
-from pydantic import BaseModel, ConfigDict
-from typing import Optional, List
+from pydantic import BaseModel, ConfigDict, field_serializer
+from typing import Optional, List, Union
 from datetime import datetime
 
 class MachineBase(BaseModel):
@@ -29,7 +29,21 @@ class MachineOut(MachineBase):
     unit_id: Optional[int] = None
     category_id: Optional[int] = None
     hourly_rate: Optional[float] = None
-    created_at: Optional[datetime] = None
-    updated_at: datetime
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Union[datetime, str]
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer('created_at', 'updated_at')
+    def serialize_dt(self, dt: datetime, _info):
+        if dt is None:
+            return None
+        if isinstance(dt, str):
+            return dt
+        return dt.isoformat()
+
+    @field_serializer('id')
+    def serialize_id(self, v, _info):
+        if v is None:
+            return None
+        return str(v)

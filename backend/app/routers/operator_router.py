@@ -17,7 +17,9 @@ router = APIRouter(
     dependencies=[Depends(get_current_user)]
 )
 
-@router.get("/tasks")
+from app.schemas.dashboard_schema import OperatorDashboardOut
+
+@router.get("/tasks", response_model=OperatorDashboardOut)
 async def get_operator_tasks(
     user_id: Optional[str] = None,
     db: Session = Depends(get_db),
@@ -38,14 +40,14 @@ async def get_operator_tasks(
         all_users = db.query(User).all()
         user_map = {u.user_id: u for u in all_users}
         machines = db.query(Machine).all()
-        machine_map = {m.id: m for m in machines}
+        machine_map = {str(m.id): m for m in machines}
         
         task_list = []
         for task in tasks:
             duration_seconds = task.total_duration_seconds or 0
             assigned_by_user = user_map.get(task.assigned_by)
             assigned_by_name = assigned_by_user.username if assigned_by_user else "Unknown"
-            machine = machine_map.get(task.machine_id)
+            machine = machine_map.get(str(task.machine_id))
             machine_name = machine.machine_name if machine else "Unknown"
             
             # Fetch hold history
@@ -54,14 +56,14 @@ async def get_operator_tasks(
                 {
                     "start": h.hold_started_at.isoformat() if h.hold_started_at else None,
                     "end": h.hold_ended_at.isoformat() if h.hold_ended_at else None,
-                    "duration_seconds": safe_datetime_diff(h.hold_ended_at, h.hold_started_at) if h.hold_ended_at else 0,
+                    "duration_seconds": int(safe_datetime_diff(h.hold_ended_at, h.hold_started_at)) if h.hold_ended_at and h.hold_started_at else 0,
                     "reason": h.hold_reason or ""
                 }
                 for h in hold_history
             ]
             
             task_data = {
-                "id": task.id,
+                "id": str(task.id),
                 "title": task.title or "",
                 "project": task.project or "",
                 "description": task.description or "",
@@ -69,17 +71,17 @@ async def get_operator_tasks(
                 "nos_unit": task.nos_unit or "",
                 "status": task.status or "pending",
                 "priority": task.priority or "medium",
-                "assigned_to": task.assigned_to or "",
-                "machine_id": task.machine_id or "",
+                "assigned_to": str(task.assigned_to) if task.assigned_to else "",
+                "machine_id": str(task.machine_id) if task.machine_id else "",
                 "machine_name": machine_name,
-                "assigned_by": task.assigned_by or "",
+                "assigned_by": str(task.assigned_by) if task.assigned_by else "",
                 "assigned_by_name": assigned_by_name,
-                "due_date": task.due_date or "",
+                "due_date": str(task.due_date) if task.due_date else "",
                 "created_at": make_aware(task.created_at).isoformat() if task.created_at else None,
                 "started_at": make_aware(task.started_at).isoformat() if task.started_at else None,
                 "completed_at": make_aware(task.completed_at).isoformat() if task.completed_at else None,
-                "total_duration_seconds": duration_seconds,
-                "total_held_seconds": task.total_held_seconds or 0,
+                "total_duration_seconds": int(duration_seconds),
+                "total_held_seconds": int(task.total_held_seconds or 0),
                 "holds": holds
             }
             task_list.append(task_data)
@@ -94,12 +96,14 @@ async def get_operator_tasks(
                 "on_hold_tasks": len([t for t in tasks if t.status == 'on_hold'])
             },
             "user": {
-                "user_id": user.user_id if user else target_user_id,
+                "user_id": str(user.user_id) if user else target_user_id,
                 "username": user.username if user else "Unknown",
                 "full_name": user.full_name or user.username if user else "Unknown"
             }
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to fetch operator tasks: {str(e)}")
 
 @router.put("/tasks/{task_id}/start")

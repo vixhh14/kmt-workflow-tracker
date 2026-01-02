@@ -298,7 +298,15 @@ def calculate_monthly_performance(db: Session, year: int) -> dict:
 # ENDPOINTS
 # ----------------------------------------------------------------------
 
-@router.get("/machines/daily")
+from app.schemas.dashboard_schema import (
+    DailyMachineReportOut, 
+    DailyUserReportOut, 
+    MonthlyPerformanceOut,
+    DetailedMachineActivityItem,
+    DetailedUserActivityItem
+)
+
+@router.get("/machines/daily", response_model=DailyMachineReportOut)
 async def get_machine_daily_report(date_str: Optional[str] = None, db: Session = Depends(get_db)):
     """JSON Data for UI"""
     target_date = get_today_date_ist()
@@ -309,9 +317,13 @@ async def get_machine_daily_report(date_str: Optional[str] = None, db: Session =
             pass
             
     data = calculate_machine_runtime(db, target_date)
+    # Ensure IDs are strings
+    for item in data:
+        item["machine_id"] = str(item["machine_id"])
+        
     return {"date": target_date.isoformat(), "report": data}
 
-@router.get("/users/daily")
+@router.get("/users/daily", response_model=DailyUserReportOut)
 async def get_user_daily_report(date_str: Optional[str] = None, db: Session = Depends(get_db)):
     """JSON Data for UI"""
     target_date = get_today_date_ist()
@@ -322,9 +334,14 @@ async def get_user_daily_report(date_str: Optional[str] = None, db: Session = De
             pass
             
     data = calculate_user_activity(db, target_date)
+    # Ensure IDs and list items are strings
+    for item in data:
+        item["user_id"] = str(item["user_id"])
+        item["machines_used"] = [str(m) for m in item["machines_used"]]
+        
     return {"date": target_date.isoformat(), "report": data}
 
-@router.get("/monthly-performance")
+@router.get("/monthly-performance", response_model=MonthlyPerformanceOut)
 async def get_monthly_performance(year: Optional[int] = None, db: Session = Depends(get_db)):
     """JSON Data for UI"""
     if not year:
@@ -515,7 +532,7 @@ async def export_projects_summary_csv(year_month: Optional[str] = None, db: Sess
         'Content-Disposition': f'attachment; filename="{filename}"'
     }
     return StreamingResponse(iter([stream.getvalue()]), media_type="text/csv", headers=response_headers)
-@router.get("/machine-detailed")
+@router.get("/machine-detailed", response_model=List[DetailedMachineActivityItem])
 async def get_machine_detailed_report(
     machine_id: str,
     target_date: date = Query(default_factory=get_today_date_ist),
@@ -524,9 +541,12 @@ async def get_machine_detailed_report(
     """
     Returns granular activity sessions for a machine on a specific date.
     """
-    return calculate_detailed_machine_activity(db, machine_id, target_date)
+    data = calculate_detailed_machine_activity(db, machine_id, target_date)
+    for item in data:
+        item["task_id"] = str(item["task_id"])
+    return data
 
-@router.get("/user-detailed")
+@router.get("/user-detailed", response_model=List[DetailedUserActivityItem])
 async def get_user_detailed_report(
     user_id: str,
     target_date: date = Query(default_factory=get_today_date_ist),
@@ -535,7 +555,10 @@ async def get_user_detailed_report(
     """
     Returns granular activity sessions for a user on a specific date.
     """
-    return calculate_detailed_user_activity(db, user_id, target_date)
+    data = calculate_detailed_user_activity(db, user_id, target_date)
+    for item in data:
+        item["task_id"] = str(item["task_id"])
+    return data
 
 @router.get("/active-monitoring")
 async def get_active_work_monitoring(db: Session = Depends(get_db)):
