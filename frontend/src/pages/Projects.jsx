@@ -24,15 +24,16 @@ const Projects = () => {
             const res = await getProjects();
             setProjects(res.data);
             setError(null);
-        } catch (err) {
-            console.error('Failed to fetch projects:', err);
-            const errorMsg = err.response?.data?.detail || err.message;
-            if (!err.response) {
+        } catch (e) {
+            console.error('Failed to fetch projects:', e);
+            const data = e.response?.data;
+            const msg = data?.message || data?.detail || 'Failed to load projects.';
+            setError(msg);
+            if (!e.response) {
                 alert('Connection Error: Failed to connect to backend server. Please check CORS settings.');
             } else {
-                alert(`Fetch Error: ${errorMsg}`);
+                alert(`Fetch Error: ${msg}`);
             }
-            setError(errorMsg);
         } finally {
             setLoading(false);
         }
@@ -53,8 +54,8 @@ const Projects = () => {
             alert('Project created successfully!');
         } catch (err) {
             console.error('Failed to create project:', err);
-            const detail = err.response?.data?.detail;
-            const message = typeof detail === 'string' ? detail : 'Failed to create project';
+            const data = err.response?.data;
+            const message = data?.message || data?.detail || err.message || 'Failed to create project';
             setError(message);
             alert(message);
         }
