@@ -151,7 +151,8 @@ def get_attendance_summary(db: Session, target_date: Optional[date] = None) -> d
                 Attendance.date == target_date
             )
         ).filter(
-            User.role.in_(['operator', 'supervisor', 'planning', 'admin'])
+            User.role.in_(['operator', 'supervisor', 'planning', 'admin']),
+            or_(User.is_deleted == False, User.is_deleted == None)
         ).all()
         
         present_users = []
