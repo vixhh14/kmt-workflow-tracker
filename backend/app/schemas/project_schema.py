@@ -1,6 +1,7 @@
-from pydantic import BaseModel, ConfigDict, field_serializer
-from typing import Optional, Union
+from pydantic import BaseModel, Field, field_serializer, ConfigDict
+from typing import Optional
 from datetime import datetime
+from uuid import UUID
 
 class ProjectCreate(BaseModel):
     project_name: str
@@ -15,27 +16,27 @@ class ProjectUpdate(BaseModel):
     project_code: Optional[str] = None
 
 class ProjectOut(BaseModel):
-    project_id: str
-    project_name: Optional[str] = "Unknown Project"
-    id: Optional[str] = None
-    name: Optional[str] = None
+    # Accept UUID from ORM, serialize to string for JSON
+    project_id: UUID
+    project_name: str = "Unknown Project"
     work_order_number: Optional[str] = None
     client_name: Optional[str] = None
     project_code: Optional[str] = None
-    created_at: Optional[Union[datetime, str]] = None
+    created_at: Optional[datetime] = None
 
-    model_config = ConfigDict(from_attributes=True)
-
+    @field_serializer('project_id')
+    def serialize_uuid(self, v: UUID, _info):
+        """Serialize UUID to string for JSON response"""
+        return str(v) if v else None
+    
     @field_serializer('created_at')
-    def serialize_dt(self, dt: datetime, _info):
-        if dt is None:
-            return None
-        if isinstance(dt, str):
-            return dt
-        return dt.isoformat()
+    def serialize_datetime(self, dt: Optional[datetime], _info):
+        """Serialize datetime to ISO 8601 string"""
+        if isinstance(dt, datetime):
+            return dt.isoformat()
+        return dt
 
-    @field_serializer('project_id', 'id')
-    def serialize_id(self, v, _info):
-        if v is None:
-            return None
-        return str(v)
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True
+    )

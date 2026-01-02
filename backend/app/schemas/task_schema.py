@@ -1,11 +1,12 @@
 from pydantic import BaseModel, ConfigDict, field_validator, field_serializer
 from typing import Optional, Union
 from datetime import datetime, date
+from uuid import UUID
 
 class TaskBase(BaseModel):
     title: str
     project: Optional[str] = None
-    project_id: Optional[str] = None
+    project_id: Optional[UUID] = None  # Accept UUID from ORM
     description: Optional[str] = None
     part_item: Optional[str] = None
     nos_unit: Optional[str] = None
@@ -19,7 +20,7 @@ class TaskBase(BaseModel):
     expected_completion_time: Optional[int] = None
     work_order_number: Optional[str] = None
 
-    @field_validator('project_id', 'machine_id', mode='before')
+    @field_validator('machine_id', mode='before')
     @classmethod
     def allow_int_ids(cls, v):
         if isinstance(v, int):
@@ -39,7 +40,7 @@ class TaskCreate(TaskBase):
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
     project: Optional[str] = None
-    project_id: Optional[Union[str, int]] = None
+    project_id: Optional[Union[str, UUID]] = None  # Accept both for flexibility
     description: Optional[str] = None
     part_item: Optional[str] = None
     nos_unit: Optional[str] = None
@@ -53,7 +54,7 @@ class TaskUpdate(BaseModel):
     expected_completion_time: Optional[int] = None
     work_order_number: Optional[str] = None
 
-    @field_validator('project_id', 'machine_id', mode='before')
+    @field_validator('machine_id', mode='before')
     @classmethod
     def allow_int_ids(cls, v):
         if isinstance(v, int):
@@ -69,20 +70,20 @@ class TaskUpdate(BaseModel):
 
 class TaskOut(TaskBase):
     id: str  # UUID as string
-    created_at: Union[datetime, str]
-    started_at: Optional[Union[datetime, str]] = None
-    completed_at: Optional[Union[datetime, str]] = None
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     total_duration_seconds: int = 0
     hold_reason: Optional[str] = None
     denial_reason: Optional[str] = None
-    actual_start_time: Optional[Union[datetime, str]] = None
-    actual_end_time: Optional[Union[datetime, str]] = None
+    actual_start_time: Optional[datetime] = None
+    actual_end_time: Optional[datetime] = None
     total_held_seconds: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 
     @field_serializer('created_at', 'started_at', 'completed_at', 'actual_start_time', 'actual_end_time', 'due_datetime')
-    def serialize_dt(self, dt: datetime, _info):
+    def serialize_dt(self, dt: Optional[datetime], _info):
         if dt is None:
             return None
         if isinstance(dt, str):
@@ -98,7 +99,7 @@ class TaskOut(TaskBase):
 # Operational Tasks (Filing/Fabrication)
 
 class OperationalTaskBase(BaseModel):
-    project_id: Optional[str] = None # Safe for both str/int
+    project_id: Optional[UUID] = None  # Accept UUID from ORM
     part_item: Optional[str] = None
     quantity: Optional[int] = 1
     due_date: Optional[Union[date, str]] = None
@@ -107,12 +108,12 @@ class OperationalTaskBase(BaseModel):
     completed_quantity: int = 0
     remarks: Optional[str] = None
     status: str = "Pending"
-    machine_id: Optional[str] = None # Safe
+    machine_id: Optional[str] = None
     work_order_number: Optional[str] = None
     assigned_by: Optional[str] = None
-    task_type: Optional[str] = None # FILING or FABRICATION
+    task_type: Optional[str] = None  # FILING or FABRICATION
 
-    @field_validator('project_id', 'machine_id', mode='before')
+    @field_validator('machine_id', mode='before')
     @classmethod
     def allow_int_ids(cls, v):
         if isinstance(v, int):
@@ -135,7 +136,7 @@ class OperationalTaskUpdate(BaseModel):
     remarks: Optional[str] = None
     status: Optional[str] = None
     # For Admin edits
-    project_id: Optional[Union[str, int]] = None
+    project_id: Optional[Union[str, UUID]] = None  # Accept both
     part_item: Optional[str] = None
     quantity: Optional[int] = None
     due_date: Optional[Union[date, str]] = None
@@ -148,7 +149,7 @@ class OperationalTaskUpdate(BaseModel):
     machine_id: Optional[Union[str, int]] = None
     work_order_number: Optional[str] = None
 
-    @field_validator('project_id', 'machine_id', mode='before')
+    @field_validator('machine_id', mode='before')
     @classmethod
     def allow_int_ids(cls, v):
         if isinstance(v, int):
@@ -164,23 +165,23 @@ class OperationalTaskUpdate(BaseModel):
 
 class OperationalTaskOut(OperationalTaskBase):
     id: Union[int, str]
-    created_at: Union[datetime, str]
-    updated_at: Union[datetime, str]
+    created_at: datetime
+    updated_at: datetime
     
     # Nested objects if needed
     project_name: Optional[str] = None
     machine_name: Optional[str] = None
     assignee_name: Optional[str] = None
-    started_at: Optional[Union[datetime, str]] = None
-    on_hold_at: Optional[Union[datetime, str]] = None
-    resumed_at: Optional[Union[datetime, str]] = None
-    completed_at: Optional[Union[datetime, str]] = None
+    started_at: Optional[datetime] = None
+    on_hold_at: Optional[datetime] = None
+    resumed_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     total_active_duration: Optional[int] = 0
 
     model_config = ConfigDict(from_attributes=True)
 
     @field_serializer('created_at', 'updated_at', 'started_at', 'on_hold_at', 'resumed_at', 'completed_at')
-    def serialize_dt(self, dt: datetime, _info):
+    def serialize_dt(self, dt: Optional[datetime], _info):
         if dt is None:
             return None
         if isinstance(dt, str):
