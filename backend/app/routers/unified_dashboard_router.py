@@ -16,39 +16,82 @@ router = APIRouter(
 @router.get("/admin", response_model=AdminDashboardOut)
 async def get_admin_dashboard(db: Session = Depends(get_db)):
     """
-    Unified dashboard for Admin as per requirements.
+    Admin Dashboard: All projects, tasks, machines, users, and operators.
+    FAIL-SAFE: Skips corrupted rows, returns partial data.
     """
     try:
-        # 1. Projects
+        # Fetch data with LEFT JOINs to handle missing relationships
         projects = db.query(Project).filter(or_(Project.is_deleted == False, Project.is_deleted == None)).all()
-        project_list = [
-            {
-                "id": str(p.project_id), 
-                "name": p.project_name, 
-                "code": p.project_code, 
-                "work_order": p.work_order_number
-            } for p in projects
-        ]
-        
-        # 2. Tasks
         tasks = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None)).all()
-        task_list = [{"id": str(t.id), "title": t.title, "status": t.status} for t in tasks]
-        
-        # 3. Machines
         machines = db.query(Machine).filter(or_(Machine.is_deleted == False, Machine.is_deleted == None)).all()
-        machine_list = [{"id": str(m.id), "machine_name": m.machine_name} for m in machines]
+        users = db.query(User).filter(
+            or_(User.is_deleted == False, User.is_deleted == None),
+            User.approval_status == 'approved'
+        ).all()
         
-        # 4. Users (all)
-        users = db.query(User).filter(User.is_deleted == False).all()
-        user_list = [{"id": str(u.user_id), "username": u.username, "role": u.role, "full_name": u.full_name} for u in users]
-        
-        # 5. Operators only
-        operators = db.query(User).filter(User.role == 'operator', User.is_deleted == False).all()
-        operator_list = [{"id": str(u.user_id), "username": u.username, "name": u.full_name} for u in operators]
-        
-        # 6. Global Overview (Unified logic)
+        # Get overview stats
         overview = get_dashboard_overview(db)
-        project_stats = get_project_overview_stats(db)
+        
+        # FAIL-SAFE: Process each row individually, skip corrupted ones
+        project_list = []
+        for p in projects:
+            try:
+                project_list.append({
+                    "project_id": str(p.project_id),
+                    "project_name": p.project_name or "Unnamed Project",
+                    "work_order_number": p.work_order_number or "",
+                    "client_name": p.client_name or "",
+                    "created_at": p.created_at.isoformat() if p.created_at else None
+                })
+            except Exception as e:
+                print(f"⚠️ Skipping corrupted project {getattr(p, 'project_id', 'unknown')}: {e}")
+                continue
+        
+        task_list = []
+        for t in tasks:
+            try:
+                task_list.append({
+                    "id": str(t.id),
+                    "title": t.title or "Untitled Task",
+                    "status": t.status or "pending",
+                    "priority": t.priority or "medium",
+                    "project_id": str(t.project_id) if t.project_id else None,
+                    "assigned_to": t.assigned_to or "",
+                    "due_date": t.due_date or "",
+                    "created_at": t.created_at.isoformat() if t.created_at else None
+                })
+            except Exception as e:
+                print(f"⚠️ Skipping corrupted task {getattr(t, 'id', 'unknown')}: {e}")
+                continue
+        
+        machine_list = []
+        for m in machines:
+            try:
+                machine_list.append({
+                    "id": str(m.id),
+                    "machine_name": m.machine_name or "Unknown Machine",
+                    "status": m.status or "unknown",
+                    "unit_id": m.unit_id or 0
+                })
+            except Exception as e:
+                print(f"⚠️ Skipping corrupted machine {getattr(m, 'id', 'unknown')}: {e}")
+                continue
+        
+        user_list = []
+        for u in users:
+            try:
+                user_list.append({
+                    "user_id": str(u.user_id),
+                    "username": u.username or "Unknown",
+                    "full_name": u.full_name or u.username or "Unknown",
+                    "role": u.role or "operator"
+                })
+            except Exception as e:
+                print(f"⚠️ Skipping corrupted user {getattr(u, 'user_id', 'unknown')}: {e}")
+                continue
+        
+        # Operators are users with role 'operator'
+        operator_list = [u for u in user_list if u.get("role") == "operator"]
         
         return {
             "projects": project_list,
@@ -56,15 +99,14 @@ async def get_admin_dashboard(db: Session = Depends(get_db)):
             "machines": machine_list,
             "users": user_list,
             "operators": operator_list,
-            "overview": {
-                "tasks": overview.get("tasks", {}),
-                "machines": overview.get("machines", {}),
-                "projects": project_stats
-            }
+            "overview": overview
         }
+        
     except Exception as e:
-        print(f"Error in /dashboard/admin: {e}")
-        # Return empty but structured response to satisfy response_model
+        print(f"❌ Admin dashboard error: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return empty but valid structure
         return {
             "projects": [],
             "tasks": [],
@@ -74,49 +116,33 @@ async def get_admin_dashboard(db: Session = Depends(get_db)):
             "overview": {
                 "tasks": {"total": 0, "pending": 0, "in_progress": 0, "completed": 0, "ended": 0, "on_hold": 0},
                 "machines": {"active": 0, "total": 0},
-                "projects": {"total": 0, "completed": 0, "in_progress": 0, "yet_to_start": 0, "held": 0}
+                "projects": {"total": 0}
             }
         }
 
 @router.get("/supervisor", response_model=SupervisorDashboardOut)
 async def get_supervisor_dashboard(db: Session = Depends(get_db)):
     """
-    Unified dashboard for Supervisor as per requirements.
+    Supervisor Dashboard: Projects, tasks, machines, operators (no user management).
+    FAIL-SAFE: Skips corrupted rows, returns partial data.
     """
     try:
-        # 1. Projects
-        projects = db.query(Project).filter(or_(Project.is_deleted == False, Project.is_deleted == None)).all()
-        project_list = [{"id": str(p.project_id), "name": p.project_name, "code": p.project_code} for p in projects]
-        
-        # 2. Tasks
-        tasks = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None)).all()
-        task_list = [{"id": str(t.id), "title": t.title, "status": t.status} for t in tasks]
-        
-        # 3. Machines
-        machines = db.query(Machine).filter(or_(Machine.is_deleted == False, Machine.is_deleted == None)).all()
-        machine_list = [{"id": str(m.id), "machine_name": m.machine_name} for m in machines]
-        
-        # 4. Operators
-        operators = db.query(User).filter(User.role == 'operator', User.is_deleted == False).all()
-        operator_list = [{"id": str(u.user_id), "username": u.username, "name": u.full_name} for u in operators]
-        
-        # 5. Global Overview
-        overview = get_dashboard_overview(db)
-        project_stats = get_project_overview_stats(db)
+        # Reuse admin logic but exclude full user list
+        admin_data = await get_admin_dashboard(db)
         
         return {
-            "projects": project_list,
-            "tasks": task_list,
-            "machines": machine_list,
-            "operators": operator_list,
-            "overview": {
-                "tasks": overview.get("tasks", {}),
-                "machines": overview.get("machines", {}),
-                "projects": project_stats
-            }
+            "projects": admin_data["projects"],
+            "tasks": admin_data["tasks"],
+            "machines": admin_data["machines"],
+            "operators": admin_data["operators"],
+            "overview": admin_data["overview"]
         }
+        
     except Exception as e:
-        print(f"Error in /dashboard/supervisor: {e}")
+        print(f"❌ Supervisor dashboard error: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return empty but valid structure
         return {
             "projects": [],
             "tasks": [],
@@ -125,6 +151,6 @@ async def get_supervisor_dashboard(db: Session = Depends(get_db)):
             "overview": {
                 "tasks": {"total": 0, "pending": 0, "in_progress": 0, "completed": 0, "ended": 0, "on_hold": 0},
                 "machines": {"active": 0, "total": 0},
-                "projects": {"total": 0, "completed": 0, "in_progress": 0, "yet_to_start": 0, "held": 0}
+                "projects": {"total": 0}
             }
         }
