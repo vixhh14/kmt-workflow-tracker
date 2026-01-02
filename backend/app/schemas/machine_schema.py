@@ -29,13 +29,16 @@ class MachineOut(MachineBase):
     unit_id: Optional[int] = None
     category_id: Optional[int] = None
     hourly_rate: Optional[float] = None
-    created_at: Optional[Union[datetime, str]] = None
-    updated_at: Union[datetime, str]
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True
+    )
 
     @field_serializer('created_at', 'updated_at')
-    def serialize_dt(self, dt: datetime, _info):
+    def serialize_dt(self, dt: Optional[datetime], _info):
         if dt is None:
             return None
         if isinstance(dt, str):
