@@ -49,7 +49,10 @@ class UserResponse(BaseModel):
 
 @router.get("/users", response_model=List[UserResponse])
 async def get_all_users(db: Session = Depends(get_db)):
-    users = db.query(User).filter(User.is_deleted == False).all()
+    users = db.query(User).filter(
+        or_(User.is_deleted == False, User.is_deleted == None),
+        User.approval_status == 'approved'
+    ).all()
     return users
 
 @router.get("/pending-users", response_model=List[UserResponse])

@@ -56,7 +56,7 @@ async def get_project_analytics(project: Optional[str] = None, db: Session = Dep
                 )
             )
         
-        tasks = query.all()
+        tasks = query.filter(or_(Task.is_deleted == False, Task.is_deleted == None)).all()
         
         # Calculate statistics
         total = len(tasks)
@@ -97,7 +97,8 @@ async def get_attendance_summary(db: Session = Depends(get_db)):
             # Return safe fallback data
             all_users = db.query(User).filter(
                 func.lower(User.role).in_(['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master']),
-                or_(User.is_deleted == False, User.is_deleted == None)
+                or_(User.is_deleted == False, User.is_deleted == None),
+                User.approval_status == 'approved'
             ).all()
             user_list = [
                 {
@@ -135,7 +136,8 @@ async def get_attendance_summary(db: Session = Depends(get_db)):
         try:
             all_users = db.query(User).filter(
                 func.lower(User.role).in_(['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master']),
-                or_(User.is_deleted == False, User.is_deleted == None)
+                or_(User.is_deleted == False, User.is_deleted == None),
+                User.approval_status == 'approved'
             ).all()
             user_list = [
                 {

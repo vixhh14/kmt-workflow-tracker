@@ -36,7 +36,10 @@ async def get_pending_tasks(db: Session = Depends(get_db)):
             or_(Task.is_deleted == False, Task.is_deleted == None)
         ).all()
         
-        all_users = db.query(User).all()
+        all_users = db.query(User).filter(
+            or_(User.is_deleted == False, User.is_deleted == None),
+            User.approval_status == 'approved'
+        ).all()
         user_map = {u.user_id: u for u in all_users}
         machines = db.query(Machine).all()
         machine_map = {m.id: m for m in machines}
@@ -76,7 +79,10 @@ async def get_running_tasks(db: Session = Depends(get_db)):
             or_(Task.is_deleted == False, Task.is_deleted == None)
         ).all()
         
-        all_users = db.query(User).all()
+        all_users = db.query(User).filter(
+            or_(User.is_deleted == False, User.is_deleted == None),
+            User.approval_status == 'approved'
+        ).all()
         user_map = {u.user_id: u for u in all_users}
         machines = db.query(Machine).all()
         machine_map = {m.id: m for m in machines}
@@ -134,7 +140,11 @@ async def get_running_tasks(db: Session = Depends(get_db)):
 async def get_task_status(operator_id: Optional[str] = None, db: Session = Depends(get_db)):
     """Get task status breakdown, optionally filtered by operator"""
     try:
-        operators = db.query(User).filter(User.role == 'operator').all()
+        operators = db.query(User).filter(
+            User.role == 'operator',
+            or_(User.is_deleted == False, User.is_deleted == None),
+            User.approval_status == 'approved'
+        ).all()
         
         if operator_id:
             operators = [op for op in operators if op.user_id == operator_id]
@@ -171,7 +181,8 @@ async def get_projects_summary(db: Session = Depends(get_db)):
     try:
         tasks_with_projects = db.query(Task).filter(
             Task.project != None, 
-            Task.project != ''
+            Task.project != '',
+            or_(Task.is_deleted == False, Task.is_deleted == None)
         ).all()
         
         project_map = {}
@@ -211,7 +222,7 @@ async def get_projects_summary(db: Session = Depends(get_db)):
 async def get_task_stats(project: Optional[str] = None, db: Session = Depends(get_db)):
     """Get task statistics, optionally filtered by project"""
     try:
-        query = db.query(Task)
+        query = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None))
         
         if project and project != "all":
             query = query.filter(Task.project == project)
@@ -301,7 +312,8 @@ async def get_project_summary(db: Session = Depends(get_db)):
     try:
         tasks_with_projects = db.query(Task).filter(
             Task.project != None, 
-            Task.project != ''
+            Task.project != '',
+            or_(Task.is_deleted == False, Task.is_deleted == None)
         ).all()
         
         project_map = {}
@@ -339,9 +351,18 @@ async def get_project_summary(db: Session = Depends(get_db)):
 async def get_priority_task_status(db: Session = Depends(get_db)):
     """Get task counts by priority level"""
     try:
-        high = db.query(Task).filter(Task.priority == 'high').count()
-        medium = db.query(Task).filter(Task.priority == 'medium').count()
-        low = db.query(Task).filter(Task.priority == 'low').count()
+        high = db.query(Task).filter(
+            func.upper(Task.priority) == 'HIGH',
+            or_(Task.is_deleted == False, Task.is_deleted == None)
+        ).count()
+        medium = db.query(Task).filter(
+            func.upper(Task.priority) == 'MEDIUM',
+            or_(Task.is_deleted == False, Task.is_deleted == None)
+        ).count()
+        low = db.query(Task).filter(
+            func.upper(Task.priority) == 'LOW',
+            or_(Task.is_deleted == False, Task.is_deleted == None)
+        ).count()
         
         return {
             "high": high,

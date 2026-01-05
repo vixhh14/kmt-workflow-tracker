@@ -11,7 +11,7 @@ class TaskBase(BaseModel):
     part_item: Optional[str] = None
     nos_unit: Optional[str] = None
     status: str = "pending"  # pending, in_progress, on_hold, completed, denied
-    priority: str = "medium"  # low, medium, high
+    priority: str = "MEDIUM"  # LOW, MEDIUM, HIGH
     assigned_to: Optional[str] = None  # operator user_id
     machine_id: Optional[str] = None
     assigned_by: Optional[str] = None  # user_id who assigned
@@ -19,6 +19,13 @@ class TaskBase(BaseModel):
     due_datetime: Optional[Union[datetime, str]] = None
     expected_completion_time: Optional[int] = None
     work_order_number: Optional[str] = None
+
+    @field_validator('priority', mode='before')
+    @classmethod
+    def normalize_priority(cls, v):
+        if isinstance(v, str):
+            return v.upper()
+        return v
 
     @field_validator('project_id', mode='before')
     @classmethod
@@ -65,6 +72,13 @@ class TaskUpdate(BaseModel):
     due_datetime: Optional[Union[datetime, str]] = None
     expected_completion_time: Optional[int] = None
     work_order_number: Optional[str] = None
+
+    @field_validator('priority', mode='before')
+    @classmethod
+    def normalize_priority(cls, v):
+        if isinstance(v, str):
+            return v.upper()
+        return v
 
     @field_validator('machine_id', mode='before')
     @classmethod
@@ -115,7 +129,7 @@ class OperationalTaskBase(BaseModel):
     part_item: Optional[str] = None
     quantity: Optional[int] = 1
     due_date: Optional[Union[date, str]] = None
-    priority: str = "medium"
+    priority: str = "MEDIUM"
     assigned_to: Optional[str] = None
     completed_quantity: int = 0
     remarks: Optional[str] = None
@@ -124,6 +138,13 @@ class OperationalTaskBase(BaseModel):
     work_order_number: Optional[str] = None
     assigned_by: Optional[str] = None
     task_type: Optional[str] = None  # FILING or FABRICATION
+
+    @field_validator('priority', mode='before')
+    @classmethod
+    def normalize_priority(cls, v):
+        if isinstance(v, str):
+            return v.upper()
+        return v
 
     @field_validator('project_id', mode='before')
     @classmethod
@@ -164,6 +185,13 @@ class OperationalTaskUpdate(BaseModel):
     quantity: Optional[int] = None
     due_date: Optional[Union[date, str]] = None
     priority: Optional[str] = None
+
+    @field_validator('priority', mode='before')
+    @classmethod
+    def normalize_priority(cls, v):
+        if isinstance(v, str):
+            return v.upper()
+        return v
     started_at: Optional[Union[datetime, str]] = None
     on_hold_at: Optional[Union[datetime, str]] = None
     resumed_at: Optional[Union[datetime, str]] = None

@@ -93,7 +93,7 @@ def calculate_user_activity(db: Session, target_date: date) -> List[dict]:
     Calculate user activity for a specific date (IST).
     """
     users = db.query(User).filter(
-        User.role.in_(['operator', 'supervisor']),
+        User.role.in_(['operator', 'supervisor', 'fab_master', 'file_master']),
         or_(User.is_deleted == False, User.is_deleted == None),
         User.approval_status == 'approved'
     ).all()
@@ -362,19 +362,24 @@ async def export_machines_csv(date_str: Optional[str] = None, db: Session = Depe
         except ValueError:
             pass
             
+    # Fetch all machine daily activity data
     data = calculate_machine_runtime(db, target_date)
     
-    # Requirement: Date,Machine Name,Runtime (minutes),Tasks Completed,Status
-    headers = ["Date", "Machine Name", "Runtime (minutes)", "Tasks Completed", "Status"]
-    
+    headers = ["Date", "Machine Name", "Runtime (Mins)", "Tasks Run", "Tasks Worked (Titles)", "Status"]
     rows = []
-    for row in data:
+    
+    for item in data:
+        # Get detailed tasks for this machine to extract titles
+        detailed = calculate_detailed_machine_activity(db, str(item["machine_id"]), target_date)
+        task_titles = "; ".join(list(set([d["task_title"] for d in detailed])))
+        
         rows.append([
-            row['date'],
-            row['machine_name'],
-            int(row['runtime_seconds'] / 60), # Raw minutes
-            row['tasks_run_count'],
-            row['status']
+            item["date"],
+            item["machine_name"],
+            round(item["runtime_seconds"] / 60, 2),
+            item["tasks_run_count"],
+            task_titles,
+            item["status"]
         ])
     
     filename = f"machine_summary_daily_{target_date}.csv"
@@ -398,21 +403,25 @@ async def export_users_csv(date_str: Optional[str] = None, db: Session = Depends
         except ValueError:
             pass
             
+    # Fetch all user daily activity data
     data = calculate_user_activity(db, target_date)
     
-    # Requirement: Date,User Name,Work Time (minutes),Tasks Completed,Status
-    headers = ["Date", "User Name", "Work Time (minutes)", "Tasks Completed", "Status"]
-    
+    headers = ["Date", "User Name", "Work Time (Mins)", "Tasks Worked", "Tasks Worked (Titles)", "Status"]
     rows = []
-    for row in data:
-        rows.append([
-            row['date'],
-            row['full_name'] or row['username'],
-            int(row['total_work_seconds'] / 60), # Raw minutes
-            row['tasks_worked_count'],
-            row['status']
-        ])
+    for item in data:
+        # Get detailed tasks for this user to extract titles
+        detailed = calculate_detailed_user_activity(db, str(item["user_id"]), target_date)
+        task_titles = "; ".join(list(set([d["task_title"] for d in detailed])))
         
+        rows.append([
+            item["date"],
+            item.get("full_name") or item.get("username") or "Unknown",
+            round(item["total_work_seconds"] / 60, 2),
+            item["tasks_worked_count"],
+            task_titles,
+            item["status"]
+        ])
+    
     filename = f"user_activity_daily_{target_date}.csv"
     stream = generate_csv_stream(headers, rows)
     
@@ -471,13 +480,13 @@ async def export_projects_summary_csv(year_month: Optional[str] = None, db: Sess
         except ValueError:
             pass
             
-    # Filter tasks completed in that month
-    # We join Task -> Project
+    # Filter tasks completed in that month, ensuring Project is active
     tasks = db.query(Task).join(Project, Task.project_id == Project.project_id).filter(
         extract('year', Task.completed_at) == target_dt.year,
         extract('month', Task.completed_at) == target_dt.month,
         Task.status == 'completed',
-        or_(Task.is_deleted == False, Task.is_deleted == None)
+        or_(Task.is_deleted == False, Task.is_deleted == None),
+        or_(Project.is_deleted == False, Project.is_deleted == None)
     ).all()
     
     # Aggregate by Project
@@ -569,3 +578,63 @@ async def get_active_work_monitoring(db: Session = Depends(get_db)):
     # Reuse the powerful supervisor logic
     res = await get_running_tasks(db)
     return res
+
+@router.get("/machines/detailed-csv")
+async def export_machine_detailed_csv(machine_id: str, date_str: Optional[str] = None, db: Session = Depends(get_db)):
+    """Detailed activity list for a machine."""
+    target_date = get_today_date_ist()
+    if date_str:
+        try:
+            target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    data = calculate_detailed_machine_activity(db, machine_id, target_date)
+    
+    headers = ["Task Title", "Operator", "Start Time", "End Time", "Runtime (Secs)", "Expected (Mins)", "Status"]
+    rows = []
+    for d in data:
+        rows.append([
+            d["task_title"],
+            d["operator"],
+            d["start_time"],
+            d["end_time"],
+            d["runtime_seconds"],
+            d["expected_duration_minutes"],
+            d["status"]
+        ])
+        
+    filename = f"machine_detailed_{machine_id}_{target_date}.csv"
+    stream = generate_csv_stream(headers, rows)
+    response_headers = {'Content-Disposition': f'attachment; filename="{filename}"'}
+    return StreamingResponse(iter([stream.getvalue()]), media_type="text/csv", headers=response_headers)
+
+@router.get("/users/detailed-csv")
+async def export_user_detailed_csv(user_id: str, date_str: Optional[str] = None, db: Session = Depends(get_db)):
+    """Detailed activity list for a user."""
+    target_date = get_today_date_ist()
+    if date_str:
+        try:
+            target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+            
+    data = calculate_detailed_user_activity(db, user_id, target_date)
+    
+    headers = ["Task Title", "Machine", "Start Time", "End Time", "Duration (Secs)", "Expected (Mins)", "Status"]
+    rows = []
+    for d in data:
+        rows.append([
+            d["task_title"],
+            d["machine_name"],
+            d["start_time"],
+            d["end_time"],
+            d["duration_seconds"],
+            d["expected_duration_minutes"],
+            d["status"]
+        ])
+        
+    filename = f"user_detailed_{user_id}_{target_date}.csv"
+    stream = generate_csv_stream(headers, rows)
+    response_headers = {'Content-Disposition': f'attachment; filename="{filename}"'}
+    return StreamingResponse(iter([stream.getvalue()]), media_type="text/csv", headers=response_headers)
