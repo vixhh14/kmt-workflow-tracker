@@ -153,6 +153,7 @@ def get_attendance_summary(db: Session, target_date: Optional[date] = None) -> d
             )
         ).filter(
             or_(User.is_deleted == False, User.is_deleted == None),
+            User.approval_status == 'approved',
             func.lower(User.role).in_(['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master'])
         ).all()
         
