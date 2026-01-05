@@ -48,6 +48,7 @@ const OperationalDashboard = ({ type }) => {
         part_item: '',
         quantity: 1,
         due_date: '',
+        due_time: '11:00',
         priority: 'medium',
         remarks: ''
     });
@@ -110,6 +111,27 @@ const OperationalDashboard = ({ type }) => {
             const msg = data?.message || data?.detail || 'Failed to load projects.';
             setError(msg);
         }
+    };
+
+    const formatDueDateTime = (isoString, fallbackDate) => {
+        if (!isoString) {
+            if (!fallbackDate) return 'Not set';
+            try {
+                const [year, month, day] = fallbackDate.split('-');
+                if (!year || !month || !day) return fallbackDate;
+                const date = new Date(year, month - 1, day, 9, 0);
+                return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + " • 09:00 AM";
+            } catch (e) { return fallbackDate; }
+        }
+        try {
+            const date = new Date(isoString);
+            if (isNaN(date.getTime())) return isoString;
+            const options = {
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', hour12: true
+            };
+            return date.toLocaleString('en-GB', options).replace(',', ' •').toUpperCase();
+        } catch (e) { return isoString; }
     };
 
     const fetchOperators = async () => {
@@ -181,6 +203,7 @@ const OperationalDashboard = ({ type }) => {
                 part_item: createFormData.part_item,
                 quantity: parseInt(createFormData.quantity),
                 due_date: createFormData.due_date,
+                due_datetime: createFormData.due_date ? `${createFormData.due_date}T${createFormData.due_time || "11:00"}:00` : null,
                 priority: createFormData.priority,
                 remarks: createFormData.remarks
             };
@@ -193,6 +216,7 @@ const OperationalDashboard = ({ type }) => {
                 part_item: '',
                 quantity: 1,
                 due_date: '',
+                due_time: '11:00',
                 priority: 'medium',
                 remarks: ''
             });
@@ -374,16 +398,28 @@ const OperationalDashboard = ({ type }) => {
                             />
                         </div>
 
-                        {/* 5. Due Date */}
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Due Date *</label>
-                            <input
-                                required
-                                type="date"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-                                value={createFormData.due_date}
-                                onChange={e => setCreateFormData({ ...createFormData, due_date: e.target.value })}
-                            />
+                        {/* 5. Due Date & Time */}
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Due Date *</label>
+                                <input
+                                    required
+                                    type="date"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                    value={createFormData.due_date}
+                                    onChange={e => setCreateFormData({ ...createFormData, due_date: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Due Time *</label>
+                                <input
+                                    required
+                                    type="time"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                    value={createFormData.due_time}
+                                    onChange={e => setCreateFormData({ ...createFormData, due_time: e.target.value })}
+                                />
+                            </div>
                         </div>
 
                         {/* 6. Priority */}
@@ -505,7 +541,7 @@ const OperationalDashboard = ({ type }) => {
                                             </div>
                                             <div className="flex items-center text-sm text-gray-600">
                                                 <Calendar size={14} className="mr-2 text-gray-400" />
-                                                <span>Due: <span className="font-bold text-red-600">{task.due_date || 'ASAP'}</span></span>
+                                                <span>Deadline: <span className="font-bold text-red-600">{formatDueDateTime(task.due_datetime, task.due_date)}</span></span>
                                             </div>
                                         </div>
 
