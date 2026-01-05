@@ -168,6 +168,7 @@ const Tasks = () => {
                     part_item: formData.part_item,
                     quantity: parseInt(formData.nos_unit) || 1,
                     due_date: formData.due_date,
+                    due_datetime: formData.due_date ? `${formData.due_date}T${formData.due_time || '09:00'}:00` : null,
                     priority: formData.priority,
                     remarks: formData.description
                 };
