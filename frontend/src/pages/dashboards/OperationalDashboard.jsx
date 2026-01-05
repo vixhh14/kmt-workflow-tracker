@@ -244,11 +244,13 @@ const OperationalDashboard = ({ type }) => {
     };
 
     const getPriorityColor = (p) => {
-        switch (p?.toLowerCase()) {
-            case 'urgent': return 'bg-red-100 text-red-700 border-red-200';
-            case 'high': return 'bg-orange-100 text-orange-700 border-orange-200';
-            case 'medium': return 'bg-blue-100 text-blue-700 border-blue-200';
-            default: return 'bg-gray-100 text-gray-700 border-gray-200';
+        const priority = p?.toLowerCase();
+        switch (priority) {
+            case 'urgent': return 'bg-red-500 text-white shadow-sm ring-1 ring-red-600/20';
+            case 'high': return 'bg-orange-500 text-white shadow-sm ring-1 ring-orange-600/20';
+            case 'medium': return 'bg-blue-500 text-white shadow-sm ring-1 ring-blue-600/20';
+            case 'low': return 'bg-green-500 text-white shadow-sm ring-1 ring-green-600/20';
+            default: return 'bg-gray-500 text-white shadow-sm ring-1 ring-gray-600/20';
         }
     };
 
@@ -486,7 +488,7 @@ const OperationalDashboard = ({ type }) => {
                                     {/* Task Identifiers */}
                                     <div className="flex-1 min-w-0">
                                         <div className="flex flex-wrap items-center gap-2 mb-2">
-                                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border ${getPriorityColor(task.priority)}`}>
+                                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${getPriorityColor(task.priority)}`}>
                                                 {task.priority || 'Medium'}
                                             </span>
                                             <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 uppercase">

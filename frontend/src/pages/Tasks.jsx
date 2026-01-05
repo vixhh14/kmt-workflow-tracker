@@ -340,11 +340,13 @@ const Tasks = () => {
     };
 
     const getPriorityColor = (priority) => {
-        switch (priority) {
-            case 'high': return 'bg-red-100 text-red-800';
-            case 'medium': return 'bg-yellow-100 text-yellow-800';
-            case 'low': return 'bg-green-100 text-green-800';
-            default: return 'bg-gray-100 text-gray-800';
+        const p = priority?.toUpperCase();
+        switch (p) {
+            case 'URGENT': return 'bg-red-500 text-white shadow-sm';
+            case 'HIGH': return 'bg-orange-500 text-white shadow-sm';
+            case 'MEDIUM': return 'bg-blue-500 text-white shadow-sm';
+            case 'LOW': return 'bg-green-500 text-white shadow-sm';
+            default: return 'bg-gray-500 text-white shadow-sm';
         }
     };
 
@@ -781,8 +783,8 @@ const Tasks = () => {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getPriorityColor(task.priority)}`}>
-                                                {task.priority}
+                                            <span className={`px-2 py-1 inline-flex text-[10px] leading-5 font-black uppercase rounded ${getPriorityColor(task.priority)}`}>
+                                                {task.priority || 'MEDIUM'}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

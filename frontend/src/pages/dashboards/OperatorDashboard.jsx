@@ -208,11 +208,13 @@ const OperatorDashboard = () => {
     };
 
     const getPriorityColor = (priority) => {
-        switch (priority) {
-            case 'high': return 'bg-red-100 text-red-800';
-            case 'medium': return 'bg-yellow-100 text-yellow-800';
-            case 'low': return 'bg-green-100 text-green-800';
-            default: return 'bg-gray-100 text-gray-800';
+        const p = priority?.toLowerCase();
+        switch (p) {
+            case 'urgent': return 'bg-red-500 text-white shadow-sm ring-1 ring-red-600/20';
+            case 'high': return 'bg-orange-500 text-white shadow-sm ring-1 ring-orange-600/20';
+            case 'medium': return 'bg-blue-500 text-white shadow-sm ring-1 ring-blue-600/20';
+            case 'low': return 'bg-green-500 text-white shadow-sm ring-1 ring-green-600/20';
+            default: return 'bg-gray-500 text-white shadow-sm ring-1 ring-gray-600/20';
         }
     };
 
@@ -340,8 +342,8 @@ const OperatorDashboard = () => {
                                         <span className={`px-2 py-1 text-xs font-medium rounded ${getStatusColor(task.status)}`}>
                                             {(task.status || 'pending').replace('_', ' ').toUpperCase()}
                                         </span>
-                                        <span className={`px-2 py-1 text-xs font-medium rounded ${getPriorityColor(task.priority)}`}>
-                                            {(task.priority || 'medium').toUpperCase()}
+                                        <span className={`px-2 py-1 text-[10px] font-black rounded uppercase ${getPriorityColor(task.priority)}`}>
+                                            {(task.priority || 'medium')}
                                         </span>
                                     </div>
 
