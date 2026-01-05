@@ -5,7 +5,9 @@ import {
     getMonthlyPerformance,
     downloadMachineReport,
     downloadUserReport,
-    downloadMonthlyPerformance
+    downloadMonthlyPerformance,
+    downloadMachineDetailedReport,
+    downloadUserDetailedReport
 } from '../../api/admin';
 import {
     ComposedChart,
@@ -109,12 +111,42 @@ const ReportsSection = () => {
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `user_activity_daily_${userDate}.csv`);
+            link.setAttribute('download', `user_summary_daily_${userDate}.csv`);
             document.body.appendChild(link);
             link.click();
             link.remove();
         } catch (error) {
             console.error("Failed to download user report", error);
+        }
+    };
+
+    const handleDownloadMachineDetailed = async (machineId) => {
+        try {
+            const response = await downloadMachineDetailedReport(machineId, machineDate);
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `machine_detailed_${machineId}_${machineDate}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (error) {
+            console.error("Failed to download machine detailed report", error);
+        }
+    };
+
+    const handleDownloadUserDetailed = async (userId) => {
+        try {
+            const response = await downloadUserDetailedReport(userId, userDate);
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `user_detailed_${userId}_${userDate}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (error) {
+            console.error("Failed to download user detailed report", error);
         }
     };
 
@@ -222,6 +254,7 @@ const ReportsSection = () => {
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Runtime</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tasks</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Export</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
@@ -240,6 +273,15 @@ const ReportsSection = () => {
                                                     }`}>
                                                     {row.status}
                                                 </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right text-sm">
+                                                <button
+                                                    onClick={() => handleDownloadMachineDetailed(row.machine_id)}
+                                                    className="text-blue-600 hover:text-blue-800"
+                                                    title="Detailed CSV"
+                                                >
+                                                    <Download size={16} />
+                                                </button>
                                             </td>
                                         </tr>
                                     ))
@@ -281,6 +323,7 @@ const ReportsSection = () => {
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Work Time</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tasks</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Export</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
@@ -299,6 +342,15 @@ const ReportsSection = () => {
                                                     }`}>
                                                     {row.status}
                                                 </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right text-sm">
+                                                <button
+                                                    onClick={() => handleDownloadUserDetailed(row.user_id)}
+                                                    className="text-blue-600 hover:text-blue-800"
+                                                    title="Detailed CSV"
+                                                >
+                                                    <Download size={16} />
+                                                </button>
                                             </td>
                                         </tr>
                                     ))
