@@ -6,7 +6,9 @@ import {
     getUserDetailedReport,
     getActiveWorkMonitoring,
     downloadMachineReport,
-    downloadUserReport
+    downloadUserReport,
+    downloadMachineDetailedReport,
+    downloadUserDetailedReport
 } from '../../api/admin';
 import { getMachines, getUsers } from '../../api/services';
 import {
@@ -117,8 +119,14 @@ const Reports = () => {
             } else if (activeTab === 'user-summary') {
                 response = await downloadUserReport(date);
                 filename = `user_summary_${date}.csv`;
+            } else if (activeTab === 'machine-detailed' && selectedId) {
+                response = await downloadMachineDetailedReport(selectedId, date);
+                filename = `machine_detailed_${selectedId}_${date}.csv`;
+            } else if (activeTab === 'user-detailed' && selectedId) {
+                response = await downloadUserDetailedReport(selectedId, date);
+                filename = `user_detailed_${selectedId}_${date}.csv`;
             } else {
-                alert("CSV Export is currently available for Summary reports only.");
+                alert("CSV Export is not available for this tab or requires a selection.");
                 return;
             }
 
@@ -147,10 +155,11 @@ const Reports = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <h1 className="text-2xl font-bold text-gray-900">Reports Center</h1>
                 <div className="flex gap-2">
-                    {['machine-summary', 'user-summary'].includes(activeTab) && (
+                    {['machine-summary', 'user-summary', 'machine-detailed', 'user-detailed'].includes(activeTab) && (
                         <button
                             onClick={handleDownload}
-                            className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+                            disabled={(['machine-detailed', 'user-detailed'].includes(activeTab) && !selectedId)}
+                            className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
                         >
                             <Download size={18} />
                             <span>Export CSV</span>

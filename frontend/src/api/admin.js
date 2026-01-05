@@ -65,6 +65,20 @@ export const getUserDetailedReport = (userId, date) => {
     return api.get('/reports/user-detailed', { params: { user_id: userId, target_date: date } });
 };
 
+export const downloadMachineDetailedReport = (machineId, date) => {
+    return api.get('/reports/machines/detailed-csv', {
+        params: { machine_id: machineId, date_str: date },
+        responseType: 'blob'
+    });
+};
+
+export const downloadUserDetailedReport = (userId, date) => {
+    return api.get('/reports/users/detailed-csv', {
+        params: { user_id: userId, date_str: date },
+        responseType: 'blob'
+    });
+};
+
 export const getActiveWorkMonitoring = () => {
     return api.get('/reports/active-monitoring');
 };

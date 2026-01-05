@@ -131,7 +131,7 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
                 part_item: '',
                 quantity: 1,
                 due_date: '',
-                priority: 'medium',
+                priority: 'MEDIUM',
                 assigned_to: '',
                 remarks: ''
             });
@@ -307,10 +307,10 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
                                     value={formData.priority}
                                     onChange={e => setFormData({ ...formData, priority: e.target.value })}
                                 >
-                                    <option value="low">Low</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="high">High</option>
-                                    <option value="urgent">Urgent</option>
+                                    <option value="LOW">Low</option>
+                                    <option value="MEDIUM">Medium</option>
+                                    <option value="HIGH">High</option>
+                                    <option value="URGENT">Urgent</option>
                                 </select>
                             </div>
 

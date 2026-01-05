@@ -251,8 +251,9 @@ const Tasks = () => {
             // Status filter
             const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
 
-            // Priority filter
-            const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
+            // Priority filter (Case-insensitive comparison for robustness)
+            const matchesPriority = priorityFilter === 'all' ||
+                task.priority?.toUpperCase() === priorityFilter.toUpperCase();
 
             // Operator filter
             const matchesOperator = operatorFilter === 'all' || task.assigned_to === operatorFilter;
@@ -407,12 +408,13 @@ const Tasks = () => {
                         <select
                             value={priorityFilter}
                             onChange={(e) => setPriorityFilter(e.target.value)}
-                            className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                         >
-                            <option value="all">Priority</option>
-                            <option value="high">High</option>
-                            <option value="medium">Medium</option>
-                            <option value="low">Low</option>
+                            <option value="all">All Priorities</option>
+                            <option value="LOW">Low</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="HIGH">High</option>
+                            <option value="URGENT">Urgent</option>
                         </select>
                     </div>
 
@@ -600,10 +602,10 @@ const Tasks = () => {
                                     onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 >
-                                    <option value="low">Low</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="high">High</option>
-                                    <option value="urgent">Urgent</option>
+                                    <option value="LOW">Low</option>
+                                    <option value="MEDIUM">Medium</option>
+                                    <option value="HIGH">High</option>
+                                    <option value="URGENT">Urgent</option>
                                 </select>
                             </div>
 
