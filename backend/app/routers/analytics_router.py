@@ -5,6 +5,7 @@ from typing import List, Optional
 from datetime import datetime
 from app.core.database import get_db
 from app.models.models_db import Task, User
+from app.services.dashboard_analytics_service import get_dashboard_overview
 
 router = APIRouter(
     prefix="/analytics",
@@ -110,7 +111,18 @@ async def project_overview(db: Session = Depends(get_db)):
     Get unified project overview statistics.
     Single source of truth for all dashboards.
     """
-    return get_project_overview_stats(db)
+    try:
+        return get_project_overview_stats(db)
+    except Exception as e:
+        print(f"Error in project_overview: {e}")
+        # Return safe default
+        return {
+            "total": 0,
+            "completed": 0,
+            "in_progress": 0,
+            "yet_to_start": 0,
+            "held": 0
+        }
 
 @router.get("/task-summary", response_model=TaskSummaryOut)
 async def get_task_summary(db: Session = Depends(get_db)):
@@ -118,17 +130,26 @@ async def get_task_summary(db: Session = Depends(get_db)):
     Legacy endpoint - kept for backward compatibility if needed, 
     but prefer /project-overview for project stats.
     """
-    # Reuse the logic but format it as expected by old frontend components if any
-    project_stats = get_project_overview_stats(db)
-    
-    # Task Status Counts
-    status_counts = db.query(
-        Task.status, func.count(Task.id)
-    ).group_by(Task.status).all()
-    
-    status_map = {str(status): int(count) for status, count in status_counts if status}
+    try:
+        # Reuse the logic but format it as expected by old frontend components if any
+        project_stats = get_project_overview_stats(db)
+        
+        # Task Status Counts
+        status_counts = db.query(
+            Task.status, func.count(Task.id)
+        ).group_by(Task.status).all()
+        
+        status_map = {str(status): int(count) for status, count in status_counts if status}
 
-    return {
-        "project_stats": project_stats,
-        "task_stats": status_map
-    }
+        return {
+            "project_stats": project_stats,
+            "task_stats": status_map
+        }
+    except Exception as e:
+        print(f"Error in get_task_summary: {e}")
+        return {
+            "project_stats": {
+                "total": 0, "completed": 0, "in_progress": 0, "yet_to_start": 0, "held": 0
+            },
+            "task_stats": {}
+        }
