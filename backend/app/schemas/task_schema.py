@@ -6,7 +6,7 @@ from uuid import UUID
 class TaskBase(BaseModel):
     title: str
     project: Optional[str] = None
-    project_id: Optional[UUID] = None  # Accept UUID from ORM
+    project_id: Optional[UUID] = None  # Expect UUID object or string
     description: Optional[str] = None
     part_item: Optional[str] = None
     nos_unit: Optional[str] = None
@@ -19,6 +19,18 @@ class TaskBase(BaseModel):
     due_datetime: Optional[Union[datetime, str]] = None
     expected_completion_time: Optional[int] = None
     work_order_number: Optional[str] = None
+
+    @field_validator('project_id', mode='before')
+    @classmethod
+    def validate_project_uuid(cls, v):
+        if v == "" or v is None:
+            return None
+        if isinstance(v, int):
+            # Reject integer inputs for UUID fields as per strict requirement
+            # Returning None or raising error depending on desired behavioral "silence" 
+            # User said "Reject integers silently" - treating as None avoids validation error but prevents bad data
+            return None 
+        return v
 
     @field_validator('machine_id', mode='before')
     @classmethod
@@ -99,7 +111,7 @@ class TaskOut(TaskBase):
 # Operational Tasks (Filing/Fabrication)
 
 class OperationalTaskBase(BaseModel):
-    project_id: Optional[UUID] = None  # Accept UUID from ORM
+    project_id: Optional[UUID] = None  # Expect UUID object or valid string
     part_item: Optional[str] = None
     quantity: Optional[int] = 1
     due_date: Optional[Union[date, str]] = None
@@ -112,6 +124,17 @@ class OperationalTaskBase(BaseModel):
     work_order_number: Optional[str] = None
     assigned_by: Optional[str] = None
     task_type: Optional[str] = None  # FILING or FABRICATION
+
+    @field_validator('project_id', mode='before')
+    @classmethod
+    def validate_project_uuid(cls, v):
+        if v == "" or v is None:
+            return None
+        if isinstance(v, int):
+            # As per instruction: "Reject integers silently". 
+            # This prevents validation error but passes None to DB, which is nullable or will be caught by logic.
+            return None
+        return v
 
     @field_validator('machine_id', mode='before')
     @classmethod
