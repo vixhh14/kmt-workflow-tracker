@@ -163,7 +163,7 @@ const Tasks = () => {
             } else {
                 // Filing or Fabrication - Strictly 7 fields
                 const payload = {
-                    project_id: parseInt(formData.project_id),
+                    project_id: formData.project_id,
                     work_order_number: formData.work_order_number,
                     part_item: formData.part_item,
                     quantity: parseInt(formData.nos_unit) || 1,
@@ -512,7 +512,7 @@ const Tasks = () => {
                                         const selectedProject = projects.find(p => String(p.id) === String(pId));
                                         setFormData({
                                             ...formData,
-                                            project_id: pId ? parseInt(pId) : '',
+                                            project_id: pId || '',
                                             project: selectedProject ? selectedProject.name : ''
                                         });
                                     }}
