@@ -10,6 +10,7 @@ def get_dashboard_overview(db: Session):
     """
     
     # 1. Task Counts (filtered by is_deleted)
+    # 1. Task Counts (filtered by is_deleted)
     task_counts = db.query(
         func.count(Task.id).label('total'),
         func.count(case((Task.status == 'pending', 1))).label('pending'),
@@ -18,6 +19,13 @@ def get_dashboard_overview(db: Session):
         func.count(case((Task.status == 'ended', 1))).label('ended'),
         func.count(case((Task.status == 'on_hold', 1))).label('on_hold')
     ).filter(or_(Task.is_deleted == False, Task.is_deleted == None)).first()
+    
+    # 🛡️ DEFENSIVE: Ensure we have a valid object with 0s if query returns None for some reason
+    if not task_counts:
+        # Mock class/dict to satisfy attribute access below
+        class Zeros:
+             total=0; pending=0; in_progress=0; completed=0; ended=0; on_hold=0
+        task_counts = Zeros()
 
     # 2. Machine Counts (active vs total)
     # Assuming 'active' status means available/working.
