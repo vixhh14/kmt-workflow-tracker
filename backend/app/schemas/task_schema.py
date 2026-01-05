@@ -129,6 +129,7 @@ class OperationalTaskBase(BaseModel):
     part_item: Optional[str] = None
     quantity: Optional[int] = 1
     due_date: Optional[Union[date, str]] = None
+    due_datetime: Optional[Union[datetime, str]] = None
     priority: str = "MEDIUM"
     assigned_to: Optional[str] = None
     completed_quantity: int = 0
@@ -184,6 +185,7 @@ class OperationalTaskUpdate(BaseModel):
     part_item: Optional[str] = None
     quantity: Optional[int] = None
     due_date: Optional[Union[date, str]] = None
+    due_datetime: Optional[Union[datetime, str]] = None
     priority: Optional[str] = None
 
     @field_validator('priority', mode='before')
@@ -227,11 +229,12 @@ class OperationalTaskOut(OperationalTaskBase):
     on_hold_at: Optional[datetime] = None
     resumed_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    due_datetime: Optional[datetime] = None
     total_active_duration: Optional[int] = 0
 
     model_config = ConfigDict(from_attributes=True)
 
-    @field_serializer('created_at', 'updated_at', 'started_at', 'on_hold_at', 'resumed_at', 'completed_at')
+    @field_serializer('created_at', 'updated_at', 'started_at', 'on_hold_at', 'resumed_at', 'completed_at', 'due_datetime')
     def serialize_dt(self, dt: Optional[datetime], _info):
         if dt is None:
             return None

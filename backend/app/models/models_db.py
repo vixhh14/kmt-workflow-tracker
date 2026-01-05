@@ -280,6 +280,7 @@ class FilingTask(Base):
     part_item = Column(String, nullable=True)  # Project / Item
     quantity = Column(Integer, default=1)
     due_date = Column(Date, nullable=True)
+    due_datetime = Column(DateTime(timezone=False), nullable=True)
     priority = Column(String, default="medium")
     assigned_to = Column(String, nullable=True) # Changed from ForeignKey to allow manual text assignment
     completed_quantity = Column(Integer, default=0)
@@ -311,6 +312,7 @@ class FabricationTask(Base):
     part_item = Column(String, nullable=True)  # Project / Item
     quantity = Column(Integer, default=1)
     due_date = Column(Date, nullable=True)
+    due_datetime = Column(DateTime(timezone=False), nullable=True)
     priority = Column(String, default="medium")
     assigned_to = Column(String, nullable=True) # Changed from ForeignKey to allow manual text assignment
     completed_quantity = Column(Integer, default=0)
