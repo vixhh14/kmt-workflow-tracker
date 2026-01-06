@@ -177,7 +177,7 @@ const OperatorDashboard = () => {
 
     const formatDueDateTime = (isoString, fallbackDate) => {
         if (!isoString) {
-            if (!fallbackDate) return 'Not set';
+            if (!fallbackDate || typeof fallbackDate !== 'string') return 'Not set';
             try {
                 const [year, month, day] = fallbackDate.split('-');
                 if (!year || !month || !day) return fallbackDate;

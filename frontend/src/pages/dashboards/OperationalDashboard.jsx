@@ -115,7 +115,7 @@ const OperationalDashboard = ({ type }) => {
 
     const formatDueDateTime = (isoString, fallbackDate) => {
         if (!isoString) {
-            if (!fallbackDate) return 'Not set';
+            if (!fallbackDate || typeof fallbackDate !== 'string') return 'Not set';
             try {
                 const [year, month, day] = fallbackDate.split('-');
                 if (!year || !month || !day) return fallbackDate;
@@ -203,7 +203,6 @@ const OperationalDashboard = ({ type }) => {
                 part_item: createFormData.part_item,
                 quantity: parseInt(createFormData.quantity),
                 due_date: createFormData.due_date,
-                due_datetime: createFormData.due_date ? `${createFormData.due_date}T${createFormData.due_time || "11:00"}:00` : null,
                 priority: createFormData.priority,
                 remarks: createFormData.remarks
             };
@@ -541,7 +540,7 @@ const OperationalDashboard = ({ type }) => {
                                             </div>
                                             <div className="flex items-center text-sm text-gray-600">
                                                 <Calendar size={14} className="mr-2 text-gray-400" />
-                                                <span>Deadline: <span className="font-bold text-red-600">{formatDueDateTime(task.due_datetime, task.due_date)}</span></span>
+                                                <span>Deadline: <span className="font-bold text-red-600">{formatDueDateTime(null, task.due_date)}</span></span>
                                             </div>
                                         </div>
 

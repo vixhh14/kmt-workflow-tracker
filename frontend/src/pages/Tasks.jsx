@@ -12,7 +12,7 @@ const Tasks = () => {
     // Helper to format due_datetime (supports legacy due_date)
     const formatDueDateTime = (isoString, fallbackDate) => {
         if (!isoString) {
-            if (!fallbackDate) return '-';
+            if (!fallbackDate || typeof fallbackDate !== 'string') return '-';
             try {
                 const [year, month, day] = fallbackDate.split('-');
                 if (!year || !month || !day) return fallbackDate;
@@ -155,7 +155,6 @@ const Tasks = () => {
 
                 const payload = {
                     ...formData,
-                    due_datetime: due_datetime,
                     expected_completion_time: durationMinutes
                 };
 
@@ -168,7 +167,6 @@ const Tasks = () => {
                     part_item: formData.part_item,
                     quantity: parseInt(formData.nos_unit) || 1,
                     due_date: formData.due_date,
-                    due_datetime: formData.due_date ? `${formData.due_date}T${formData.due_time || '09:00'}:00` : null,
                     priority: formData.priority,
                     remarks: formData.description
                 };
