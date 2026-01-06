@@ -1,10 +1,12 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import func, or_
 from app.models.auth_model import LoginRequest, LoginResponse, ChangePasswordRequest
 from app.core.auth_utils import verify_password, create_access_token, hash_password
 from app.core.dependencies import get_current_active_user
 from app.core.database import get_db
 from app.models.models_db import User
+from app.schemas.user_schema import UserUpdate
 from app.core.password_validation import validate_password_strength
 
 router = APIRouter(
@@ -35,7 +37,7 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
         t1 = time.time()
         from sqlalchemy import or_
         user = db.query(User).filter(
-            User.username == credentials.username, 
+            func.lower(User.username) == func.lower(credentials.username), 
             or_(User.is_deleted == False, User.is_deleted == None)
         ).first()
         print(f"Database query took: {time.time() - t1:.4f}s")
@@ -171,8 +173,97 @@ async def get_current_user(current_user: User = Depends(get_current_active_user)
         "full_name": current_user.full_name,
         "unit_id": current_user.unit_id,
         "machine_types": current_user.machine_types,
-        "created_at": current_user.created_at
+        "created_at": current_user.created_at,
+        "contact_number": current_user.contact_number,
+        "security_question": current_user.security_question
     }
+
+@router.put("/profile")
+async def update_profile(
+    updates: UserUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Update current user's profile information"""
+    update_data = updates.dict(exclude_none=True)
+    
+    # Validation for unique fields
+    if "username" in update_data and update_data["username"] != current_user.username:
+        if db.query(User).filter(func.lower(User.username) == func.lower(update_data["username"]), or_(User.is_deleted == False, User.is_deleted == None)).first():
+            raise HTTPException(status_code=400, detail="Username already taken")
+            
+    if "email" in update_data and update_data["email"] != current_user.email:
+        if db.query(User).filter(func.lower(User.email) == func.lower(update_data["email"]), or_(User.is_deleted == False, User.is_deleted == None)).first():
+            raise HTTPException(status_code=400, detail="Email already taken")
+
+    # Update fields
+    for key, value in update_data.items():
+        # Specifically hash the security answer if provided (optional but safer)
+        # For now, just store as plain text as it's a simple reset flow
+        setattr(current_user, key, value)
+        
+    from app.core.time_utils import get_current_time_ist
+    current_user.updated_at = get_current_time_ist()
+    
+    db.commit()
+    db.refresh(current_user)
+    return {"message": "Profile updated successfully", "user": {
+        "username": current_user.username,
+        "email": current_user.email,
+        "full_name": current_user.full_name,
+        "contact_number": current_user.contact_number
+    }}
+
+class ForgotPasswordRequest(BaseModel):
+    username: str
+
+@router.post("/get-security-question")
+async def get_security_question(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Get security question for a user (forgot password step 1)"""
+    user = db.query(User).filter(
+        func.lower(User.username) == func.lower(request.username),
+        or_(User.is_deleted == False, User.is_deleted == None)
+    ).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if not user.security_question:
+        raise HTTPException(status_code=400, detail="No security question set for this user. Please contact admin.")
+        
+    return {"question": user.security_question}
+
+class ResetPasswordRequest(BaseModel):
+    username: str
+    security_answer: str
+    new_password: str
+
+@router.post("/reset-password")
+async def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Reset password using security answer (forgot password step 2)"""
+    user = db.query(User).filter(
+        func.lower(User.username) == func.lower(request.username),
+        or_(User.is_deleted == False, User.is_deleted == None)
+    ).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if not user.security_answer or user.security_answer.lower() != request.security_answer.lower():
+        raise HTTPException(status_code=400, detail="Incorrect security answer")
+        
+    # Validate password strength
+    is_valid, errors = validate_password_strength(request.new_password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=errors[0])
+        
+    # Reset
+    user.password_hash = hash_password(request.new_password)
+    from app.core.time_utils import get_current_time_ist
+    user.updated_at = get_current_time_ist()
+    
+    db.commit()
+    return {"message": "Password reset successfully"}
 
 @router.post("/change-password")
 async def change_password(

@@ -38,10 +38,12 @@ async def get_monthly_performance(
     # To keep it efficient and simple matching the request: "per-task rows... summary cards"
     
     # Let's query tasks assigned to user and created or updated in that month
+    from sqlalchemy import or_
     tasks_query = db.query(Task).filter(
         Task.assigned_to == user_id,
         extract('month', Task.created_at) == month,
-        extract('year', Task.created_at) == year
+        extract('year', Task.created_at) == year,
+        or_(Task.is_deleted == False, Task.is_deleted == None)
     ).all()
     
     # If we want tasks *completed* in that month regardless of creation:

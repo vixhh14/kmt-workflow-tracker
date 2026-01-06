@@ -13,10 +13,15 @@ class UserCreate(UserBase):
     password: str   # Only for creation
 
 class UserUpdate(BaseModel):
-    role: Optional[str] = None
+    username: Optional[str] = None
+    email: Optional[str] = None
     full_name: Optional[str] = None
+    role: Optional[str] = None
+    contact_number: Optional[str] = None
     machine_types: Optional[str] = None
-    unit_id: Optional[int] = None
+    unit_id: Optional[str] = None
+    security_question: Optional[str] = None
+    security_answer: Optional[str] = None
 
 class UserOut(UserBase):
     # Map database user_id to frontend id
