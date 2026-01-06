@@ -15,7 +15,7 @@ class TaskBase(BaseModel):
     assigned_to: Optional[str] = None  # operator user_id
     machine_id: Optional[str] = None
     assigned_by: Optional[str] = None  # user_id who assigned
-    due_date: Optional[str] = None
+    due_date: Optional[datetime] = None
     expected_completion_time: Optional[int] = None
     work_order_number: Optional[str] = None
 
@@ -70,7 +70,7 @@ class TaskUpdate(BaseModel):
     assigned_to: Optional[str] = None
     machine_id: Optional[Union[str, int]] = None
     assigned_by: Optional[str] = None
-    due_date: Optional[Union[str, date]] = None
+    due_date: Optional[datetime] = None
     expected_completion_time: Optional[int] = None
     work_order_number: Optional[str] = None
 
@@ -112,7 +112,7 @@ class TaskOut(TaskBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-    @field_serializer('created_at', 'started_at', 'completed_at', 'actual_start_time', 'actual_end_time')
+    @field_serializer('created_at', 'started_at', 'completed_at', 'actual_start_time', 'actual_end_time', 'due_date')
     def serialize_dt(self, dt: Optional[datetime], _info):
         if dt is None:
             return None
@@ -132,7 +132,7 @@ class OperationalTaskBase(BaseModel):
     project_id: Optional[UUID] = None  # Expect UUID object or valid string
     part_item: Optional[str] = None
     quantity: Optional[int] = 1
-    due_date: Optional[Union[date, str]] = None
+    due_date: Optional[datetime] = None
     priority: str = "MEDIUM"
     assigned_to: Optional[str] = None
     completed_quantity: int = 0
@@ -190,7 +190,7 @@ class OperationalTaskUpdate(BaseModel):
     project_id: Optional[Union[str, UUID]] = None  # Accept both
     part_item: Optional[str] = None
     quantity: Optional[int] = None
-    due_date: Optional[Union[date, str]] = None
+    due_date: Optional[datetime] = None
     priority: Optional[str] = None
 
     @field_validator('priority', mode='before')
@@ -241,7 +241,7 @@ class OperationalTaskOut(OperationalTaskBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-    @field_serializer('created_at', 'updated_at', 'started_at', 'on_hold_at', 'resumed_at', 'completed_at')
+    @field_serializer('created_at', 'updated_at', 'started_at', 'on_hold_at', 'resumed_at', 'completed_at', 'due_date')
     def serialize_dt(self, dt: Optional[datetime], _info):
         if dt is None:
             return None
