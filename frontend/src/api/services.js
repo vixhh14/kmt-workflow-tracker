@@ -6,6 +6,7 @@ export const signup = (data) => api.post('/auth/signup', data);
 export const getCurrentUser = () => api.get('/auth/me');
 export const resetPassword = (data) => api.post('/auth/reset-password', data);
 export const getSecurityQuestion = (username) => api.post('/auth/get-security-question', { username });
+export const updateProfile = (data) => api.put('/auth/profile', data);
 export const changePassword = (data) => api.post('/auth/change-password', data);
 
 /* -------------------- USERS -------------------- */
