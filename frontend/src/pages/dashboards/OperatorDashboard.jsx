@@ -352,7 +352,7 @@ const OperatorDashboard = () => {
                                         {task.machine_name && (
                                             <p><span className="font-medium">Machine:</span> {task.machine_name}</p>
                                         )}
-                                        {(task.due_datetime || task.due_date) && (
+                                        {task.due_date && (
                                             <p><span className="font-medium text-red-600">Deadline:</span> <span className="font-bold">{formatDueDateTime(task.due_date)}</span></p>
                                         )}
                                         {task.assigned_by_name && (

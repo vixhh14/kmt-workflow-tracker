@@ -142,18 +142,26 @@ const Tasks = () => {
 
                 const payload = {
                     ...formData,
+                    due_date: due_datetime,
                     expected_completion_time: durationMinutes
                 };
 
                 await createTask(payload);
             } else {
                 // Filing or Fabrication - Strictly 7 fields
+                // Combine Date and Time for due_datetime
+                let due_datetime = null;
+                if (formData.due_date) {
+                    const timeStr = formData.due_time || '11:00';
+                    due_datetime = `${formData.due_date}T${timeStr}:00`;
+                }
+
                 const payload = {
                     project_id: formData.project_id,
                     work_order_number: formData.work_order_number,
                     part_item: formData.part_item,
                     quantity: parseInt(formData.nos_unit) || 1,
-                    due_date: formData.due_date,
+                    due_date: due_datetime,
                     priority: formData.priority,
                     remarks: formData.description
                 };
@@ -842,7 +850,7 @@ const Tasks = () => {
                                                                     <div className="space-y-1 text-xs">
                                                                         <p className="flex justify-between">
                                                                             <span className="text-gray-500">Deadline:</span>
-                                                                            <span className="font-bold text-red-600">{formatDueDateTime(task.due_datetime, task.due_date)}</span>
+                                                                            <span className="font-bold text-red-600">{formatDueDateTime(task.due_date)}</span>
                                                                         </p>
                                                                         <p className="flex justify-between">
                                                                             <span className="text-gray-500">Task Completion Duration:</span>
