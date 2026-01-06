@@ -28,6 +28,7 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
         part_item: '',
         quantity: 1,
         due_date: '',
+        due_time: '11:00',
         priority: 'medium',
         assigned_to: '',
         remarks: ''
@@ -111,7 +112,7 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
                 work_order_number: formData.work_order_number,
                 part_item: formData.part_item,
                 quantity: parseInt(formData.quantity),
-                due_date: formData.due_date,
+                due_date: formData.due_date && formData.due_time ? `${formData.due_date}T${formData.due_time}:00` : formData.due_date,
                 priority: formData.priority,
                 assigned_to: formData.assigned_to || null, // Ensure empty string becomes null
                 remarks: formData.remarks
@@ -131,6 +132,7 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
                 part_item: '',
                 quantity: 1,
                 due_date: '',
+                due_time: '11:00',
                 priority: 'MEDIUM',
                 assigned_to: '',
                 remarks: ''
@@ -288,14 +290,23 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
 
                             {/* Due Date Field */}
                             <div>
-                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Due Date *</label>
-                                <input
-                                    type="date"
-                                    required
-                                    className="w-full text-sm border rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
-                                    value={formData.due_date}
-                                    onChange={e => setFormData({ ...formData, due_date: e.target.value })}
-                                />
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Deadline *</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="date"
+                                        required
+                                        className="flex-1 text-sm border rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                                        value={formData.due_date}
+                                        onChange={e => setFormData({ ...formData, due_date: e.target.value })}
+                                    />
+                                    <input
+                                        type="time"
+                                        required
+                                        className="w-24 text-sm border rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
+                                        value={formData.due_time}
+                                        onChange={e => setFormData({ ...formData, due_time: e.target.value })}
+                                    />
+                                </div>
                             </div>
 
                             {/* Priority Field */}
@@ -473,7 +484,8 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
                                                                 work_order_number: task.work_order_number || '',
                                                                 part_item: task.part_item || '',
                                                                 quantity: task.quantity,
-                                                                due_date: task.due_date || '',
+                                                                due_date: (task.due_date && task.due_date.includes('T')) ? task.due_date.split('T')[0] : (task.due_date || ''),
+                                                                due_time: (task.due_date && task.due_date.includes('T')) ? task.due_date.split('T')[1].substring(0, 5) : '11:00',
                                                                 priority: task.priority || 'medium',
                                                                 assigned_to: task.assigned_to || '',
                                                                 remarks: task.remarks || ''
