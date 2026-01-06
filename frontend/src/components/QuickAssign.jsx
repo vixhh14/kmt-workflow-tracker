@@ -20,7 +20,8 @@ const QuickAssign = ({ onAssignSuccess }) => {
         machine_id: '',
         priority: 'medium',
         expected_duration_hhmm: '00:00',
-        due_date: ''
+        due_date: '',
+        due_time: '11:00'
     });
     const [submitting, setSubmitting] = useState(false);
 
@@ -61,7 +62,8 @@ const QuickAssign = ({ onAssignSuccess }) => {
             machine_id: task.machine_id || '',
             priority: task.priority || 'medium',
             expected_duration_hhmm: minutesToHHMM(task.expected_completion_time || 0),
-            due_date: task.due_date || ''
+            due_date: task.due_date ? task.due_date.split('T')[0] : '',
+            due_time: task.due_date && task.due_date.includes('T') ? task.due_date.split('T')[1].substring(0, 5) : '11:00'
         });
         setShowModal(true);
     };
@@ -82,8 +84,13 @@ const QuickAssign = ({ onAssignSuccess }) => {
 
         setSubmitting(true);
         try {
+            const combinedDueDateTime = assigningData.due_date && assigningData.due_time
+                ? `${assigningData.due_date}T${assigningData.due_time}:00`
+                : assigningData.due_date;
+
             await assignTask(selectedTask.id, {
                 ...assigningData,
+                due_date: combinedDueDateTime,
                 expected_completion_time: durationMinutes
             });
 
@@ -238,13 +245,21 @@ const QuickAssign = ({ onAssignSuccess }) => {
                                     <p className="text-[10px] text-gray-400">Total Minutes: {hhmmToMinutes(assigningData.expected_duration_hhmm)}</p>
                                 </div>
                                 <div className="space-y-1 sm:col-span-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Due Date</label>
-                                    <input
-                                        type="date"
-                                        value={assigningData.due_date}
-                                        onChange={(e) => setAssigningData({ ...assigningData, due_date: e.target.value })}
-                                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                                    />
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Deadline</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="date"
+                                            value={assigningData.due_date}
+                                            onChange={(e) => setAssigningData({ ...assigningData, due_date: e.target.value })}
+                                            className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <input
+                                            type="time"
+                                            value={assigningData.due_time}
+                                            onChange={(e) => setAssigningData({ ...assigningData, due_time: e.target.value })}
+                                            className="w-32 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>

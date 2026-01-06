@@ -113,25 +113,17 @@ const OperationalDashboard = ({ type }) => {
         }
     };
 
-    const formatDueDateTime = (isoString, fallbackDate) => {
-        if (!isoString) {
-            if (!fallbackDate || typeof fallbackDate !== 'string') return 'Not set';
-            try {
-                const [year, month, day] = fallbackDate.split('-');
-                if (!year || !month || !day) return fallbackDate;
-                const date = new Date(year, month - 1, day, 9, 0);
-                return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + " • 09:00 AM";
-            } catch (e) { return fallbackDate; }
-        }
+    const formatDueDateTime = (dtStr) => {
+        if (!dtStr) return 'Not set';
         try {
-            const date = new Date(isoString);
-            if (isNaN(date.getTime())) return isoString;
+            const date = new Date(dtStr);
+            if (isNaN(date.getTime())) return dtStr;
             const options = {
                 day: '2-digit', month: 'short', year: 'numeric',
                 hour: '2-digit', minute: '2-digit', hour12: true
             };
             return date.toLocaleString('en-GB', options).replace(',', ' •').toUpperCase();
-        } catch (e) { return isoString; }
+        } catch (e) { return dtStr; }
     };
 
     const fetchOperators = async () => {
@@ -197,12 +189,16 @@ const OperationalDashboard = ({ type }) => {
         e.preventDefault();
         try {
             setSubmitting(true);
+            const combinedDueDateTime = createFormData.due_date && createFormData.due_time
+                ? `${createFormData.due_date}T${createFormData.due_time}:00`
+                : createFormData.due_date;
+
             const payload = {
                 project_id: createFormData.project_id,
                 work_order_number: createFormData.work_order_number,
                 part_item: createFormData.part_item,
                 quantity: parseInt(createFormData.quantity),
-                due_date: createFormData.due_date,
+                due_date: combinedDueDateTime,
                 priority: createFormData.priority,
                 remarks: createFormData.remarks
             };
@@ -540,7 +536,7 @@ const OperationalDashboard = ({ type }) => {
                                             </div>
                                             <div className="flex items-center text-sm text-gray-600">
                                                 <Calendar size={14} className="mr-2 text-gray-400" />
-                                                <span>Deadline: <span className="font-bold text-red-600">{formatDueDateTime(null, task.due_date)}</span></span>
+                                                <span>Deadline: <span className="font-bold text-red-600">{formatDueDateTime(task.due_date)}</span></span>
                                             </div>
                                         </div>
 

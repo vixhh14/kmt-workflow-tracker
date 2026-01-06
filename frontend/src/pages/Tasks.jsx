@@ -10,24 +10,11 @@ const Tasks = () => {
     const { user: currentUser } = useAuth();
 
     // Helper to format due_datetime (supports legacy due_date)
-    const formatDueDateTime = (isoString, fallbackDate) => {
-        if (!isoString) {
-            if (!fallbackDate || typeof fallbackDate !== 'string') return '-';
-            try {
-                const [year, month, day] = fallbackDate.split('-');
-                if (!year || !month || !day) return fallbackDate;
-                const date = new Date(year, month - 1, day, 9, 0); // Default to 09:00 AM
-                const options = { day: '2-digit', month: 'short', year: 'numeric' };
-                return date.toLocaleDateString('en-GB', options) + " • 09:00 AM";
-            } catch (e) { return fallbackDate; }
-        }
-
+    const formatDueDateTime = (dtStr) => {
+        if (!dtStr) return '-';
         try {
-            // isoString from backend is like "2023-12-23T14:30:00" (Naive)
-            // Parsing it directly as naive depends on browser, but usually works as local.
-            // If it ends in Z, it's UTC, which we want to avoid but handle if present.
-            const date = new Date(isoString);
-            if (isNaN(date.getTime())) return isoString;
+            const date = new Date(dtStr);
+            if (isNaN(date.getTime())) return dtStr;
 
             const options = {
                 day: '2-digit', month: 'short', year: 'numeric',
@@ -36,7 +23,7 @@ const Tasks = () => {
             };
             const formatted = date.toLocaleString('en-GB', options);
             return formatted.replace(',', ' •').toUpperCase();
-        } catch (e) { return isoString; }
+        } catch (e) { return dtStr; }
     };
 
     const [tasks, setTasks] = useState([]);
@@ -77,7 +64,7 @@ const Tasks = () => {
         assigned_by: '',
         machine_id: '',
         due_date: '',
-        due_time: '09:00',
+        due_time: '11:00',
         expected_completion_time: ''
     });
 
@@ -149,7 +136,7 @@ const Tasks = () => {
                 // Combine Date and Time for due_datetime
                 let due_datetime = null;
                 if (formData.due_date) {
-                    const timeStr = formData.due_time || '09:00';
+                    const timeStr = formData.due_time || '11:00';
                     due_datetime = `${formData.due_date}T${timeStr}:00`;
                 }
 
@@ -190,7 +177,7 @@ const Tasks = () => {
                 assigned_by: '',
                 machine_id: '',
                 due_date: '',
-                due_time: '09:00',
+                due_time: '11:00',
                 expected_completion_time: ''
             });
             setShowForm(false);
@@ -791,7 +778,7 @@ const Tasks = () => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-[11px] font-bold text-gray-700 bg-gray-50 px-2 py-1 rounded inline-block">
-                                                {formatDueDateTime(task.due_datetime, task.due_date)}
+                                                {formatDueDateTime(task.due_date)}
                                             </div>
                                         </td>
                                         <td className="px-2 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium">

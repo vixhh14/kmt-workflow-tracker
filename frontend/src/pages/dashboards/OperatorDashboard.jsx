@@ -175,25 +175,17 @@ const OperatorDashboard = () => {
         }
     };
 
-    const formatDueDateTime = (isoString, fallbackDate) => {
-        if (!isoString) {
-            if (!fallbackDate || typeof fallbackDate !== 'string') return 'Not set';
-            try {
-                const [year, month, day] = fallbackDate.split('-');
-                if (!year || !month || !day) return fallbackDate;
-                const date = new Date(year, month - 1, day, 9, 0);
-                return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + " • 09:00 AM";
-            } catch (e) { return fallbackDate; }
-        }
+    const formatDueDateTime = (dtStr) => {
+        if (!dtStr) return 'Not set';
         try {
-            const date = new Date(isoString);
-            if (isNaN(date.getTime())) return isoString;
+            const date = new Date(dtStr);
+            if (isNaN(date.getTime())) return dtStr;
             const options = {
                 day: '2-digit', month: 'short', year: 'numeric',
                 hour: '2-digit', minute: '2-digit', hour12: true
             };
             return date.toLocaleString('en-GB', options).replace(',', ' •').toUpperCase();
-        } catch (e) { return isoString; }
+        } catch (e) { return dtStr; }
     };
 
     const getStatusColor = (status) => {
@@ -361,7 +353,7 @@ const OperatorDashboard = () => {
                                             <p><span className="font-medium">Machine:</span> {task.machine_name}</p>
                                         )}
                                         {(task.due_datetime || task.due_date) && (
-                                            <p><span className="font-medium text-red-600">Deadline:</span> <span className="font-bold">{formatDueDateTime(task.due_datetime, task.due_date)}</span></p>
+                                            <p><span className="font-medium text-red-600">Deadline:</span> <span className="font-bold">{formatDueDateTime(task.due_date)}</span></p>
                                         )}
                                         {task.assigned_by_name && (
                                             <p><span className="font-medium">Assigned By:</span> {task.assigned_by_name}</p>
