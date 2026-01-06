@@ -113,7 +113,7 @@ class Task(Base):
     assigned_to = Column(String, nullable=True)
     machine_id = Column(String, ForeignKey("machines.id"), nullable=True)
     assigned_by = Column(String, nullable=True)
-    due_date = Column(String, nullable=True)
+    due_date = Column(DateTime(timezone=True), nullable=True)
     # CRITICAL FIX: Use UUID type to match projects.project_id
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.project_id"), nullable=True)
     is_deleted = Column(Boolean, default=False)
@@ -278,7 +278,7 @@ class FilingTask(Base):
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.project_id"), nullable=True)
     part_item = Column(String, nullable=True)  # Project / Item
     quantity = Column(Integer, default=1)
-    due_date = Column(Date, nullable=True)
+    due_date = Column(DateTime(timezone=True), nullable=True)
     priority = Column(String, default="medium")
     assigned_to = Column(String, nullable=True) # Changed from ForeignKey to allow manual text assignment
     completed_quantity = Column(Integer, default=0)
@@ -309,7 +309,7 @@ class FabricationTask(Base):
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.project_id"), nullable=True)
     part_item = Column(String, nullable=True)  # Project / Item
     quantity = Column(Integer, default=1)
-    due_date = Column(Date, nullable=True)
+    due_date = Column(DateTime(timezone=True), nullable=True)
     priority = Column(String, default="medium")
     assigned_to = Column(String, nullable=True) # Changed from ForeignKey to allow manual text assignment
     completed_quantity = Column(Integer, default=0)

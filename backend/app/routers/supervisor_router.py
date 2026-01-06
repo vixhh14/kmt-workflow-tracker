@@ -21,7 +21,7 @@ class AssignTaskRequest(BaseModel):
     machine_id: Optional[str] = None
     priority: Optional[str] = None
     expected_completion_time: Optional[int] = None
-    due_date: Optional[str] = None
+    due_date: Optional[datetime] = None
 
 @router.get("/pending-tasks")
 async def get_pending_tasks(db: Session = Depends(get_db)):
