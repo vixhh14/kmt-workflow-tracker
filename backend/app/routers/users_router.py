@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, func
 from app.schemas.user_schema import UserCreate, UserOut, UserUpdate
 from app.core.database import get_db
 from app.core.dependencies import get_current_active_admin
@@ -24,7 +25,7 @@ def list_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    users = db.query(User).filter(User.is_deleted == False).all()
+    users = db.query(User).filter(or_(User.is_deleted == False, User.is_deleted == None)).all()
     return [
         UserOut(
             user_id=u.user_id,
@@ -44,9 +45,19 @@ def list_users(
 # --------------------------
 @router.post("", response_model=UserOut)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    # Check if username exists
-    if db.query(User).filter(User.username == user.username).first():
+    # Check if username exists (active)
+    if db.query(User).filter(
+        func.lower(User.username) == func.lower(user.username),
+        or_(User.is_deleted == False, User.is_deleted == None)
+    ).first():
         raise HTTPException(status_code=400, detail="Username already registered")
+        
+    # Check if email exists (active)
+    if user.email and db.query(User).filter(
+        func.lower(User.email) == func.lower(user.email),
+        or_(User.is_deleted == False, User.is_deleted == None)
+    ).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
 
     from app.core.auth_utils import hash_password
 
@@ -89,8 +100,25 @@ def update_user_data(user_id: str, updates: UserUpdate, db: Session = Depends(ge
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+        
     update_data = updates.dict(exclude_none=True)
+    
+    # Uniqueness checks
+    if "username" in update_data and update_data["username"] != user.username:
+        if db.query(User).filter(
+            func.lower(User.username) == func.lower(update_data["username"]),
+            User.user_id != user_id,
+            or_(User.is_deleted == False, User.is_deleted == None)
+        ).first():
+            raise HTTPException(status_code=400, detail="Username already taken")
+            
+    if "email" in update_data and update_data["email"] != user.email:
+        if db.query(User).filter(
+            func.lower(User.email) == func.lower(update_data["email"]),
+            User.user_id != user_id,
+            or_(User.is_deleted == False, User.is_deleted == None)
+        ).first():
+            raise HTTPException(status_code=400, detail="Email already taken")
     
     for key, value in update_data.items():
         setattr(user, key, value)
