@@ -54,7 +54,7 @@ async def read_tasks(
         query = query.filter(Task.assigned_to == assigned_to)
     
     # Sort by deadline (closest first), then by creation date (newest first)
-    query = query.order_by(Task.due_datetime.asc().nulls_last(), Task.created_at.desc())
+    query = query.order_by(Task.due_date.asc().nulls_last(), Task.created_at.desc())
     
     tasks = query.all()
     results = []
@@ -86,7 +86,6 @@ async def read_tasks(
                 "assigned_to": t.assigned_to,
                 "machine_id": str(t.machine_id) if t.machine_id else None,
                 "due_date": t.due_date,
-                "due_datetime": t.due_datetime, # Pydantic will serialize this
                 "expected_completion_time": t.expected_completion_time,
                 "created_at": t.created_at,
                 "started_at": t.started_at,
@@ -144,6 +143,8 @@ async def create_task(
 
     # 4. Normalization
     priority_norm = (task.priority or "MEDIUM").upper()
+    if priority_norm not in ["LOW", "MEDIUM", "HIGH"]:
+        priority_norm = "MEDIUM"
     assigned_by = current_user.user_id
 
     try:
@@ -160,7 +161,6 @@ async def create_task(
             assigned_to=assigned_to,
             machine_id=task.machine_id,
             due_date=task.due_date,
-            due_datetime=task.due_datetime,
             expected_completion_time=task.expected_completion_time,
             work_order_number=task.work_order_number.strip(),
             created_at=get_current_time_ist(),
@@ -585,7 +585,6 @@ async def update_task(
         "assigned_to": db_task.assigned_to,
         "machine_id": db_task.machine_id,
         "due_date": db_task.due_date,
-        "due_datetime": db_task.due_datetime.isoformat() if db_task.due_datetime else None,
         "expected_completion_time": db_task.expected_completion_time,
         "started_at": db_task.started_at.isoformat() if db_task.started_at else None,
         "completed_at": db_task.completed_at.isoformat() if db_task.completed_at else None,

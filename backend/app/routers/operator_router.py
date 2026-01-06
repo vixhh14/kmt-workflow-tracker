@@ -77,7 +77,6 @@ async def get_operator_tasks(
                 "assigned_by": str(task.assigned_by) if task.assigned_by else "",
                 "assigned_by_name": assigned_by_name,
                 "due_date": str(task.due_date) if task.due_date else "",
-                "due_datetime": task.due_datetime.isoformat() if task.due_datetime else None,
                 "created_at": make_aware(task.created_at).isoformat() if task.created_at else None,
                 "started_at": make_aware(task.started_at).isoformat() if task.started_at else None,
                 "completed_at": make_aware(task.completed_at).isoformat() if task.completed_at else None,

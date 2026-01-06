@@ -32,7 +32,8 @@ async def get_pending_approvals(db: Session = Depends(get_db)):
     results = db.query(UserApprovalModel, UserModel).join(
         UserModel, UserApprovalModel.user_id == UserModel.user_id
     ).filter(
-        UserApprovalModel.status == 'pending'
+        UserApprovalModel.status == 'pending',
+        UserModel.is_deleted == False
     ).order_by(
         UserApprovalModel.created_at.desc()
     ).all()

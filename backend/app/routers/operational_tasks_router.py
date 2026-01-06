@@ -135,8 +135,7 @@ async def create_operational_task(
         "part_item": task.part_item,
         "quantity": task.quantity,
         "due_date": task.due_date,
-        "due_datetime": task.due_datetime,
-        "priority": (task.priority or "MEDIUM").upper(),
+        "priority": (task.priority or "MEDIUM").upper() if (task.priority or "MEDIUM").upper() in ["LOW", "MEDIUM", "HIGH"] else "MEDIUM",
         "remarks": task.remarks,
         "assigned_by": current_user.user_id,
         "assigned_to": task.assigned_to, # Use provided value
@@ -251,7 +250,7 @@ async def update_operational_task(
          (role == "operator" and db_task.assigned_to == current_user.user_id):
         
         # Masters and assigned Operators can update status and execute
-        execution_fields = ["assigned_to", "completed_quantity", "remarks", "status", "started_at", "on_hold_at", "resumed_at", "completed_at", "total_active_duration", "machine_id", "work_order_number", "due_datetime"]
+        execution_fields = ["assigned_to", "completed_quantity", "remarks", "status", "started_at", "on_hold_at", "resumed_at", "completed_at", "total_active_duration", "machine_id", "work_order_number"]
         for key in execution_fields:
             if key in update_data:
                 setattr(db_task, key, update_data[key])

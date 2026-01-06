@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func, extract, case
+from sqlalchemy import func, extract, case, or_
 from typing import List, Optional
 from datetime import datetime
 from app.core.database import get_db
@@ -41,7 +41,8 @@ async def get_operator_performance(
     # Base query for tasks in the specified month/year
     query = db.query(Task).filter(
         extract('month', Task.created_at) == month,
-        extract('year', Task.created_at) == year
+        extract('year', Task.created_at) == year,
+        or_(Task.is_deleted == False, Task.is_deleted == None)
     )
 
     if operator_id:
@@ -137,7 +138,7 @@ async def get_task_summary(db: Session = Depends(get_db)):
         # Task Status Counts
         status_counts = db.query(
             Task.status, func.count(Task.id)
-        ).group_by(Task.status).all()
+        ).filter(or_(Task.is_deleted == False, Task.is_deleted == None)).group_by(Task.status).all()
         
         status_map = {str(status): int(count) for status, count in status_counts if status}
 

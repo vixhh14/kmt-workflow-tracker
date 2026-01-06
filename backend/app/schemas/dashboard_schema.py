@@ -185,7 +185,6 @@ class OperatorTask(BaseModel):
     assigned_by: str
     assigned_by_name: str
     due_date: str
-    due_datetime: Optional[str] = None
     created_at: Optional[str] = None
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
