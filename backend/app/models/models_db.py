@@ -131,7 +131,6 @@ class Task(Base):
     actual_end_time = Column(DateTime(timezone=True), nullable=True)
     total_held_seconds = Column(BigInteger, default=0)
     expected_completion_time = Column(Integer, nullable=True) # Duration in minutes
-    due_datetime = Column(DateTime(timezone=False), nullable=True) # Precisely selected date + time
     work_order_number = Column(String, nullable=True) # Work Order Number for Normal Tasks
 
     # Relationships
@@ -280,7 +279,6 @@ class FilingTask(Base):
     part_item = Column(String, nullable=True)  # Project / Item
     quantity = Column(Integer, default=1)
     due_date = Column(Date, nullable=True)
-    due_datetime = Column(DateTime(timezone=False), nullable=True)
     priority = Column(String, default="medium")
     assigned_to = Column(String, nullable=True) # Changed from ForeignKey to allow manual text assignment
     completed_quantity = Column(Integer, default=0)
@@ -312,7 +310,6 @@ class FabricationTask(Base):
     part_item = Column(String, nullable=True)  # Project / Item
     quantity = Column(Integer, default=1)
     due_date = Column(Date, nullable=True)
-    due_datetime = Column(DateTime(timezone=False), nullable=True)
     priority = Column(String, default="medium")
     assigned_to = Column(String, nullable=True) # Changed from ForeignKey to allow manual text assignment
     completed_quantity = Column(Integer, default=0)

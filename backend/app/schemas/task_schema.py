@@ -16,7 +16,6 @@ class TaskBase(BaseModel):
     machine_id: Optional[str] = None
     assigned_by: Optional[str] = None  # user_id who assigned
     due_date: Optional[str] = None
-    due_datetime: Optional[Union[datetime, str]] = None
     expected_completion_time: Optional[int] = None
     work_order_number: Optional[str] = None
 
@@ -24,8 +23,11 @@ class TaskBase(BaseModel):
     @classmethod
     def normalize_priority(cls, v):
         if isinstance(v, str):
-            return v.upper()
-        return v
+            v_up = v.upper()
+            if v_up in ["LOW", "MEDIUM", "HIGH"]:
+                return v_up
+            if v_up == "URGENT": return "HIGH"
+        return "MEDIUM"
 
     @field_validator('project_id', mode='before')
     @classmethod
@@ -46,7 +48,7 @@ class TaskBase(BaseModel):
             return str(v)
         return v
 
-    @field_validator('due_date', 'due_datetime', mode='before')
+    @field_validator('due_date', mode='before')
     @classmethod
     def empty_str_to_none(cls, v):
         if v == "":
@@ -69,7 +71,6 @@ class TaskUpdate(BaseModel):
     machine_id: Optional[Union[str, int]] = None
     assigned_by: Optional[str] = None
     due_date: Optional[Union[str, date]] = None
-    due_datetime: Optional[Union[datetime, str]] = None
     expected_completion_time: Optional[int] = None
     work_order_number: Optional[str] = None
 
@@ -77,8 +78,11 @@ class TaskUpdate(BaseModel):
     @classmethod
     def normalize_priority(cls, v):
         if isinstance(v, str):
-            return v.upper()
-        return v
+            v_up = v.upper()
+            if v_up in ["LOW", "MEDIUM", "HIGH"]:
+                return v_up
+            if v_up == "URGENT": return "HIGH"
+        return "MEDIUM"
 
     @field_validator('machine_id', mode='before')
     @classmethod
@@ -87,7 +91,7 @@ class TaskUpdate(BaseModel):
             return str(v)
         return v
     
-    @field_validator('due_date', 'due_datetime', mode='before')
+    @field_validator('due_date', mode='before')
     @classmethod
     def empty_str_to_none(cls, v):
         if v == "":
@@ -108,7 +112,7 @@ class TaskOut(TaskBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-    @field_serializer('created_at', 'started_at', 'completed_at', 'actual_start_time', 'actual_end_time', 'due_datetime')
+    @field_serializer('created_at', 'started_at', 'completed_at', 'actual_start_time', 'actual_end_time')
     def serialize_dt(self, dt: Optional[datetime], _info):
         if dt is None:
             return None
@@ -129,7 +133,6 @@ class OperationalTaskBase(BaseModel):
     part_item: Optional[str] = None
     quantity: Optional[int] = 1
     due_date: Optional[Union[date, str]] = None
-    due_datetime: Optional[Union[datetime, str]] = None
     priority: str = "MEDIUM"
     assigned_to: Optional[str] = None
     completed_quantity: int = 0
@@ -144,8 +147,11 @@ class OperationalTaskBase(BaseModel):
     @classmethod
     def normalize_priority(cls, v):
         if isinstance(v, str):
-            return v.upper()
-        return v
+            v_up = v.upper()
+            if v_up in ["LOW", "MEDIUM", "HIGH"]:
+                return v_up
+            if v_up == "URGENT": return "HIGH"
+        return "MEDIUM"
 
     @field_validator('project_id', mode='before')
     @classmethod
@@ -185,15 +191,17 @@ class OperationalTaskUpdate(BaseModel):
     part_item: Optional[str] = None
     quantity: Optional[int] = None
     due_date: Optional[Union[date, str]] = None
-    due_datetime: Optional[Union[datetime, str]] = None
     priority: Optional[str] = None
 
     @field_validator('priority', mode='before')
     @classmethod
     def normalize_priority(cls, v):
         if isinstance(v, str):
-            return v.upper()
-        return v
+            v_up = v.upper()
+            if v_up in ["LOW", "MEDIUM", "HIGH"]:
+                return v_up
+            if v_up == "URGENT": return "HIGH"
+        return "MEDIUM"
     started_at: Optional[Union[datetime, str]] = None
     on_hold_at: Optional[Union[datetime, str]] = None
     resumed_at: Optional[Union[datetime, str]] = None
@@ -229,12 +237,11 @@ class OperationalTaskOut(OperationalTaskBase):
     on_hold_at: Optional[datetime] = None
     resumed_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-    due_datetime: Optional[datetime] = None
     total_active_duration: Optional[int] = 0
 
     model_config = ConfigDict(from_attributes=True)
 
-    @field_serializer('created_at', 'updated_at', 'started_at', 'on_hold_at', 'resumed_at', 'completed_at', 'due_datetime')
+    @field_serializer('created_at', 'updated_at', 'started_at', 'on_hold_at', 'resumed_at', 'completed_at')
     def serialize_dt(self, dt: Optional[datetime], _info):
         if dt is None:
             return None
