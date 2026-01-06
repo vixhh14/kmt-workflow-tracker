@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException, status, Depends
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
+import time
 from app.models.auth_model import LoginRequest, LoginResponse, ChangePasswordRequest
 from app.core.auth_utils import verify_password, create_access_token, hash_password
 from app.core.dependencies import get_current_active_user
@@ -35,7 +37,6 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     try:
         # Find user by username in SQLite
         t1 = time.time()
-        from sqlalchemy import or_
         user = db.query(User).filter(
             func.lower(User.username) == func.lower(credentials.username), 
             or_(User.is_deleted == False, User.is_deleted == None)
