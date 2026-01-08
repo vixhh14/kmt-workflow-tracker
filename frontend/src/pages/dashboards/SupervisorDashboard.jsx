@@ -58,6 +58,8 @@ const SupervisorDashboard = () => {
     const [selectedProject, setSelectedProject] = useState('all');
     const [selectedTask, setSelectedTask] = useState(null);
     const [showAssignModal, setShowAssignModal] = useState(false);
+    const [showEndModal, setShowEndModal] = useState(false);
+    const [endReason, setEndReason] = useState('');
     const [assigningOperator, setAssigningOperator] = useState('');
     const [operators, setOperators] = useState([]);
     const [machines, setMachines] = useState([]);
@@ -180,10 +182,24 @@ const SupervisorDashboard = () => {
         }
     };
 
-    const handleEndTask = async (taskId) => {
-        if (!window.confirm("Are you sure you want to forcibly END this task? This action cannot be undone.")) return;
+    const handleEndTask = (task) => {
+        setSelectedTask(task);
+        setEndReason('');
+        setShowEndModal(true);
+    };
+
+    const confirmEndTask = async () => {
+        if (!endReason.trim()) {
+            alert("Please provide a reason for ending the task.");
+            return;
+        }
+        if (!confirm("Are you sure you want to forcibly END this task? This action cannot be undone.")) return;
+
         try {
-            await endTask(taskId);
+            await endTask(selectedTask.id, endReason);
+            setShowEndModal(false);
+            setEndReason('');
+            setSelectedTask(null);
             await fetchDashboard();
         } catch (err) {
             alert(err.response?.data?.detail || 'Failed to end task');
@@ -433,7 +449,7 @@ const SupervisorDashboard = () => {
                                                 COMPLETE
                                             </button>
                                             <button
-                                                onClick={() => handleEndTask(task.id)}
+                                                onClick={() => handleEndTask(task)}
                                                 className="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-md hover:bg-red-700 flex items-center gap-1 shadow-sm"
                                             >
                                                 <X size={14} />
@@ -510,6 +526,47 @@ const SupervisorDashboard = () => {
                     )}
                 </div>
             </div>
+
+            {/* End Task Modal */}
+            {showEndModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4">End Task</h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                            You are about to forcibly end task <span className="font-semibold">{selectedTask?.title}</span>.
+                            This will stop all timing and mark it as ended.
+                        </p>
+
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Reason for Ending <span className="text-red-500">*</span>
+                            </label>
+                            <textarea
+                                value={endReason}
+                                onChange={(e) => setEndReason(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                rows="3"
+                                placeholder="e.g. Broken tool, Material defect, etc."
+                            ></textarea>
+                        </div>
+
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => { setShowEndModal(false); setEndReason(''); setSelectedTask(null); }}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmEndTask}
+                                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+                            >
+                                End Task
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );

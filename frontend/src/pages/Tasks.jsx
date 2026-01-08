@@ -68,6 +68,10 @@ const Tasks = () => {
         expected_completion_time: ''
     });
 
+    const [showEndModal, setShowEndModal] = useState(false);
+    const [endReason, setEndReason] = useState('');
+    const [taskToEnd, setTaskToEnd] = useState(null);
+
     useEffect(() => {
         fetchData();
     }, []);
@@ -199,15 +203,29 @@ const Tasks = () => {
         }
     };
 
-    const handleEndTask = async (taskId) => {
-        if (window.confirm('Are you sure you want to end this task? It will be closed and cannot be resumed by operators.')) {
-            try {
-                await endTask(taskId);
-                fetchData();
-            } catch (error) {
-                console.error('Failed to end task:', error);
-                alert(error.response?.data?.detail || 'Failed to end task');
-            }
+    const handleEndTask = (task) => {
+        setTaskToEnd(task);
+        setEndReason('');
+        setShowEndModal(true);
+    };
+
+    const confirmEndTask = async () => {
+        if (!taskToEnd) return;
+        if (!endReason.trim()) {
+            alert('Please provide a reason to end the task.');
+            return;
+        }
+        if (!window.confirm('Are you sure you want to force-end this task? It will be closed immediately.')) return;
+
+        try {
+            await endTask(taskToEnd.id, endReason);
+            setShowEndModal(false);
+            setTaskToEnd(null);
+            setEndReason('');
+            fetchData();
+        } catch (error) {
+            console.error('Failed to end task:', error);
+            alert(error.response?.data?.detail || 'Failed to end task');
         }
     };
 
@@ -791,11 +809,12 @@ const Tasks = () => {
                                         </td>
                                         <td className="px-2 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium">
                                             <div className="flex items-center space-x-2">
-                                                {currentUser?.role === 'admin' && task.status !== 'ended' && task.status !== 'completed' && (
+
+                                                {['admin', 'supervisor'].includes(currentUser?.role) && task.status !== 'ended' && task.status !== 'completed' && (
                                                     <button
-                                                        onClick={() => handleEndTask(task.id)}
+                                                        onClick={() => handleEndTask(task)}
                                                         className="text-purple-600 hover:text-purple-900 p-1 flex items-center space-x-1 border border-purple-200 rounded hover:bg-purple-50"
-                                                        title="End Task (Admin Only)"
+                                                        title="End Task (Force)"
                                                     >
                                                         <Square size={14} fill="currentColor" />
                                                         <span className="text-[10px] uppercase font-bold">End</span>
@@ -865,6 +884,22 @@ const Tasks = () => {
                                                                                 {Math.floor(task.total_duration_seconds / 60)} mins
                                                                             </span>
                                                                         </p>
+                                                                        {task.status === 'ended' && (
+                                                                            <div className="mt-2 pt-2 border-t border-gray-100">
+                                                                                <p className="flex justify-between">
+                                                                                    <span className="text-gray-500">Ended By:</span>
+                                                                                    <span className="font-medium text-gray-900">
+                                                                                        {users.find(u => u.user_id === task.ended_by)?.username || task.ended_by || 'Unknown'}
+                                                                                    </span>
+                                                                                </p>
+                                                                                {task.end_reason && (
+                                                                                    <p className="flex flex-col mt-1">
+                                                                                        <span className="text-[10px] text-gray-500 uppercase">Reason:</span>
+                                                                                        <span className="font-medium text-gray-900 text-xs italic bg-gray-100 p-1 rounded">"{task.end_reason}"</span>
+                                                                                    </p>
+                                                                                )}
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -989,6 +1024,50 @@ const Tasks = () => {
                     </div>
                 )}
             </div>
+
+
+            {/* End Task Modal */}
+            {
+                showEndModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                            <h3 className="text-lg font-bold text-gray-900 mb-4">Force End Task</h3>
+                            <p className="text-sm text-gray-600 mb-4">
+                                You are about to forcibly end status for <b>{taskToEnd?.title}</b>.
+                                This will stop all timing and mark it as 'ended'.
+                            </p>
+
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Reason for Ending <span className="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    value={endReason}
+                                    onChange={(e) => setEndReason(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                    rows="3"
+                                    placeholder="e.g. Cancelled by client, Material issue..."
+                                ></textarea>
+                            </div>
+
+                            <div className="flex justify-end gap-3">
+                                <button
+                                    onClick={() => { setShowEndModal(false); setEndReason(''); setTaskToEnd(null); }}
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmEndTask}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700"
+                                >
+                                    End Task
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
         </div >
     );
 };
