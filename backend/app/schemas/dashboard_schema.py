@@ -282,7 +282,7 @@ class DetailedMachineActivityItem(BaseModel):
     start_time: str
     end_time: Optional[str] = None
     runtime_seconds: int
-    expected_duration_minutes: int
+
     held_time_seconds: int
     status: str
 
@@ -299,6 +299,6 @@ class DetailedUserActivityItem(BaseModel):
     start_time: str
     end_time: Optional[str] = None
     duration_seconds: int
-    expected_duration_minutes: int
+
     holds: List[DetailedHold]
     status: str

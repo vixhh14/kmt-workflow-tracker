@@ -5,7 +5,7 @@ from typing import List, Optional
 from datetime import datetime
 from app.core.database import get_db
 from app.models.models_db import Task, User
-from app.services.dashboard_analytics_service import get_dashboard_overview
+from app.services.dashboard_analytics_service import get_operations_overview
 
 router = APIRouter(
     prefix="/analytics",
@@ -25,7 +25,7 @@ async def dashboard_overview(db: Session = Depends(get_db)):
     """
     Unified dashboard overview for Admin, Supervisor, and Planning.
     """
-    return get_dashboard_overview(db)
+    return get_operations_overview(db)
 
 
 @router.get("/operator-performance", response_model=OperatorPerformanceOut)

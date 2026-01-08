@@ -5,7 +5,7 @@ from typing import List, Optional
 from app.core.database import get_db
 from app.models.models_db import Task, User, Machine, Project, FilingTask, FabricationTask
 from types import SimpleNamespace
-from app.services.dashboard_analytics_service import get_dashboard_overview
+from app.services.dashboard_analytics_service import get_operations_overview
 from app.services.project_overview_service import get_project_overview_stats
 from app.schemas.dashboard_schema import AdminDashboardOut, SupervisorDashboardOut
 import uuid
@@ -104,7 +104,7 @@ async def get_admin_dashboard(
             ))
 
         # Get overview stats (handles filtered recalculation)
-        overview = get_dashboard_overview(db)
+        overview = get_operations_overview(db)
         if project_id or operator_id:
             overview = {
                 "tasks": {

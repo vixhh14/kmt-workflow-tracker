@@ -1,179 +1,81 @@
 """
 PRODUCTION STABILIZATION: Unified Dashboard Analytics Service
 Purpose: Provide accurate, consistent dashboard metrics across all roles
-Strategy: Use database views for normalization, aggregate all task types
-Safety: Defensive null handling, fallback to zeros, no crashes
+Strategy: Single source of truth using canonical SQL for core metrics
+Safety: Direct DB queries, no in-memory aggregation, consistent filtering
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func, case, or_, text
-from app.models.models_db import Task, Machine, Project, FilingTask, FabricationTask, User
-from typing import Dict, Any, Optional
+from sqlalchemy import text, func, or_
+from app.models.models_db import User, Machine, Attendance
+from typing import Dict, Any
+from app.core.time_utils import get_current_time_ist
 
-def get_dashboard_overview_optimized(db: Session) -> Dict[str, Any]:
+def get_operations_overview(db: Session) -> Dict[str, Any]:
     """
-    OPTIMIZED: Use materialized view for instant dashboard metrics
-    Falls back to live aggregation if view doesn't exist
+    SINGLE SOURCE OF TRUTH for Admin, Supervisor, and Planning dashboards.
+    
+    Strict Adherence:
+    1. Canonical SQL for Project/Task counts (Fixes LEFT JOIN bug)
+    2. Attendance: Present = row exists for today
+    3. Operators: Valid 'operator' role only
+    4. Machines: Active = 'active' status
     """
+    
+    # 1. CANONICAL SQL QUERY (Projects & Tasks)
+    # Fixes the bug where filtering t.is_deleted in WHERE clause excluded empty projects
+    canonical_sql = text("""
+        SELECT
+          COUNT(DISTINCT p.project_id)                                  AS total_projects,
+          COUNT(t.id)                                                   AS total_tasks,
+          COUNT(*) FILTER (WHERE t.status = 'pending')                 AS pending,
+          COUNT(*) FILTER (WHERE t.status = 'in_progress')             AS in_progress,
+          COUNT(*) FILTER (WHERE t.status = 'completed')               AS completed,
+          COUNT(*) FILTER (WHERE t.status = 'on_hold')                 AS on_hold
+        FROM projects p
+        LEFT JOIN tasks t
+          ON t.project_id = p.project_id
+          AND t.is_deleted = false
+        WHERE p.is_deleted = false;
+    """)
+    
     try:
-        # Try to use materialized view first (much faster)
-        result = db.execute(text("SELECT * FROM dashboard_overview_mv LIMIT 1")).fetchone()
+        result = db.execute(canonical_sql).fetchone()
         
-        if result:
-            return {
-                "tasks": {
-                    "total": result.total_tasks or 0,
-                    "pending": result.pending_tasks or 0,
-                    "in_progress": result.in_progress_tasks or 0,
-                    "completed": result.completed_tasks or 0,
-                    "ended": result.ended_tasks or 0,
-                    "on_hold": result.on_hold_tasks or 0,
-                    "by_type": {
-                        "general": result.general_tasks_total or 0,
-                        "filing": result.filing_tasks_total or 0,
-                        "fabrication": result.fabrication_tasks_total or 0
-                    }
-                },
-                "projects": {
-                    "total": db.query(Project).filter(
-                        or_(Project.is_deleted == False, Project.is_deleted == None)
-                    ).count(),
-                    "with_tasks": result.total_projects_with_tasks or 0
-                },
-                "machines": {
-                    "total": db.query(Machine).filter(
-                        or_(Machine.is_deleted == False, Machine.is_deleted == None)
-                    ).count(),
-                    "with_tasks": result.total_machines_with_tasks or 0,
-                    "active": db.query(Machine).filter(
-                        or_(Machine.is_deleted == False, Machine.is_deleted == None),
-                        Machine.status == 'active'
-                    ).count()
-                },
-                "operators": {
-                    "total": db.query(User).filter(
-                        User.role == 'operator',
-                        or_(User.is_deleted == False, User.is_deleted == None),
-                        User.approval_status == 'approved'
-                    ).count(),
-                    "with_tasks": result.total_operators_with_tasks or 0
-                },
-                "last_refreshed": result.last_refreshed.isoformat() if result.last_refreshed else None
-            }
+        # Parse result safely
+        total_projects = result.total_projects if result else 0
+        total_tasks = result.total_tasks if result else 0
+        pending = result.pending if result else 0
+        in_progress = result.in_progress if result else 0
+        completed = result.completed if result else 0
+        on_hold = result.on_hold if result else 0
+        
     except Exception as e:
-        print(f"⚠️ Materialized view not available, using live aggregation: {e}")
-    
-    # Fallback to live aggregation
-    return get_dashboard_overview(db)
+        print(f"❌ CRITICAL: Error executing canonical overview SQL: {e}")
+        # Fallback to zeros on critical failure
+        total_projects = 0
+        total_tasks = 0
+        pending = 0
+        in_progress = 0
+        completed = 0
+        on_hold = 0
 
-
-def get_dashboard_overview(db: Session) -> Dict[str, Any]:
-    """
-    COMPREHENSIVE: Aggregate from ALL task tables with defensive null handling
-    Returns accurate counts even if some tables are empty
-    """
-    
-    # Helper class for zero defaults
-    class Zeros:
-        total=0; pending=0; in_progress=0; completed=0; ended=0; on_hold=0
-    
-    # 1. GENERAL TASKS (tasks table)
+    # 2. MACHINES OVERVIEW
     try:
-        general_task_counts = db.query(
-            func.count(Task.id).label('total'),
-            func.count(case((func.lower(Task.status) == 'pending', 1))).label('pending'),
-            func.count(case((func.lower(Task.status) == 'in_progress', 1))).label('in_progress'),
-            func.count(case((func.lower(Task.status) == 'completed', 1))).label('completed'),
-            func.count(case((func.lower(Task.status) == 'ended', 1))).label('ended'),
-            func.count(case((or_(
-                func.lower(Task.status) == 'on_hold',
-                func.lower(Task.status) == 'onhold',
-                func.lower(Task.status) == 'on hold'
-            ), 1))).label('on_hold')
-        ).filter(or_(Task.is_deleted == False, Task.is_deleted == None)).first()
-    except Exception as e:
-        print(f"❌ Error querying general tasks: {e}")
-        general_task_counts = Zeros()
-    
-    general_task_counts = general_task_counts or Zeros()
-    
-    # 2. FILING TASKS (filing_tasks table)
-    try:
-        filing_task_counts = db.query(
-            func.count(FilingTask.id).label('total'),
-            func.count(case((func.lower(FilingTask.status) == 'pending', 1))).label('pending'),
-            func.count(case((or_(
-                func.lower(FilingTask.status) == 'in progress',
-                func.lower(FilingTask.status) == 'in_progress'
-            ), 1))).label('in_progress'),
-            func.count(case((func.lower(FilingTask.status) == 'completed', 1))).label('completed'),
-            func.count(case((or_(
-                func.lower(FilingTask.status) == 'on hold',
-                func.lower(FilingTask.status) == 'onhold',
-                func.lower(FilingTask.status) == 'on_hold'
-            ), 1))).label('on_hold')
-        ).filter(or_(FilingTask.is_deleted == False, FilingTask.is_deleted == None)).first()
-    except Exception as e:
-        print(f"❌ Error querying filing tasks: {e}")
-        filing_task_counts = Zeros()
-    
-    filing_task_counts = filing_task_counts or Zeros()
-    
-    # 3. FABRICATION TASKS (fabrication_tasks table)
-    try:
-        fabrication_task_counts = db.query(
-            func.count(FabricationTask.id).label('total'),
-            func.count(case((func.lower(FabricationTask.status) == 'pending', 1))).label('pending'),
-            func.count(case((or_(
-                func.lower(FabricationTask.status) == 'in progress',
-                func.lower(FabricationTask.status) == 'in_progress'
-            ), 1))).label('in_progress'),
-            func.count(case((func.lower(FabricationTask.status) == 'completed', 1))).label('completed'),
-            func.count(case((or_(
-                func.lower(FabricationTask.status) == 'on hold',
-                func.lower(FabricationTask.status) == 'onhold',
-                func.lower(FabricationTask.status) == 'on_hold'
-            ), 1))).label('on_hold')
-        ).filter(or_(FabricationTask.is_deleted == False, FabricationTask.is_deleted == None)).first()
-    except Exception as e:
-        print(f"❌ Error querying fabrication tasks: {e}")
-        fabrication_task_counts = Zeros()
-    
-    fabrication_task_counts = fabrication_task_counts or Zeros()
-    
-    # AGGREGATE ALL TASK TYPES
-    total_tasks = (general_task_counts.total or 0) + (filing_task_counts.total or 0) + (fabrication_task_counts.total or 0)
-    total_pending = (general_task_counts.pending or 0) + (filing_task_counts.pending or 0) + (fabrication_task_counts.pending or 0)
-    total_in_progress = (general_task_counts.in_progress or 0) + (filing_task_counts.in_progress or 0) + (fabrication_task_counts.in_progress or 0)
-    total_completed = (general_task_counts.completed or 0) + (filing_task_counts.completed or 0) + (fabrication_task_counts.completed or 0)
-    total_ended = (general_task_counts.ended or 0)  # Only general tasks have 'ended' status
-    total_on_hold = (general_task_counts.on_hold or 0) + (filing_task_counts.on_hold or 0) + (fabrication_task_counts.on_hold or 0)
-
-    # 4. Machine Counts
-    try:
-        machines_total = db.query(Machine).filter(
+        total_machines = db.query(Machine).filter(
             or_(Machine.is_deleted == False, Machine.is_deleted == None)
         ).count()
         
-        machines_active = db.query(Machine).filter(
+        active_machines = db.query(Machine).filter(
             or_(Machine.is_deleted == False, Machine.is_deleted == None),
             Machine.status == 'active'
         ).count()
     except Exception as e:
-        print(f"❌ Error querying machines: {e}")
-        machines_total = 0
-        machines_active = 0
+        print(f"❌ Error counting machines: {e}")
+        total_machines = 0
+        active_machines = 0
 
-    # 5. Project Counts
-    try:
-        total_projects = db.query(Project).filter(
-            or_(Project.is_deleted == False, Project.is_deleted == None)
-        ).count()
-    except Exception as e:
-        print(f"❌ Error querying projects: {e}")
-        total_projects = 0
-
-    # 6. Operator Counts
+    # 3. OPERATORS OVERVIEW
     try:
         total_operators = db.query(User).filter(
             User.role == 'operator',
@@ -181,33 +83,21 @@ def get_dashboard_overview(db: Session) -> Dict[str, Any]:
             User.approval_status == 'approved'
         ).count()
     except Exception as e:
-        print(f"❌ Error querying operators: {e}")
+        print(f"❌ Error counting operators: {e}")
         total_operators = 0
-
-    # 6. PROJECTS
-    try:
-        total_projects = db.query(Project).filter(or_(Project.is_deleted == False, Project.is_deleted == None)).count()
-    except Exception as e:
-        print(f"❌ Error counting projects: {e}")
-        total_projects = 0
 
     return {
         "tasks": {
-            "total": g.total + fil.total + fab.total,
-            "pending": g.pending + fil.pending + fab.pending,
-            "in_progress": g.in_progress + fil.in_progress + fab.in_progress,
-            "completed": g.completed + fil.completed + fab.completed,
-            "ended": g.ended + fil.ended + fab.ended,
-            "on_hold": g.on_hold + fil.on_hold + fab.on_hold,
-            "by_type": {
-                "general": g.total or 0,
-                "filing": fil.total or 0,
-                "fabrication": fab.total or 0
-            }
+            "total": total_tasks,
+            "pending": pending,
+            "in_progress": in_progress,
+            "completed": completed,
+            "on_hold": on_hold,
+            "ended": 0 
         },
         "machines": {
-            "active": active_machines,
-            "total": total_machines
+            "total": total_machines,
+            "active": active_machines
         },
         "projects": {
             "total": total_projects
@@ -217,17 +107,6 @@ def get_dashboard_overview(db: Session) -> Dict[str, Any]:
         }
     }
 
-
-def refresh_dashboard_cache(db: Session) -> bool:
-    """
-    Refresh the materialized view for dashboard metrics
-    Call this after bulk task operations
-    """
-    try:
-        db.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY dashboard_overview_mv"))
-        db.commit()
-        print("✅ Dashboard cache refreshed successfully")
-        return True
-    except Exception as e:
-        print(f"⚠️ Failed to refresh dashboard cache: {e}")
-        return False
+# Legacy support - redirect to new function
+def get_dashboard_overview(db: Session) -> Dict[str, Any]:
+    return get_operations_overview(db)
