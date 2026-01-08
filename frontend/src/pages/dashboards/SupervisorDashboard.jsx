@@ -490,13 +490,13 @@ const SupervisorDashboard = () => {
                             {machines.map(machine => (
                                 <div key={machine.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
                                     <div className="flex items-center">
-                                        <div className={`w-3 h-3 rounded-full mr-3 ${machine.status === 'active' ? 'bg-green-500 animate-pulse' : machine.status === 'maintenance' ? 'bg-amber-500' : 'bg-gray-400'}`}></div>
+                                        <div className={`w-3 h-3 rounded-full mr-3 ${machine.status === 'running' ? 'bg-green-500 animate-pulse' : machine.status === 'maintenance' ? 'bg-amber-500' : 'bg-gray-400'}`}></div>
                                         <div>
                                             <p className="text-sm font-bold text-gray-800">{resolveMachineName(machine)}</p>
                                             <p className="text-[10px] text-gray-500 uppercase">{machine.category_name || 'General'}</p>
                                         </div>
                                     </div>
-                                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${machine.status === 'active' ? 'text-green-700 bg-green-100' : 'text-gray-700 bg-gray-200'}`}>
+                                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${machine.status === 'running' ? 'text-green-700 bg-green-100' : 'text-gray-700 bg-gray-200'}`}>
                                         {machine.status}
                                     </span>
                                 </div>
