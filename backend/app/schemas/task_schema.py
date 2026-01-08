@@ -16,7 +16,7 @@ class TaskBase(BaseModel):
     machine_id: Optional[str] = None
     assigned_by: Optional[str] = None  # user_id who assigned
     due_date: Optional[datetime] = None
-    expected_completion_time: Optional[int] = None
+
     work_order_number: Optional[str] = None
 
     @field_validator('priority', mode='before')
@@ -71,7 +71,7 @@ class TaskUpdate(BaseModel):
     machine_id: Optional[Union[str, int]] = None
     assigned_by: Optional[str] = None
     due_date: Optional[datetime] = None
-    expected_completion_time: Optional[int] = None
+
     work_order_number: Optional[str] = None
 
     @field_validator('priority', mode='before')

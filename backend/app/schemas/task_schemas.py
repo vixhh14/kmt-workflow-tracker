@@ -14,7 +14,7 @@ class TaskBase(BaseModel):
     machine_id: Optional[str] = None
     assigned_by: Optional[str] = None
     due_date: Optional[str] = None
-    expected_completion_time: Optional[str] = None
+
 
 class TaskCreate(TaskBase):
     pass
@@ -33,7 +33,7 @@ class TaskUpdate(BaseModel):
     due_date: Optional[str] = None
     hold_reason: Optional[str] = None
     denial_reason: Optional[str] = None
-    expected_completion_time: Optional[str] = None
+
 
 class TaskResponse(BaseModel):
     id: str
@@ -57,7 +57,7 @@ class TaskResponse(BaseModel):
     total_held_seconds: Optional[int] = None
     hold_reason: Optional[str] = None
     denial_reason: Optional[str] = None
-    expected_completion_time: Optional[str] = None
+
 
     model_config = ConfigDict(from_attributes=True)
 

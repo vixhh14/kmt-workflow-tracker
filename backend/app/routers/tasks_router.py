@@ -86,7 +86,7 @@ async def read_tasks(
                 "assigned_to": t.assigned_to,
                 "machine_id": str(t.machine_id) if t.machine_id else None,
                 "due_date": t.due_date,
-                "expected_completion_time": t.expected_completion_time,
+
                 "created_at": t.created_at,
                 "started_at": t.started_at,
                 "completed_at": t.completed_at,
@@ -161,7 +161,7 @@ async def create_task(
             assigned_to=assigned_to,
             machine_id=task.machine_id,
             due_date=task.due_date,
-            expected_completion_time=task.expected_completion_time,
+
             work_order_number=task.work_order_number.strip(),
             created_at=get_current_time_ist(),
         )
@@ -585,7 +585,7 @@ async def update_task(
         "assigned_to": db_task.assigned_to,
         "machine_id": db_task.machine_id,
         "due_date": db_task.due_date,
-        "expected_completion_time": db_task.expected_completion_time,
+
         "started_at": db_task.started_at.isoformat() if db_task.started_at else None,
         "completed_at": db_task.completed_at.isoformat() if db_task.completed_at else None,
         "total_duration_seconds": db_task.total_duration_seconds,

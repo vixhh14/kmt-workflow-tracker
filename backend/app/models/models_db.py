@@ -130,7 +130,7 @@ class Task(Base):
     actual_start_time = Column(DateTime(timezone=True), nullable=True)
     actual_end_time = Column(DateTime(timezone=True), nullable=True)
     total_held_seconds = Column(BigInteger, default=0)
-    expected_completion_time = Column(Integer, nullable=True) # Duration in minutes
+
     work_order_number = Column(String, nullable=True) # Work Order Number for Normal Tasks
 
     # Relationships

@@ -192,7 +192,7 @@ def calculate_detailed_machine_activity(db: Session, machine_id: str, target_dat
             "start_time": log.start_time.isoformat(),
             "end_time": log.end_time.isoformat() if log.end_time else None,
             "runtime_seconds": max(0, duration),
-            "expected_duration_minutes": task.expected_completion_time if task else 0,
+
             "held_time_seconds": task.total_held_seconds if task else 0,
             "status": "Running" if log.end_time is None else "Finished"
         })
@@ -235,7 +235,7 @@ def calculate_detailed_user_activity(db: Session, user_id: str, target_date: dat
             "start_time": log.start_time.isoformat(),
             "end_time": log.end_time.isoformat() if log.end_time else None,
             "duration_seconds": max(0, duration),
-            "expected_duration_minutes": task.expected_completion_time if task else 0,
+
             "holds": hold_history,
             "status": "Running" if log.end_time is None else "Finished"
         })
@@ -591,7 +591,7 @@ async def export_machine_detailed_csv(machine_id: str, date_str: Optional[str] =
             
     data = calculate_detailed_machine_activity(db, machine_id, target_date)
     
-    headers = ["Task Title", "Operator", "Start Time", "End Time", "Runtime (Secs)", "Expected (Mins)", "Status"]
+    headers = ["Task Title", "Operator", "Start Time", "End Time", "Runtime (Secs)", "Status"]
     rows = []
     for d in data:
         rows.append([
@@ -600,7 +600,7 @@ async def export_machine_detailed_csv(machine_id: str, date_str: Optional[str] =
             d["start_time"],
             d["end_time"],
             d["runtime_seconds"],
-            d["expected_duration_minutes"],
+
             d["status"]
         ])
         
@@ -621,7 +621,7 @@ async def export_user_detailed_csv(user_id: str, date_str: Optional[str] = None,
             
     data = calculate_detailed_user_activity(db, user_id, target_date)
     
-    headers = ["Task Title", "Machine", "Start Time", "End Time", "Duration (Secs)", "Expected (Mins)", "Status"]
+    headers = ["Task Title", "Machine", "Start Time", "End Time", "Duration (Secs)", "Status"]
     rows = []
     for d in data:
         rows.append([
@@ -630,7 +630,7 @@ async def export_user_detailed_csv(user_id: str, date_str: Optional[str] = None,
             d["start_time"],
             d["end_time"],
             d["duration_seconds"],
-            d["expected_duration_minutes"],
+
             d["status"]
         ])
         
