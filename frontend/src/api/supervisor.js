@@ -10,13 +10,18 @@ export const getPendingTasks = () => {
 };
 
 // Get running tasks
-export const getRunningTasks = () => {
-    return api.get('/supervisor/running-tasks');
+export const getRunningTasks = (projectId = null, operatorId = null) => {
+    const params = {};
+    if (projectId && projectId !== 'all') params.project_id = projectId;
+    if (operatorId && operatorId !== 'all') params.operator_id = operatorId;
+    return api.get('/supervisor/running-tasks', { params });
 };
 
-// Get task status breakdown (optionally filtered by operator)
-export const getTaskStatus = (operatorId = null) => {
-    const params = operatorId ? { operator_id: operatorId } : {};
+// Get task status breakdown (optionally filtered by operator and project)
+export const getTaskStatus = (operatorId = null, projectId = null) => {
+    const params = {};
+    if (operatorId && operatorId !== 'all') params.operator_id = operatorId;
+    if (projectId && projectId !== 'all') params.project_id = projectId;
     return api.get('/supervisor/task-status', { params });
 };
 
@@ -25,9 +30,11 @@ export const getProjectsSummary = () => {
     return api.get('/supervisor/projects-summary');
 };
 
-// Get task statistics (optionally filtered by project)
-export const getTaskStats = (project = null) => {
-    const params = project ? { project } : {};
+// Get task statistics (optionally filtered by project and operator)
+export const getTaskStats = (projectId = null, operatorId = null) => {
+    const params = {};
+    if (projectId && projectId !== 'all') params.project = projectId; // Backend supports 'project' (name/id)
+    if (operatorId && operatorId !== 'all') params.operator_id = operatorId;
     return api.get('/supervisor/task-stats', { params });
 };
 
