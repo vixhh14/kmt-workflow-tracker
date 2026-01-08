@@ -8,6 +8,7 @@ from app.core.dependencies import get_current_user
 from app.models.models_db import Task, User, Machine, TaskHold
 from app.utils.datetime_utils import utc_now, make_aware, safe_datetime_diff
 from datetime import datetime, timezone
+import uuid
 
 router = APIRouter(
     prefix="/supervisor",
@@ -84,7 +85,11 @@ async def get_running_tasks(
         )
 
         if project_id and project_id != "all":
-            query = query.filter(Task.project_id == project_id) # Filter by UUID
+            try:
+                uuid.UUID(str(project_id))
+                query = query.filter(Task.project_id == project_id) # Filter by UUID
+            except ValueError:
+                query = query.filter(Task.project == project_id) # Filter by Project Name
         
         if operator_id and operator_id != "all":
             query = query.filter(Task.assigned_to == operator_id)
@@ -172,7 +177,11 @@ async def get_task_status(
         tasks_query = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None))
         
         if project_id and project_id != "all":
-            tasks_query = tasks_query.filter(Task.project_id == project_id)
+            try:
+                uuid.UUID(str(project_id))
+                tasks_query = tasks_query.filter(Task.project_id == project_id)
+            except ValueError:
+                tasks_query = tasks_query.filter(Task.project == project_id)
             
         all_tasks = tasks_query.all()
         
@@ -267,11 +276,11 @@ async def get_task_stats(
         # SAFE AUTO-DETECT: Check if 'project' looks like UUID, else use name.
         
         if project and project != "all":
-            # Simple heuristic: if it has hyphens and length is 36, assume UUID
-            if len(project) == 36 and '-' in project:
-                 query = query.filter(Task.project_id == project)
-            else:
-                 query = query.filter(Task.project == project)
+            try:
+                uuid.UUID(str(project))
+                query = query.filter(Task.project_id == project)
+            except ValueError:
+                query = query.filter(Task.project == project)
         
         if operator_id and operator_id != "all":
              query = query.filter(Task.assigned_to == operator_id)
