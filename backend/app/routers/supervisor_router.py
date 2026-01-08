@@ -5,7 +5,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
-from app.models.models_db import Task, User, Machine, TaskHold
+from app.models.models_db import Task, User, Machine, TaskHold, Project
 from app.utils.datetime_utils import utc_now, make_aware, safe_datetime_diff
 from datetime import datetime, timezone
 import uuid
@@ -196,8 +196,10 @@ async def get_task_status(
             
             # Don't show operators with zero tasks if filtering by project (unless they are the selected operator)
             total = completed + in_progress + pending
-            if total == 0 and project_id and project_id != "all" and not operator_id:
-                 continue
+            # Don't show operators with zero tasks if filtering by project (unless they are the selected operator)
+            total = completed + in_progress + pending
+            # if total == 0 and project_id and project_id != "all" and not operator_id:
+            #      continue
 
             operator_stats.append({
                 "operator": operator.full_name if operator.full_name else operator.username,
@@ -295,17 +297,12 @@ async def get_task_stats(
         
         # Get list of all projects for dropdown (Always return ALL available projects, not filtered ones)
         # Using project_id and project name
-        projects_query = db.query(Task.project_id, Task.project).filter(
-             or_(Task.is_deleted == False, Task.is_deleted == None),
-             Task.project != None
+        # Get list of all projects for dropdown from Project table
+        projects_query = db.query(Project.project_name).filter(
+             or_(Project.is_deleted == False, Project.is_deleted == None)
         ).distinct().all()
         
-        # We want to return IDs if possible, but the frontend expects names in 'available_projects' list?
-        # The previous code returned `project_names`.
-        # Let's keep returning names for backward compat unless we fix frontend dropdowns to use IDs + Names.
-        # But we should really return objects {id, name}.
-        # For now, stick to names to avoid breaking the dropdown render if it expects strings.
-        project_names = list(set([p.project for p in projects_query if p.project]))
+        project_names = [p[0] for p in projects_query if p[0]]
         
         return {
             "total_tasks": total,

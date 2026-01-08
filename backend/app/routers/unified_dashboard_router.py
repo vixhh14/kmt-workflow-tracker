@@ -105,7 +105,11 @@ async def get_admin_dashboard(
 
         # Get overview stats (handles filtered recalculation)
         overview = get_operations_overview(db)
-        if project_id or operator_id:
+        
+        # Only recalculate if specific filters are applied (not "all")
+        is_filtered = (project_id and project_id != "all") or (operator_id and operator_id != "all")
+        
+        if is_filtered:
             overview = {
                 "tasks": {
                     "total": len(tasks),
@@ -127,39 +131,39 @@ async def get_admin_dashboard(
         # Machine Status Logic
         # 1. Get all active tasks (in_progress, on_hold)
         # 2. Filter by project/operator if provided (already done in 'tasks' list)
-        active_machine_tasks = [t for t in tasks if t.status in ('in_progress', 'on_hold', 'onhold') and t.machine_id]
+        active_machine_tasks = [t for t in tasks if getattr(t, 'status', '') in ('in_progress', 'on_hold', 'onhold') and getattr(t, 'machine_id', None)]
         
         # Map machine_id -> status
         machine_status_map = {}
         for t in active_machine_tasks:
-            current = machine_status_map.get(t.machine_id)
-            if t.status == 'in_progress':
-                machine_status_map[t.machine_id] = 'active' # Highest priority
-            elif t.status in ('on_hold', 'onhold') and current != 'active':
-                machine_status_map[t.machine_id] = 'on_hold'
+            mid = getattr(t, 'machine_id', None)
+            if not mid: continue
+            
+            current = machine_status_map.get(mid)
+            status = getattr(t, 'status', '')
+            if status == 'in_progress':
+                machine_status_map[mid] = 'running' # Highest priority
+            elif status in ('on_hold', 'onhold') and current != 'running':
+                machine_status_map[mid] = 'on_hold'
         
         # Update machine objects
         machines_data = []
         for m in machines:
-            # We need to return objects compatible with Pydantic model. 
-            # ORM objects can be modified if not committed, or correct way involves separate dicts.
-            # safe way -> dict
-            m_status = machine_status_map.get(m.id, 'idle')
+            m_status = machine_status_map.get(m.id, 'available')
             machines_data.append({
                 "id": m.id,
                 "machine_name": m.machine_name,
-                "category_id": m.category_id,
-                "category_name": m.category_name,
                 "status": m_status,
+                # Fields below exist on model but might not be in schema, keeping safe ones
+                "category_id": m.category_id,
                 "hourly_rate": m.hourly_rate,
-                "unit": m.unit,
                 "is_deleted": m.is_deleted,
                 "created_at": m.created_at,
                 "updated_at": m.updated_at
             })
             
-        active_machines_count = len([m_id for m_id, status in machine_status_map.items() if status == 'active'])
-        if 'machines' in overview:
+        active_machines_count = len([m_id for m_id, status in machine_status_map.items() if status == 'running'])
+        if is_filtered and 'machines' in overview:
              overview['machines']['active'] = active_machines_count
         
         # Filter operators - ALWAYS load all active operators regardless of task filters
