@@ -7,6 +7,7 @@ from app.models.models_db import Task, User, Machine, Project
 from app.services.dashboard_analytics_service import get_dashboard_overview
 from app.services.project_overview_service import get_project_overview_stats
 from app.schemas.dashboard_schema import AdminDashboardOut, SupervisorDashboardOut
+import uuid
 
 router = APIRouter(
     prefix="/dashboard",
@@ -35,7 +36,11 @@ async def get_admin_dashboard(
             or_(Task.is_deleted == False, Task.is_deleted == None)
         )
         if project_id and project_id != "all":
-            tasks_query = tasks_query.filter(Task.project_id == project_id)
+            try:
+                uuid.UUID(str(project_id))
+                tasks_query = tasks_query.filter(Task.project_id == project_id)
+            except ValueError:
+                tasks_query = tasks_query.filter(Task.project == project_id)
         if operator_id and operator_id != "all":
             tasks_query = tasks_query.filter(Task.assigned_to == operator_id)
             
