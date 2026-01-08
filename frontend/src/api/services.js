@@ -112,7 +112,12 @@ export const downloadUserReport = (dateStr) => {
 };
 /* -------------------- UNIFIED DASHBOARDS -------------------- */
 export const getAdminUnifiedDashboard = () => api.get('/dashboard/admin');
-export const getSupervisorUnifiedDashboard = () => api.get('/dashboard/supervisor');
+export const getSupervisorUnifiedDashboard = (projectId = null, operatorId = null) => {
+    const params = {};
+    if (projectId && projectId !== 'all') params.project_id = projectId;
+    if (operatorId && operatorId !== 'all') params.operator_id = operatorId;
+    return api.get('/dashboard/supervisor', { params });
+};
 
 /* -------------------- OPERATIONAL TASKS (FILING / FABRICATION) -------------------- */
 export const getOperationalTasks = (type) => api.get(`/operational-tasks/${type}`);

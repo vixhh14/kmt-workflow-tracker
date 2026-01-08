@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getRunningTasks, getTaskStatus, getProjectsSummary, getTaskStats, getProjectSummary, getPriorityStatus, getOperators, assignTask } from '../../api/supervisor';
 import QuickAssign from '../../components/QuickAssign';
-import { getUsers, getDashboardOverview, getProjectOverviewStats, getSupervisorUnifiedDashboard } from '../../api/services';
+import { getUsers, getDashboardOverview, getProjectOverviewStats, getSupervisorUnifiedDashboard, endTask, completeTask } from '../../api/services';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Folder, CheckCircle, Clock, TrendingUp, AlertCircle, RefreshCw, UserPlus, Play, Users, X, Pause } from 'lucide-react';
 import { resolveMachineName } from '../../utils/machineUtils';
@@ -66,40 +66,41 @@ const SupervisorDashboard = () => {
 
     const isMounted = React.useRef(false);
 
-    useEffect(() => {
-        fetchDashboard();
-        const interval = setInterval(fetchRunningTasksOnly, 60000); // Update running tasks every minute
-        return () => clearInterval(interval);
-    }, []);
+    // Ref to hold current filters for the interval
+    const filtersRef = React.useRef({ project: 'all', operator: 'all' });
 
     useEffect(() => {
-        if (isMounted.current) {
-            fetchOperatorStatus();
-        }
-    }, [selectedOperator]);
+        // Update ref when state changes
+        filtersRef.current = { project: selectedProject, operator: selectedOperator };
 
-    useEffect(() => {
+        // Fetch data on filter change
         if (isMounted.current) {
-            fetchTaskStatsFiltered();
+            fetchDashboard();
         } else {
             isMounted.current = true;
+            fetchDashboard();
         }
-    }, [selectedProject]);
+    }, [selectedProject, selectedOperator]);
 
-
+    useEffect(() => {
+        const interval = setInterval(fetchRunningTasksOnly, 15000); // 15s recommended for live feel
+        return () => clearInterval(interval);
+    }, []);
 
     const fetchDashboard = async () => {
         try {
             setLoading(true);
             setError(null);
 
-            console.log('🔄 Fetching supervisor dashboard data...');
+            const { project, operator } = filtersRef.current;
+            console.log('🔄 Fetching supervisor dashboard data...', { project, operator });
 
+            // Pass filters to all endpoints
             const [unifiedRes, runningRes, operatorStatusRes, statsRes] = await Promise.all([
-                getSupervisorUnifiedDashboard(),
-                getRunningTasks(),
-                getTaskStatus(),
-                getTaskStats()
+                getSupervisorUnifiedDashboard(project, operator),
+                getRunningTasks(project, operator),
+                getTaskStatus(operator, project),
+                getTaskStats(project, operator)
             ]);
 
             console.log('✅ Supervisor dashboard loaded');
@@ -117,7 +118,7 @@ const SupervisorDashboard = () => {
             });
 
             setRunningTasks(Array.isArray(runningRes?.data) ? runningRes.data : []);
-            setProjectsDistribution(projectStats || {}); // Using projectStats for distribution
+            setProjectsDistribution(projectStats || {});
 
             // Overwrite unified stats, keep project list
             setTaskStats({
@@ -144,40 +145,20 @@ const SupervisorDashboard = () => {
 
     const fetchRunningTasksOnly = async () => {
         try {
-            const res = await getRunningTasks();
+            const { project, operator } = filtersRef.current;
+            const res = await getRunningTasks(project, operator);
             setRunningTasks(Array.isArray(res?.data) ? res.data : []);
         } catch (err) {
             console.error('Failed to fetch running tasks:', err);
         }
     };
 
-    const fetchOperatorStatus = async () => {
-        try {
-            const operatorId = selectedOperator === 'all' ? null : selectedOperator;
-            const res = await getTaskStatus(operatorId);
-            setOperatorStatus(Array.isArray(res?.data) ? res.data : []);
-        } catch (err) {
-            console.error('Failed to fetch operator status:', err);
-        }
-    };
-
-    const fetchTaskStatsFiltered = async () => {
-        try {
-            const project = selectedProject === 'all' ? null : selectedProject;
-            const res = await getTaskStats(project);
-            setTaskStats(res?.data || {
-                total_tasks: 0,
-                pending: 0,
-                in_progress: 0,
-                completed: 0,
-                on_hold: 0,
-                available_projects: [],
-                selected_project: project || 'all'
-            });
-        } catch (err) {
-            console.error('Failed to fetch task stats:', err);
-        }
-    };
+    // Derived fetches are now consolidated into fetchDashboard
+    // but these might be called by child components if any... 
+    // Keeping safe stubs if needed, or deleting if unused. 
+    // Re-adding as they were in original file to avoid breaking references if any.
+    const fetchOperatorStatus = async () => { };
+    const fetchTaskStatsFiltered = async () => { };
 
     const handleAssignClick = (task) => {
         setSelectedTask(task);
@@ -196,6 +177,26 @@ const SupervisorDashboard = () => {
             await fetchDashboard(); // Refresh all data
         } catch (err) {
             alert(err.response?.data?.detail || 'Failed to assign task');
+        }
+    };
+
+    const handleEndTask = async (taskId) => {
+        if (!window.confirm("Are you sure you want to forcibly END this task? This action cannot be undone.")) return;
+        try {
+            await endTask(taskId);
+            await fetchDashboard();
+        } catch (err) {
+            alert(err.response?.data?.detail || 'Failed to end task');
+        }
+    };
+
+    const handleCompleteTask = async (taskId) => {
+        if (!window.confirm("Mark this task as COMPLETED?")) return;
+        try {
+            await completeTask(taskId);
+            await fetchDashboard();
+        } catch (err) {
+            alert(err.response?.data?.detail || 'Failed to complete task');
         }
     };
 
@@ -379,7 +380,7 @@ const SupervisorDashboard = () => {
                                     <div className="flex-1">
                                         <div className="flex justify-between items-start">
                                             <h3 className="font-bold text-gray-900">{task.title || 'Untitled'}</h3>
-                                            <div className="text-right">
+                                            <div className="text-right flex items-center gap-2">
                                                 <span className="px-3 py-1 text-[10px] font-bold bg-green-600 text-white rounded-full uppercase tracking-wider">
                                                     IN PROGRESS
                                                 </span>
@@ -420,6 +421,24 @@ const SupervisorDashboard = () => {
                                                     <p className="text-gray-400 italic text-[10px] pt-1 text-center">No active or previous holds</p>
                                                 )}
                                             </div>
+                                        </div>
+
+                                        {/* Actions Footer */}
+                                        <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-green-200">
+                                            <button
+                                                onClick={() => handleCompleteTask(task.id)}
+                                                className="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-md hover:bg-green-700 flex items-center gap-1 shadow-sm"
+                                            >
+                                                <CheckCircle size={14} />
+                                                COMPLETE
+                                            </button>
+                                            <button
+                                                onClick={() => handleEndTask(task.id)}
+                                                className="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-md hover:bg-red-700 flex items-center gap-1 shadow-sm"
+                                            >
+                                                <X size={14} />
+                                                END TASK
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
