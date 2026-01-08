@@ -184,23 +184,30 @@ def get_dashboard_overview(db: Session) -> Dict[str, Any]:
         print(f"❌ Error querying operators: {e}")
         total_operators = 0
 
+    # 6. PROJECTS
+    try:
+        total_projects = db.query(Project).filter(or_(Project.is_deleted == False, Project.is_deleted == None)).count()
+    except Exception as e:
+        print(f"❌ Error counting projects: {e}")
+        total_projects = 0
+
     return {
         "tasks": {
-            "total": total_tasks,
-            "pending": total_pending,
-            "in_progress": total_in_progress,
-            "completed": total_completed,
-            "ended": total_ended,
-            "on_hold": total_on_hold,
+            "total": g.total + fil.total + fab.total,
+            "pending": g.pending + fil.pending + fab.pending,
+            "in_progress": g.in_progress + fil.in_progress + fab.in_progress,
+            "completed": g.completed + fil.completed + fab.completed,
+            "ended": g.ended + fil.ended + fab.ended,
+            "on_hold": g.on_hold + fil.on_hold + fab.on_hold,
             "by_type": {
-                "general": general_task_counts.total or 0,
-                "filing": filing_task_counts.total or 0,
-                "fabrication": fabrication_task_counts.total or 0
+                "general": g.total or 0,
+                "filing": fil.total or 0,
+                "fabrication": fab.total or 0
             }
         },
         "machines": {
-            "active": machines_active,
-            "total": machines_total
+            "active": active_machines,
+            "total": total_machines
         },
         "projects": {
             "total": total_projects

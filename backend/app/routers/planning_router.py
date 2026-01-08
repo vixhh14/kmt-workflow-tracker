@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List
 from app.core.database import get_db
-from app.models.models_db import Task, User, Machine
+from app.models.models_db import Task, User, Machine, FilingTask, FabricationTask, Project as DBProject
+from sqlalchemy import or_
 
 router = APIRouter(
     prefix="/planning",
@@ -19,62 +20,83 @@ async def get_planning_dashboard_summary(db: Session = Depends(get_db)):
     NON-CRASHING GUARANTEE: Returns safe defaults if DB queries fail.
     """
     try:
-        from sqlalchemy import or_
-        from app.models.models_db import Project as DBProject
+        # Get all tasks from all tables (Normal, Filing, Fabrication)
+        general_tasks = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None)).all()
+        filing_tasks = db.query(FilingTask).filter(or_(FilingTask.is_deleted == False, FilingTask.is_deleted == None)).all()
+        fabrication_tasks = db.query(FabricationTask).filter(or_(FabricationTask.is_deleted == False, FabricationTask.is_deleted == None)).all()
         
-        # Get all tasks (filtered by is_deleted)
-        all_tasks = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None)).all()
+        # Combine and normalize for stats processing
+        all_tasks = []
+        for t in general_tasks:
+            all_tasks.append({
+                'title': t.title,
+                'status': t.status,
+                'project_id': t.project_id,
+                'project_obj': t.project_obj,
+                'project': t.project,
+                'machine_id': t.machine_id,
+                'assigned_to': t.assigned_to
+            })
+        for t in filing_tasks:
+            all_tasks.append({
+                'title': t.part_item, # Normalizing part_item to title
+                'status': t.status,
+                'project_id': t.project_id,
+                'project_obj': t.project_obj,
+                'project': None, # Filing tasks don't have legacy project string
+                'machine_id': t.machine_id,
+                'assigned_to': t.assigned_to
+            })
+        for t in fabrication_tasks:
+            all_tasks.append({
+                'title': t.part_item, # Normalizing part_item to title
+                'status': t.status,
+                'project_id': t.project_id,
+                'project_obj': t.project_obj,
+                'project': None,
+                'machine_id': t.machine_id,
+                'assigned_to': t.assigned_to
+            })
         
-        # Project-wise summary
-        project_map = {}
+        # Get all projects initially to ensure non-empty dashboard
+        projects = db.query(DBProject).filter(or_(DBProject.is_deleted == False, DBProject.is_deleted == None)).all()
+        
+        project_map = {p.project_name: {
+            'total': 0, 'completed': 0, 'ended': 0, 'in_progress': 0, 'pending': 0, 'on_hold': 0
+        } for p in projects}
+        project_map["Unassigned"] = {'total': 0, 'completed': 0, 'ended': 0, 'in_progress': 0, 'pending': 0, 'on_hold': 0}
+
         for task in all_tasks:
             # Safe logic to determine Project Name
             p_name = "Unassigned"
             
             try:
                 # 1. Try relationship object
-                if task.project_obj:
-                    p_name = task.project_obj.project_name
-                # 2. Fallback to legacy string field
-                elif task.project and task.project != '-' and task.project.strip():
-                     p_name = task.project
-                # 3. Fallback to manual lookup via ID (Handling corrupt IDs safely)
-                elif task.project_id:
-                    # Defensive ID check: ensure it's a string, passing int to UUID query crashes Postgres
-                    pid_str = str(task.project_id).strip()
-                    # Only query if it LOOKS like a UUID (len 36 or 32) or at least a string, 
-                    # but if it IS an int-like string (e.g. "123") Postgres might still complain comparing to UUID.
-                    # Best safety: Try/Except the query itself.
-                    try:
-                        p_obj = db.query(DBProject).filter(DBProject.project_id == pid_str).first()
-                        if p_obj:
-                            p_name = p_obj.project_name
-                    except Exception:
-                        # If query fails (e.g. data type mismatch), ignore and keep "Unassigned"
-                         pass
+                if 'project_obj' in task and task['project_obj']:
+                    p_name = task['project_obj'].project_name
+                # 2. Try relationship via project_id lookup if not normalized
+                elif 'project_id' in task and task['project_id']:
+                    # Since we have projects list, we can look it up
+                    for p in projects:
+                        if p.project_id == task['project_id']:
+                            p_name = p.project_name
+                            break
+                # 3. Fallback to legacy string field
+                elif 'project' in task and task['project'] and task['project'] != '-' and task['project'].strip():
+                     p_name = task['project']
             except Exception:
                  p_name = "Unassigned"
 
-            if not p_name:
-                p_name = "Unassigned"
+            if not p_name: p_name = "Unassigned"
             
             if p_name not in project_map:
-                project_map[p_name] = {
-                    'total': 0,
-                    'completed': 0,
-                    'ended': 0,
-                    'in_progress': 0,
-                    'pending': 0,
-                    'on_hold': 0
-                }
+                project_map[p_name] = {'total': 0, 'completed': 0, 'ended': 0, 'in_progress': 0, 'pending': 0, 'on_hold': 0}
             
             project_map[p_name]['total'] += 1
             
-            status_key = (task.status or "").lower().replace(" ", "_")
+            status_key = (task['status'] or "").lower().replace(" ", "_")
             if status_key in ['completed', 'ended', 'in_progress', 'pending', 'on_hold']:
                 project_map[p_name][status_key] += 1
-            elif status_key == 'in_progress': # handle underscore variation
-                 project_map[p_name]['in_progress'] += 1
         
         project_summary = []
         for project_name, stats in project_map.items():
@@ -104,7 +126,7 @@ async def get_planning_dashboard_summary(db: Session = Depends(get_db)):
         project_summary.sort(key=lambda x: x['progress'], reverse=True)
         
         # Global Counts
-        total_projects = len(project_summary)
+        total_projects = len(projects)
         active_machine_ids = set()
         
         # Robust counting using list comprehensions with safe checks
@@ -114,11 +136,11 @@ async def get_planning_dashboard_summary(db: Session = Depends(get_db)):
         on_hold_tasks = 0
         
         for t in all_tasks:
-            s = (t.status or "").lower().replace(" ", "_")
+            s = (t['status'] or "").lower().replace(" ", "_")
             if s == 'in_progress':
                 total_tasks_running += 1
-                if t.machine_id:
-                     active_machine_ids.add(t.machine_id)
+                if t['machine_id']:
+                     active_machine_ids.add(t['machine_id'])
             elif s == 'pending':
                 pending_tasks += 1
             elif s in ['completed', 'ended']:
@@ -135,15 +157,31 @@ async def get_planning_dashboard_summary(db: Session = Depends(get_db)):
             operators = db.query(User).filter(User.role == 'operator').all()
             for operator in operators:
                 # Safely query current task
+                # Safely query current task across all types
                 current_task = db.query(Task).filter(
                     Task.assigned_to == operator.user_id,
                     or_(func.lower(Task.status) == 'in_progress', Task.status == 'In Progress'),
                     or_(Task.is_deleted == False, Task.is_deleted == None)
                 ).first()
+                if not current_task:
+                    current_task = db.query(FilingTask).filter(
+                        FilingTask.assigned_to == operator.user_id,
+                        or_(func.lower(FilingTask.status) == 'in progress', FilingTask.status == 'In Progress'),
+                        or_(FilingTask.is_deleted == False, FilingTask.is_deleted == None)
+                    ).first()
+                if not current_task:
+                    current_task = db.query(FabricationTask).filter(
+                        FabricationTask.assigned_to == operator.user_id,
+                        or_(func.lower(FabricationTask.status) == 'in progress', FabricationTask.status == 'In Progress'),
+                        or_(FabricationTask.is_deleted == False, FabricationTask.is_deleted == None)
+                    ).first()
+                
+                # Normalize title for display
+                title = getattr(current_task, 'title', None) or getattr(current_task, 'part_item', None)
                 
                 operator_status.append({
                     "name": operator.full_name if operator.full_name else operator.username,
-                    "current_task": current_task.title if current_task else None,
+                    "current_task": title,
                     "status": "Active" if current_task else "Idle"
                 })
         except Exception:

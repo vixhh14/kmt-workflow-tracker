@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from typing import List, Optional
 from app.core.database import get_db
-from app.models.models_db import Task, User, Machine, Project
+from app.models.models_db import Task, User, Machine, Project, FilingTask, FabricationTask
+from types import SimpleNamespace
 from app.services.dashboard_analytics_service import get_dashboard_overview
 from app.services.project_overview_service import get_project_overview_stats
 from app.schemas.dashboard_schema import AdminDashboardOut, SupervisorDashboardOut
@@ -31,40 +32,97 @@ async def get_admin_dashboard(
             or_(Project.is_deleted == False, Project.is_deleted == None)
         ).all()
         
-        # Filter Tasks
-        tasks_query = db.query(Task).filter(
-            or_(Task.is_deleted == False, Task.is_deleted == None)
-        )
-        if project_id and project_id != "all":
-            try:
-                uuid.UUID(str(project_id))
-                tasks_query = tasks_query.filter(Task.project_id == project_id)
-            except ValueError:
-                tasks_query = tasks_query.filter(Task.project == project_id)
-        if operator_id and operator_id != "all":
-            tasks_query = tasks_query.filter(Task.assigned_to == operator_id)
-            
-        tasks = tasks_query.all()
-        
-        # Machines - List all machines, but update status based on active tasks
+        # Machines - List all machines
         machines = db.query(Machine).filter(
             or_(Machine.is_deleted == False, Machine.is_deleted == None)
         ).all()
         
+        # Approved users for the admin dashboard
         users = db.query(User).filter(
             or_(User.is_deleted == False, User.is_deleted == None),
             User.approval_status == 'approved'
         ).all()
         
-        # Get overview stats - Use our filtered tasks list to calculate stats on the fly
-        # instead of the unfiltered service call
-        
-        total_tasks = len(tasks)
-        pending = len([t for t in tasks if t.status == 'pending'])
-        in_progress = len([t for t in tasks if t.status == 'in_progress'])
-        completed = len([t for t in tasks if t.status == 'completed'])
-        on_hold = len([t for t in tasks if t.status == 'on_hold' or t.status == 'onhold'])
-        ended = len([t for t in tasks if t.status == 'ended']) # Assuming 'ended' is a valid status
+        # Determine project UUID for unified filtering
+        active_project_uuid = None
+        if project_id and project_id != "all":
+            try:
+                active_project_uuid = uuid.UUID(str(project_id))
+            except ValueError:
+                # Find project by name if not a UUID
+                p_obj = db.query(Project).filter(
+                    or_(Project.project_name == project_id, Project.project_code == project_id)
+                ).first()
+                if p_obj:
+                    active_project_uuid = p_obj.project_id
+
+        # 1. Normal Tasks
+        tasks_query = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None))
+        if active_project_uuid:
+            tasks_query = tasks_query.filter(Task.project_id == active_project_uuid)
+        elif project_id and project_id != "all":
+            tasks_query = tasks_query.filter(Task.project == project_id)
+        if operator_id and operator_id != "all":
+            tasks_query = tasks_query.filter(Task.assigned_to == operator_id)
+        normal_tasks = tasks_query.all()
+
+        # 2. Filing Tasks
+        f_query = db.query(FilingTask).filter(or_(FilingTask.is_deleted == False, FilingTask.is_deleted == None))
+        if active_project_uuid:
+            f_query = f_query.filter(FilingTask.project_id == active_project_uuid)
+        elif project_id and project_id != "all":
+            f_query = f_query.filter(False) # No legacy string project field
+        if operator_id and operator_id != "all":
+            f_query = f_query.filter(FilingTask.assigned_to == operator_id)
+        filing_tasks = f_query.all()
+
+        # 3. Fabrication Tasks
+        fab_query = db.query(FabricationTask).filter(or_(FabricationTask.is_deleted == False, FabricationTask.is_deleted == None))
+        if active_project_uuid:
+            fab_query = fab_query.filter(FabricationTask.project_id == active_project_uuid)
+        elif project_id and project_id != "all":
+            fab_query = fab_query.filter(False)
+        if operator_id and operator_id != "all":
+            fab_query = fab_query.filter(FabricationTask.assigned_to == operator_id)
+        fabrication_tasks = fab_query.all()
+
+        # Combine and normalize all tasks
+        tasks = []
+        for t in normal_tasks:
+            tasks.append(t)
+        for t in filing_tasks:
+            tasks.append(SimpleNamespace(
+                id=str(t.id), title=t.part_item, status=t.status, 
+                project_id=t.project_id, machine_id=t.machine_id, 
+                assigned_to=t.assigned_to, priority=getattr(t, 'priority', 'medium')
+            ))
+        for t in fabrication_tasks:
+            tasks.append(SimpleNamespace(
+                id=str(t.id), title=t.part_item, status=t.status, 
+                project_id=t.project_id, machine_id=t.machine_id, 
+                assigned_to=t.assigned_to, priority=getattr(t, 'priority', 'medium')
+            ))
+
+        # Get overview stats (handles filtered recalculation)
+        overview = get_dashboard_overview(db)
+        if project_id or operator_id:
+            overview = {
+                "tasks": {
+                    "total": len(tasks),
+                    "pending": len([t for t in tasks if (getattr(t, 'status', '') or '').lower() == 'pending']),
+                    "in_progress": len([t for t in tasks if (getattr(t, 'status', '') or '').lower() in ('in_progress', 'in progress')]),
+                    "completed": len([t for t in tasks if (getattr(t, 'status', '') or '').lower() == 'completed']),
+                    "ended": len([t for t in tasks if (getattr(t, 'status', '') or '').lower() == 'ended']),
+                    "on_hold": len([t for t in tasks if (getattr(t, 'status', '') or '').lower() in ('on_hold', 'onhold', 'on hold')])
+                },
+                "machines": {
+                    "active": 0, # Placeholder, updated below
+                    "total": len(machines)
+                },
+                "projects": {
+                    "total": len(projects)
+                }
+            }
         
         # Machine Status Logic
         # 1. Get all active tasks (in_progress, on_hold)
@@ -100,26 +158,9 @@ async def get_admin_dashboard(
                 "updated_at": m.updated_at
             })
             
-        active_machines_count = len([m for m in machines_data if m['status'] == 'active'])
-        
-        # Calculate Logic for Overview if filtering is applied
-        overview = {
-            "tasks": {
-                "total": total_tasks,
-                "pending": pending,
-                "in_progress": in_progress,
-                "completed": completed,
-                "ended": ended,
-                "on_hold": on_hold
-            },
-            "machines": {
-                "active": active_machines_count,
-                "total": len(machines)
-            },
-            "projects": {
-                "total": len(projects) # Projects list is total available
-            }
-        }
+        active_machines_count = len([m_id for m_id, status in machine_status_map.items() if status == 'active'])
+        if 'machines' in overview:
+             overview['machines']['active'] = active_machines_count
         
         # Filter operators - ALWAYS load all active operators regardless of task filters
         # This ensures the operator dropdown is never empty
