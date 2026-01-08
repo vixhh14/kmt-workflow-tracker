@@ -56,6 +56,25 @@ def sync_schema():
                 print(f"⚠️ Could not convert project_id in {table}: {type_err}")
                 session.rollback()
 
+        # 3. Tasks Table Audit Fields
+        task_cols = [
+            ("ended_by", "VARCHAR"),
+            ("end_reason", "VARCHAR")
+        ]
+        
+        for col_name, col_type in task_cols:
+             try:
+                query = text(f"SELECT column_name FROM information_schema.columns WHERE table_name='tasks' AND column_name='{col_name}'")
+                exists = session.execute(query).fetchone()
+
+                if not exists:
+                    print(f"🛠 Adding column {col_name} to tasks...")
+                    session.execute(text(f"ALTER TABLE tasks ADD COLUMN {col_name} {col_type}"))
+                    session.commit()
+             except Exception as task_col_err:
+                 print(f"⚠️ Could not add {col_name} to tasks: {task_col_err}")
+                 session.rollback()
+
     except Exception as e:
         print(f"❌ sync_schema error: {e}")
     finally:
