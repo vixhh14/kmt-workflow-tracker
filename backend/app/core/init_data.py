@@ -59,7 +59,8 @@ def sync_schema():
         # 3. Tasks Table Audit Fields
         task_cols = [
             ("ended_by", "VARCHAR"),
-            ("end_reason", "VARCHAR")
+            ("end_reason", "VARCHAR"),
+            ("expected_completion_time", "INTEGER DEFAULT 0")
         ]
         
         for col_name, col_type in task_cols:
