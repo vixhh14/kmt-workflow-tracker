@@ -139,12 +139,13 @@ async def get_running_tasks(
                 "operator_name": operator.full_name if operator and operator.full_name else (operator.username if operator else "Unknown"),
                 "machine_id": task.machine_id or "",
                 "machine_name": machine.machine_name if machine else "Unknown",
-                "started_at": make_aware(task.actual_start_time or task.started_at).isoformat() if (task.actual_start_time or task.started_at) else None,
-                "actual_start_time": make_aware(task.actual_start_time).isoformat() if task.actual_start_time else None,
+                "started_at": task.actual_start_time or task.started_at,
+                "actual_start_time": task.actual_start_time,
                 "expected_completion_time": task.expected_completion_time,
                 "duration_seconds": duration_seconds,
                 "total_held_seconds": task.total_held_seconds or 0,
                 "holds": holds,
+                "due_date": task.due_date,
                 "status": "in_progress"
             })
         

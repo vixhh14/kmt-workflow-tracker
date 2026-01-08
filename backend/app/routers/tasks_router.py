@@ -96,7 +96,12 @@ async def read_tasks(
                 "actual_start_time": t.actual_start_time,
                 "actual_end_time": t.actual_end_time,
                 "total_held_seconds": t.total_held_seconds or 0,
-                "work_order_number": t.work_order_number
+                "work_order_number": t.work_order_number,
+                
+                # Audit and Timing Info
+                "ended_by": t.ended_by,
+                "end_reason": t.end_reason,
+                "expected_completion_time": t.expected_completion_time or 0
             }
             
             results.append(task_data)
