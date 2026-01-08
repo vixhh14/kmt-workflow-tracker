@@ -484,8 +484,8 @@ async def end_task(
     # Check if admin
     user_id = admin_user.user_id
     user = db.query(User).filter(User.user_id == user_id).first()
-    if not user or user.role != 'admin':
-        raise HTTPException(status_code=403, detail="Only admins can end tasks")
+    if not user or user.role not in ['admin', 'supervisor']:
+        raise HTTPException(status_code=403, detail="Only admins and supervisors can end tasks")
 
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:

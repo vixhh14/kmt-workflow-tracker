@@ -70,14 +70,26 @@ async def get_pending_tasks(db: Session = Depends(get_db)):
 
 
 @router.get("/running-tasks")
-async def get_running_tasks(db: Session = Depends(get_db)):
-    """Get all currently running (in_progress) tasks"""
+async def get_running_tasks(
+    project_id: Optional[str] = None,
+    operator_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get all currently running (in_progress) tasks, optionally filtered"""
     try:
         from sqlalchemy import or_
-        running_tasks = db.query(Task).filter(
+        query = db.query(Task).filter(
             Task.status == 'in_progress',
             or_(Task.is_deleted == False, Task.is_deleted == None)
-        ).all()
+        )
+
+        if project_id and project_id != "all":
+            query = query.filter(Task.project_id == project_id) # Filter by UUID
+        
+        if operator_id and operator_id != "all":
+            query = query.filter(Task.assigned_to == operator_id)
+
+        running_tasks = query.all()
         
         all_users = db.query(User).filter(
             or_(User.is_deleted == False, User.is_deleted == None),
@@ -137,35 +149,54 @@ async def get_running_tasks(db: Session = Depends(get_db)):
 
 
 @router.get("/task-status")
-async def get_task_status(operator_id: Optional[str] = None, db: Session = Depends(get_db)):
-    """Get task status breakdown, optionally filtered by operator"""
+async def get_task_status(
+    operator_id: Optional[str] = None, 
+    project_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get task status breakdown for graph, optionally filtered"""
     try:
-        operators = db.query(User).filter(
+        # Get base list of operators
+        operators_query = db.query(User).filter(
             User.role == 'operator',
             or_(User.is_deleted == False, User.is_deleted == None),
             User.approval_status == 'approved'
-        ).all()
+        )
         
-        if operator_id:
-            operators = [op for op in operators if op.user_id == operator_id]
+        if operator_id and operator_id != "all":
+            operators_query = operators_query.filter(User.user_id == operator_id)
+            
+        operators = operators_query.all()
         
-        all_tasks = db.query(Task).all()
+        # Get Tasks to aggregate
+        tasks_query = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None))
+        
+        if project_id and project_id != "all":
+            tasks_query = tasks_query.filter(Task.project_id == project_id)
+            
+        all_tasks = tasks_query.all()
         
         operator_stats = []
         for operator in operators:
+            # Filter tasks for this operator from the pre-filtered list
             operator_tasks = [t for t in all_tasks if t.assigned_to == operator.user_id]
             
             completed = len([t for t in operator_tasks if t.status == 'completed'])
             in_progress = len([t for t in operator_tasks if t.status == 'in_progress'])
             pending = len([t for t in operator_tasks if t.status == 'pending'])
             
+            # Don't show operators with zero tasks if filtering by project (unless they are the selected operator)
+            total = completed + in_progress + pending
+            if total == 0 and project_id and project_id != "all" and not operator_id:
+                 continue
+
             operator_stats.append({
                 "operator": operator.full_name if operator.full_name else operator.username,
                 "operator_id": operator.user_id,
                 "completed": completed,
                 "in_progress": in_progress,
                 "pending": pending,
-                "total": completed + in_progress + pending
+                "total": total
             })
         
         operator_stats.sort(key=lambda x: x['total'], reverse=True)
@@ -219,14 +250,32 @@ async def get_projects_summary(db: Session = Depends(get_db)):
 
 
 @router.get("/task-stats")
-async def get_task_stats(project: Optional[str] = None, db: Session = Depends(get_db)):
-    """Get task statistics, optionally filtered by project"""
+async def get_task_stats(
+    project: Optional[str] = None, 
+    operator_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get task statistics, optionally filtered by project and operator"""
     try:
         query = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None))
         
-        if project and project != "all":
-            query = query.filter(Task.project == project)
+        # Note: 'project' param refers to project_id in frontend logic usually, but here it was comparing to Task.project (name)
+        # We need to support both or stick to one. The frontend likely sends ID now. 
+        # But wait, looking at the previous code: `query.filter(Task.project == project)` -> this implies Name filtering?
+        # Let's check the Task model: `project = Column(String)`, `project_id = Column(UUID)`.
+        # If frontend sends ID, we should use project_id.
+        # SAFE AUTO-DETECT: Check if 'project' looks like UUID, else use name.
         
+        if project and project != "all":
+            # Simple heuristic: if it has hyphens and length is 36, assume UUID
+            if len(project) == 36 and '-' in project:
+                 query = query.filter(Task.project_id == project)
+            else:
+                 query = query.filter(Task.project == project)
+        
+        if operator_id and operator_id != "all":
+             query = query.filter(Task.assigned_to == operator_id)
+
         all_tasks = query.all()
         
         total = len(all_tasks)
@@ -235,12 +284,19 @@ async def get_task_stats(project: Optional[str] = None, db: Session = Depends(ge
         completed = len([t for t in all_tasks if t.status == 'completed'])
         on_hold = len([t for t in all_tasks if t.status == 'on_hold'])
         
-        # Get list of all projects for dropdown
-        all_projects = db.query(Task.project).filter(
-            Task.project != None,
-            Task.project != ''
+        # Get list of all projects for dropdown (Always return ALL available projects, not filtered ones)
+        # Using project_id and project name
+        projects_query = db.query(Task.project_id, Task.project).filter(
+             or_(Task.is_deleted == False, Task.is_deleted == None),
+             Task.project != None
         ).distinct().all()
-        project_names = [p[0] for p in all_projects]
+        
+        # We want to return IDs if possible, but the frontend expects names in 'available_projects' list?
+        # The previous code returned `project_names`.
+        # Let's keep returning names for backward compat unless we fix frontend dropdowns to use IDs + Names.
+        # But we should really return objects {id, name}.
+        # For now, stick to names to avoid breaking the dropdown render if it expects strings.
+        project_names = list(set([p.project for p in projects_query if p.project]))
         
         return {
             "total_tasks": total,

@@ -14,10 +14,15 @@ router = APIRouter(
 )
 
 @router.get("/admin", response_model=AdminDashboardOut)
-async def get_admin_dashboard(db: Session = Depends(get_db)):
+async def get_admin_dashboard(
+    project_id: Optional[str] = None,
+    operator_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
     """
     Admin Dashboard: All projects, tasks, machines, users, and operators.
     Returns ORM objects - Pydantic handles aliasing via Field(alias=...)
+     Supports validation filtering for Project and Operator.
     """
     try:
         # Fetch ORM objects
@@ -25,10 +30,18 @@ async def get_admin_dashboard(db: Session = Depends(get_db)):
             or_(Project.is_deleted == False, Project.is_deleted == None)
         ).all()
         
-        tasks = db.query(Task).filter(
+        # Filter Tasks
+        tasks_query = db.query(Task).filter(
             or_(Task.is_deleted == False, Task.is_deleted == None)
-        ).all()
+        )
+        if project_id and project_id != "all":
+            tasks_query = tasks_query.filter(Task.project_id == project_id)
+        if operator_id and operator_id != "all":
+            tasks_query = tasks_query.filter(Task.assigned_to == operator_id)
+            
+        tasks = tasks_query.all()
         
+        # Machines - List all machines, but update status based on active tasks
         machines = db.query(Machine).filter(
             or_(Machine.is_deleted == False, Machine.is_deleted == None)
         ).all()
@@ -38,23 +51,80 @@ async def get_admin_dashboard(db: Session = Depends(get_db)):
             User.approval_status == 'approved'
         ).all()
         
-        # Get overview stats
-        overview = get_dashboard_overview(db)
+        # Get overview stats - Use our filtered tasks list to calculate stats on the fly
+        # instead of the unfiltered service call
+        
+        total_tasks = len(tasks)
+        pending = len([t for t in tasks if t.status == 'pending'])
+        in_progress = len([t for t in tasks if t.status == 'in_progress'])
+        completed = len([t for t in tasks if t.status == 'completed'])
+        on_hold = len([t for t in tasks if t.status == 'on_hold' or t.status == 'onhold'])
+        ended = len([t for t in tasks if t.status == 'ended']) # Assuming 'ended' is a valid status
+        
+        # Machine Status Logic
+        # 1. Get all active tasks (in_progress, on_hold)
+        # 2. Filter by project/operator if provided (already done in 'tasks' list)
+        active_machine_tasks = [t for t in tasks if t.status in ('in_progress', 'on_hold', 'onhold') and t.machine_id]
+        
+        # Map machine_id -> status
+        machine_status_map = {}
+        for t in active_machine_tasks:
+            current = machine_status_map.get(t.machine_id)
+            if t.status == 'in_progress':
+                machine_status_map[t.machine_id] = 'active' # Highest priority
+            elif t.status in ('on_hold', 'onhold') and current != 'active':
+                machine_status_map[t.machine_id] = 'on_hold'
+        
+        # Update machine objects
+        machines_data = []
+        for m in machines:
+            # We need to return objects compatible with Pydantic model. 
+            # ORM objects can be modified if not committed, or correct way involves separate dicts.
+            # safe way -> dict
+            m_status = machine_status_map.get(m.id, 'idle')
+            machines_data.append({
+                "id": m.id,
+                "machine_name": m.machine_name,
+                "category_id": m.category_id,
+                "category_name": m.category_name,
+                "status": m_status,
+                "hourly_rate": m.hourly_rate,
+                "unit": m.unit,
+                "is_deleted": m.is_deleted,
+                "created_at": m.created_at,
+                "updated_at": m.updated_at
+            })
+            
+        active_machines_count = len([m for m in machines_data if m['status'] == 'active'])
+        
+        # Calculate Logic for Overview if filtering is applied
+        overview = {
+            "tasks": {
+                "total": total_tasks,
+                "pending": pending,
+                "in_progress": in_progress,
+                "completed": completed,
+                "ended": ended,
+                "on_hold": on_hold
+            },
+            "machines": {
+                "active": active_machines_count,
+                "total": len(machines)
+            },
+            "projects": {
+                "total": len(projects) # Projects list is total available
+            }
+        }
         
         # Filter operators
         operators = [u for u in users if u.role == 'operator']
         
-        # Return ORM objects directly - Pydantic will:
-        # 1. Map project_id -> id via Field(alias="project_id")
-        # 2. Map user_id -> id via Field(alias="user_id")
-        # 3. Serialize UUIDs to strings
-        # 4. Handle all datetime conversions
         return {
-            "projects": projects,  # ORM objects
-            "tasks": tasks,        # ORM objects
-            "machines": machines,  # ORM objects
-            "users": users,        # ORM objects
-            "operators": operators,  # ORM objects
+            "projects": projects,  
+            "tasks": tasks,        
+            "machines": machines_data,  
+            "users": users,        
+            "operators": operators, 
             "overview": overview
         }
         
@@ -77,14 +147,19 @@ async def get_admin_dashboard(db: Session = Depends(get_db)):
         }
 
 @router.get("/supervisor", response_model=SupervisorDashboardOut)
-async def get_supervisor_dashboard(db: Session = Depends(get_db)):
+async def get_supervisor_dashboard(
+    project_id: Optional[str] = None,
+    operator_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
     """
     Supervisor Dashboard: Projects, tasks, machines, operators (no user management).
     FAIL-SAFE: Skips corrupted rows, returns partial data.
+    Supports filtering by project_id and operator_id.
     """
     try:
         # Reuse admin logic but exclude full user list
-        admin_data = await get_admin_dashboard(db)
+        admin_data = await get_admin_dashboard(project_id, operator_id, db)
         
         return {
             "projects": admin_data["projects"],

@@ -222,7 +222,7 @@ class ForgotPasswordRequest(BaseModel):
 async def get_security_question(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
     """Get security question for a user (forgot password step 1)"""
     user = db.query(User).filter(
-        func.lower(User.username) == func.lower(request.username),
+        or_(func.lower(User.username) == func.lower(request.username), func.lower(User.email) == func.lower(request.username)),
         or_(User.is_deleted == False, User.is_deleted == None)
     ).first()
     
@@ -243,7 +243,7 @@ class ResetPasswordRequest(BaseModel):
 async def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
     """Reset password using security answer (forgot password step 2)"""
     user = db.query(User).filter(
-        func.lower(User.username) == func.lower(request.username),
+        or_(func.lower(User.username) == func.lower(request.username), func.lower(User.email) == func.lower(request.username)),
         or_(User.is_deleted == False, User.is_deleted == None)
     ).first()
     
