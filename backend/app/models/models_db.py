@@ -131,11 +131,14 @@ class Task(Base):
     actual_end_time = Column(DateTime(timezone=True), nullable=True)
     total_held_seconds = Column(BigInteger, default=0)
     
+    today_active_duration = None  # Placeholder for runtime calculation
+
     # End Task Audit
     ended_by = Column(String, nullable=True) # User ID who ended the task
     end_reason = Column(String, nullable=True)
 
     work_order_number = Column(String, nullable=True) # Work Order Number for Normal Tasks
+    expected_completion_time = Column(Integer, default=0) # In minutes or seconds based on usage. Frontend sends HH:MM converted to minutes usually.
 
     # Relationships
     machine = relationship("Machine")
