@@ -889,7 +889,10 @@ const Tasks = () => {
                                                                                 <p className="flex justify-between">
                                                                                     <span className="text-gray-500">Ended By:</span>
                                                                                     <span className="font-medium text-gray-900">
-                                                                                        {users.find(u => u.user_id === task.ended_by)?.username || task.ended_by || 'Unknown'}
+                                                                                        {(() => {
+                                                                                            const user = users.find(u => u.user_id === task.ended_by);
+                                                                                            return user ? (user.full_name || user.username) : (task.ended_by || 'Unknown');
+                                                                                        })()}
                                                                                     </span>
                                                                                 </p>
                                                                                 {task.end_reason && (
