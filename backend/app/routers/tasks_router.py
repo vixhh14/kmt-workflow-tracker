@@ -3,7 +3,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from pydantic import BaseModel
-from app.schemas.task_schema import TaskCreate, TaskUpdate, TaskOut
+from app.schemas.task_schema import TaskCreate, TaskUpdate, TaskOut, TaskActionRequest
 from app.models.models_db import Task, TaskTimeLog, TaskHold, RescheduleRequest, MachineRuntimeLog, UserWorkLog, User
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -475,16 +475,15 @@ async def deny_task(task_id: str, request: TaskActionRequest, db: Session = Depe
 @router.post("/{task_id}/end")
 async def end_task(
     task_id: str, 
+    request: Optional[TaskActionRequest] = None,
     db: Session = Depends(get_db),
-    admin_user: User = Depends(get_current_user) # We will check role inside or via dependency if strict
+    current_user: User = Depends(get_current_user)
 ):
-    """Admin action to force-end a task"""
+    """Admin/Supervisor action to force-end a task"""
     from app.models.models_db import User
     
-    # Check if admin
-    user_id = admin_user.user_id
-    user = db.query(User).filter(User.user_id == user_id).first()
-    if not user or user.role not in ['admin', 'supervisor']:
+    # Check if admin or supervisor
+    if current_user.role not in ['admin', 'supervisor']:
         raise HTTPException(status_code=403, detail="Only admins and supervisors can end tasks")
 
     task = db.query(Task).filter(Task.id == task_id).first()
@@ -492,6 +491,7 @@ async def end_task(
         raise HTTPException(status_code=404, detail="Task not found")
     
     now = get_current_time_ist()
+    reason = request.reason if request else None
     
     # Close any open intervals
     if task.status == "in_progress":
@@ -521,15 +521,22 @@ async def end_task(
     task.completed_at = now
     task.started_at = None
     
+    # Audit fields
+    task.ended_by = current_user.user_id # Store ID
+    task.end_reason = reason
+    
+    action_key = f"end_by_{current_user.role}"
+    
     log = TaskTimeLog(
         id=str(uuid.uuid4()),
         task_id=task_id,
-        action="end_by_admin",
+        action=action_key,
         timestamp=now,
+        reason=reason
     )
     db.add(log)
     db.commit()
-    return {"message": "Task ended successfully by admin", "status": "ended"}
+    return {"message": f"Task ended successfully by {current_user.role}", "status": "ended"}
 
 @router.put("/{task_id}", response_model=TaskOut)
 async def update_task(

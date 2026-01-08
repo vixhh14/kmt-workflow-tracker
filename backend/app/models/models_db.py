@@ -130,6 +130,10 @@ class Task(Base):
     actual_start_time = Column(DateTime(timezone=True), nullable=True)
     actual_end_time = Column(DateTime(timezone=True), nullable=True)
     total_held_seconds = Column(BigInteger, default=0)
+    
+    # End Task Audit
+    ended_by = Column(String, nullable=True) # User ID who ended the task
+    end_reason = Column(String, nullable=True)
 
     work_order_number = Column(String, nullable=True) # Work Order Number for Normal Tasks
 

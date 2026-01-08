@@ -108,6 +108,10 @@ class TaskOut(TaskBase):
     denial_reason: Optional[str] = None
     actual_start_time: Optional[datetime] = None
     actual_end_time: Optional[datetime] = None
+    today_active_duration: Optional[int] = 0 # Computed on the fly usually
+    # Audit
+    ended_by: Optional[str] = None
+    end_reason: Optional[str] = None
     total_held_seconds: int = 0
 
     model_config = ConfigDict(from_attributes=True)
@@ -125,6 +129,9 @@ class TaskOut(TaskBase):
         if v is None:
             return None
         return str(v)
+
+class TaskActionRequest(BaseModel):
+    reason: Optional[str] = None
 
 # Operational Tasks (Filing/Fabrication)
 
