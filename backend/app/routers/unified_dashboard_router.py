@@ -121,15 +121,20 @@ async def get_admin_dashboard(
             }
         }
         
-        # Filter operators
-        operators = [u for u in users if u.role == 'operator']
+        # Filter operators - ALWAYS load all active operators regardless of task filters
+        # This ensures the operator dropdown is never empty
+        all_operators = db.query(User).filter(
+            User.role == 'operator',
+            or_(User.is_deleted == False, User.is_deleted == None),
+            User.approval_status == 'approved'
+        ).all()
         
         return {
             "projects": projects,  
             "tasks": tasks,        
             "machines": machines_data,  
             "users": users,        
-            "operators": operators, 
+            "operators": all_operators,  # CRITICAL: Load independently from filters
             "overview": overview
         }
         
