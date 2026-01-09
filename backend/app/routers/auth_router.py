@@ -21,30 +21,38 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     """
     Authenticate user and return JWT token.
     """
-    import time
     from app.core.config import JWT_SECRET
     
     if not JWT_SECRET:
         print("❌ CRITICAL: JWT_SECRET is not set in environment variables.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Server configuration error"
+            detail="Server configuration error: Security token missing"
         )
 
     start_time = time.time()
     print(f"Login request received for: {credentials.username}")
     
     try:
-        # Find user by username in SQLite
+        # Find user by username
+        # Use case-insensitive comparison and handle soft-delete
         t1 = time.time()
-        user = db.query(User).filter(
-            func.lower(User.username) == func.lower(credentials.username), 
-            or_(User.is_deleted == False, User.is_deleted == None)
-        ).first()
+        try:
+            user = db.query(User).filter(
+                func.lower(User.username) == func.lower(credentials.username), 
+                or_(User.is_deleted == False, User.is_deleted == None)
+            ).first()
+        except Exception as query_error:
+            print(f"❌ Database query error during login: {query_error}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database service temporarily unavailable"
+            )
+            
         print(f"Database query took: {time.time() - t1:.4f}s")
         
         if not user:
-            print("User not found")
+            print(f"Login failed: User '{credentials.username}' not found")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username or password",
@@ -52,38 +60,37 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
             )
         
         # Check approval status
-        # Admin bypasses approval check
-        user_role = (user.role or "").lower()
+        user_role = (user.role or "operator").lower()
         if user_role != 'admin':
-            # Safe access to approval_status
             approval = getattr(user, 'approval_status', 'pending')
             if approval == 'pending':
-                print("User pending approval")
+                print(f"Login blocked: User '{user.username}' is pending approval")
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Your account is awaiting approval by the admin.",
                 )
             elif approval == 'rejected':
-                print("User rejected")
+                print(f"Login blocked: User '{user.username}' was rejected")
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Your account registration was rejected. Please contact admin.",
                 )
         
-        # Verify password
+        # Verify password existence
         if not user.password_hash:
-            print(f"User {user.username} has no password hash set.")
+            print(f"Login failed: User {user.username} has no password hash.")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username or password",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
+        # Verify password
         t2 = time.time()
         try:
             is_valid = verify_password(credentials.password, user.password_hash)
         except Exception as e:
-            print(f"Error during password verification for {credentials.username}: {e}")
+            print(f"❌ Error during password verification for {credentials.username}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Internal authentication error"
@@ -92,7 +99,7 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
         print(f"Password verification took: {time.time() - t2:.4f}s")
         
         if not is_valid:
-            print(f"Invalid password for user {user.username}")
+            print(f"Login failed: Invalid password for user {user.username}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username or password",
@@ -103,65 +110,62 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
         t3 = time.time()
         try:
             token_data = {
-                "sub": user.username or "",
-                "user_id": user.user_id or "",
-                "role": user_role
+                "sub": str(user.username or ""),
+                "user_id": str(user.user_id or ""),
+                "role": str(user_role)
             }
             access_token = create_access_token(data=token_data)
         except Exception as e:
-            print(f"Error creating access token for {credentials.username}: {e}")
+            print(f"❌ Error creating access token for {credentials.username}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Could not generate authentication token"
             )
         print(f"Token creation took: {time.time() - t3:.4f}s")
         
-        # Automatically mark user as present for today
+        # Automatically mark user as present for today (Non-blocking)
         try:
             from app.services import attendance_service
-            t4 = time.time()
             if hasattr(attendance_service, 'mark_present'):
                  attendance_result = attendance_service.mark_present(
                     db=db,
                     user_id=user.user_id,
                     ip_address=None
                 )
-                 print(f"Attendance marking took: {time.time() - t4:.4f}s")
                  if attendance_result.get("success"):
-                     print(f"✅ Attendance marked for {user.username}: {attendance_result.get('message')}")
+                     print(f"✅ Attendance marked for {user.username}")
                  else:
                      print(f"⚠️ Attendance marking failed: {attendance_result.get('message')}")
-            else:
-                 print("⚠️ mark_present function not found in attendance_service")
         except Exception as e:
             print(f"❌ Error marking attendance (non-blocking): {e}")
-            # Don't fail login if attendance fails
         
-        print(f"Total login time: {time.time() - start_time:.4f}s")
+        print(f"✅ Login successful for {user.username} in {time.time() - start_time:.4f}s")
         
-        # Return token and user info
+        # Return token and user info - ensure all fields are explicitly string converted if needed
         return LoginResponse(
             access_token=access_token,
             token_type="bearer",
             user={
-                "user_id": user.user_id,
-                "username": user.username,
-                "email": user.email,
-                "role": user_role,
-                "full_name": user.full_name
+                "user_id": str(user.user_id),
+                "username": str(user.username),
+                "email": str(user.email or ""),
+                "role": str(user_role),
+                "full_name": str(user.full_name or user.username)
             }
         )
     except HTTPException:
+        # Re-raise HTTP exceptions to maintain correct status codes
         raise
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
-        print(f"❌ Login error for user '{credentials.username}': {str(e)}")
+        print(f"❌ UNEXPECTED Login error for user '{credentials.username}': {str(e)}")
         print(f"❌ Full traceback:\n{error_trace}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Login failed"
+            detail=f"Login failed due to unexpected error: {str(e)}"
         )
+
 
 @router.get("/me")
 async def get_current_user(current_user: User = Depends(get_current_active_user)):
