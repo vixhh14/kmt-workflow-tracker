@@ -13,14 +13,34 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise Exception(" DATABASE_URL is missing — backend cannot start.")
 
-# Fix Render-style postgres:// URL → postgresql://
+# Fix Render-style postgres:// URL → postgresql:// and ensure sslmode=require
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# Create SQLAlchemy engine for PostgreSQL
+# Check for sslmode and add if missing (Required for external Render DB connections)
+if "sslmode=" not in DATABASE_URL:
+    separator = "&" if "?" in DATABASE_URL else "?"
+    DATABASE_URL = f"{DATABASE_URL}{separator}sslmode=require"
+
+# Create SQLAlchemy engine for PostgreSQL with robust connection arguments
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,
+    # connect_args are passed to the DB-API (psycopg2)
+    connect_args={
+        "sslmode": "require",
+        "gssencmode": "disable", # Fixes certain SSL issues on Windows
+        "connect_timeout": 15,
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 5,
+    },
+    # Pooling settings for production-grade stability
+    pool_size=5,
+    max_overflow=10,
+    pool_timeout=45,
+    pool_recycle=1200, # Recycle faster to avoid stale connections
+    pool_pre_ping=True, # Verify connection health before use
 )
 
 # Session factory
