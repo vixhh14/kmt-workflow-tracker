@@ -70,41 +70,34 @@ app.add_exception_handler(Exception, global_exception_handler)
 
 
 
-# Startup event – create tables and demo users
 @app.on_event("startup")
 async def startup_event():
-    import asyncio
-    from fastapi.concurrency import run_in_threadpool
-    from app.core.database import Base, engine
-    from app.models.models_db import Subtask
-    from create_demo_users import create_demo_users
-    from app.core.init_data import init_db_data
-    
-    async def run_init_tasks():
-        try:
-            print("🚀 Running startup tasks in background...")
-            
-            # 1. Create tables (Sync blocking I/O)
-            print("📊 Creating database tables...")
-            await run_in_threadpool(Base.metadata.create_all, bind=engine)
-            print("✅ Database tables created/verified")
-            
-            # 2. Demo Users
-            print("👥 Creating demo users...")
-            await run_in_threadpool(create_demo_users)
-            
-            # 3. Init Data (Schema Check + Seeding)
-            print("🌱 Initializing data...")
-            await run_in_threadpool(init_db_data)
-            print("✅ Startup tasks complete")
-            
-        except Exception as e:
-            print(f"❌ Error during background startup: {e}")
-            import traceback
-            traceback.print_exc()
-
-    # Create task to run in background so API is responsive immediately
-    asyncio.create_task(run_init_tasks())
+    # Run startup tasks synchronously before accepting traffic
+    try:
+        print("🚀 Running startup tasks...")
+        
+        # 1. Create tables
+        print("📊 Creating database tables...")
+        from app.core.database import Base, engine
+        Base.metadata.create_all(bind=engine)
+        print("✅ Database tables created/verified")
+        
+        # 2. Demo Users
+        print("👥 Creating demo users...")
+        from create_demo_users import create_demo_users
+        create_demo_users()
+        
+        # 3. Init Data (Schema Check + Seeding)
+        print("🌱 Initializing data...")
+        from app.core.init_data import init_db_data
+        init_db_data()
+        
+        print("✅ Startup tasks complete")
+        
+    except Exception as e:
+        print(f"❌ Error during startup: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 # Root endpoint
