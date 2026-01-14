@@ -93,8 +93,26 @@ class GoogleSheetsService:
         worksheet = self.get_worksheet(name)
         return worksheet.get_all_records()
 
+    def ensure_headers(self, name: str, expected_headers: List[str]):
+        """Ensures that all expected headers exist in row 1."""
+        worksheet = self.get_worksheet(name)
+        existing_headers = worksheet.row_values(1)
+        
+        missing = [h for h in expected_headers if h not in existing_headers]
+        if missing:
+            print(f"Adding missing headers to {name}: {missing}")
+            next_col = len(existing_headers) + 1
+            for header in missing:
+                worksheet.update_cell(1, next_col, header)
+                next_col += 1
+        return True
+
     def insert_row(self, name: str, data: Dict[str, Any]):
         """Inserts a new row into the specified worksheet."""
+        from app.core.sheets_db import SHEETS_SCHEMA
+        if name in SHEETS_SCHEMA:
+            self.ensure_headers(name, SHEETS_SCHEMA[name])
+            
         worksheet = self.get_worksheet(name)
         headers = worksheet.row_values(1)
         
@@ -112,6 +130,10 @@ class GoogleSheetsService:
 
     def update_row(self, name: str, row_id: str, data: Dict[str, Any]):
         """Updates a row identified by its ID (assumes ID is in the first column)."""
+        from app.core.sheets_db import SHEETS_SCHEMA
+        if name in SHEETS_SCHEMA:
+            self.ensure_headers(name, SHEETS_SCHEMA[name])
+            
         worksheet = self.get_worksheet(name)
         records = worksheet.get_all_records()
         headers = worksheet.row_values(1)
