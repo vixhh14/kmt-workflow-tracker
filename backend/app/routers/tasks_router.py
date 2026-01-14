@@ -1,7 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Optional
-from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from typing import List, Optional, Any
 from pydantic import BaseModel
 from app.schemas.task_schema import TaskCreate, TaskUpdate, TaskOut, TaskActionRequest
 from app.models.models_db import Task, TaskTimeLog, TaskHold, RescheduleRequest, MachineRuntimeLog, UserWorkLog, User
@@ -30,51 +28,54 @@ async def read_tasks(
     month: Optional[int] = None,
     year: Optional[int] = None,
     assigned_to: Optional[str] = None,
-    db: Session = Depends(get_db),
+    db: any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     # Role-based restriction: Operators only see their own tasks
     if current_user.role == "operator":
         assigned_to = current_user.user_id
 
-    query = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None))
+    # Get all tasks that are not deleted
+    tasks = db.query(Task).all()
+    tasks = [t for t in tasks if not t.is_deleted]
     
     # Filter by month and year if provided
-    if month is not None and year is not None:
-        from sqlalchemy import extract
-        query = query.filter(
-            extract('month', Task.created_at) == month,
-            extract('year', Task.created_at) == year
-        )
-    elif year is not None:
-        from sqlalchemy import extract
-        query = query.filter(extract('year', Task.created_at) == year)
+    if year is not None:
+        tasks = [t for t in tasks if t.created_at and t.created_at.year == year]
+    if month is not None:
+        tasks = [t for t in tasks if t.created_at and t.created_at.month == month]
     
     if assigned_to:
-        query = query.filter(Task.assigned_to == assigned_to)
+        tasks = [t for t in tasks if str(t.assigned_to) == str(assigned_to)]
     
     # Sort by deadline (closest first), then by creation date (newest first)
-    query = query.order_by(Task.due_date.asc().nulls_last(), Task.created_at.desc())
+    # Using a helper for sort key to handle None
+    def sort_key(t):
+        due = t.due_date if t.due_date else datetime(9999, 12, 31)
+        created = t.created_at if t.created_at else datetime(1970, 1, 1)
+        return (due, -created.timestamp())
+        
+    tasks.sort(key=sort_key)
     
-    tasks = query.all()
     results = []
+    # Load projects once to avoid heavy lookup
+    all_projects = db.query("projects").all()
+    project_map = {str(p.project_id): p.project_name for p in all_projects}
+
     for t in tasks:
         try:
-            # Resolve Project Name if missing (Backward compatibility)
+            # Resolve Project Name
             resolved_project = t.project
             if (not resolved_project or resolved_project == '-') and t.project_id:
-                from app.models.models_db import Project as DBProject
-                p_obj = db.query(DBProject).filter(DBProject.project_id == t.project_id).first()
-                if p_obj:
-                    resolved_project = p_obj.project_name
-                    # Optional: Sync it back to DB if missing
+                resolved_project = project_map.get(str(t.project_id), "-")
+                if resolved_project != "-":
                     t.project = resolved_project
-                    db.commit()
+                    # No need to commit immediately unless we want to sync the sheet
 
             # Construct dictionary for TaskOut
             task_data = {
                 "id": str(t.id),
-                "title": t.title,
+                "title": str(t.title),
                 "description": t.description,
                 "project": resolved_project or "-",
                 "project_id": str(t.project_id) if t.project_id else None,
@@ -103,11 +104,11 @@ async def read_tasks(
                 "end_reason": t.end_reason,
                 "expected_completion_time": t.expected_completion_time or 0
             }
-            
             results.append(task_data)
         except Exception as e:
-            print(f"⚠️ Skipping corrupted task {getattr(t, 'id', 'unknown')}: {e}")
+            print(f"⚠️ Error preparing task {getattr(t, 'id', 'unknown')}: {e}")
             continue
+            
     return results
 
 @router.post("", response_model=TaskOut, status_code=201)

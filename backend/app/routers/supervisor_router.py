@@ -1,6 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
 from typing import List, Optional
 from pydantic import BaseModel
 from app.core.database import get_db
@@ -25,47 +23,30 @@ class AssignTaskRequest(BaseModel):
     due_date: Optional[datetime] = None
 
 @router.get("/pending-tasks")
-async def get_pending_tasks(db: Session = Depends(get_db)):
-    """Get all pending/unassigned tasks for quick assignment"""
+async def get_pending_tasks(db: any = Depends(get_db)):
     try:
-        pending_tasks = db.query(Task).filter(
-            or_(
-                Task.status == 'pending',
-                Task.assigned_to == None,
-                Task.assigned_to == ''
-            ),
-            or_(Task.is_deleted == False, Task.is_deleted == None)
-        ).all()
+        all_tasks = db.query(Task).all()
+        pending = [t for t in all_tasks if not t.is_deleted and (not t.assigned_to or t.status == 'pending')]
         
-        all_users = db.query(User).filter(
-            or_(User.is_deleted == False, User.is_deleted == None),
-            User.approval_status == 'approved'
-        ).all()
+        all_users = db.query(User).all()
         user_map = {u.user_id: u for u in all_users}
-        machines = db.query(Machine).all()
-        machine_map = {m.id: m for m in machines}
+        all_machines = db.query(Machine).all()
+        machine_map = {str(m.id): m for m in all_machines}
         
-        task_list = []
-        for task in pending_tasks:
-            assigned_by_user = user_map.get(task.assigned_by)
-            machine = machine_map.get(task.machine_id)
-            
-            task_list.append({
-                "id": task.id,
-                "title": task.title or "",
-                "project": task.project or "",
-                "description": task.description or "",
-                "priority": task.priority or "medium",
-                "status": task.status or "pending",
-                "machine_id": task.machine_id or "",
-                "machine_name": machine.machine_name if machine else "",
-                "assigned_by": task.assigned_by or "",
-                "assigned_by_name": assigned_by_user.username if assigned_by_user else "",
-                "due_date": task.due_date or "",
-                "created_at": make_aware(task.created_at).isoformat() if task.created_at else None
-            })
-        
-        return task_list
+        return [{
+            "id": str(t.id),
+            "title": t.title or "",
+            "project": t.project or "",
+            "description": t.description or "",
+            "priority": t.priority or "medium",
+            "status": t.status or "pending",
+            "machine_id": str(t.machine_id) if t.machine_id else "",
+            "machine_name": machine_map.get(str(t.machine_id)).machine_name if str(t.machine_id) in machine_map else "",
+            "assigned_by": str(t.assigned_by) if t.assigned_by else "",
+            "assigned_by_name": user_map.get(str(t.assigned_by)).username if str(t.assigned_by) in user_map else "",
+            "due_date": str(t.due_date) if t.due_date else "",
+            "created_at": str(t.created_at) if t.created_at else None
+        } for t in pending]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch pending tasks: {str(e)}")
 
@@ -74,78 +55,78 @@ async def get_pending_tasks(db: Session = Depends(get_db)):
 async def get_running_tasks(
     project_id: Optional[str] = None,
     operator_id: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: any = Depends(get_db)
 ):
     """Get all currently running (in_progress) tasks, optionally filtered"""
     try:
-        from sqlalchemy import or_
-        query = db.query(Task).filter(
-            Task.status == 'in_progress',
-            or_(Task.is_deleted == False, Task.is_deleted == None)
-        )
-
+        all_tasks = db.query(Task).all()
+        running = [t for t in all_tasks if not t.is_deleted and t.status == 'in_progress']
+        
         if project_id and project_id != "all":
+            # Check if project_id is a UUID or a project name
+            is_uuid = False
             try:
                 uuid.UUID(str(project_id))
-                query = query.filter(Task.project_id == project_id) # Filter by UUID
+                is_uuid = True
             except ValueError:
-                query = query.filter(Task.project == project_id) # Filter by Project Name
+                pass
+
+            if is_uuid:
+                running = [t for t in running if str(t.project_id) == str(project_id)]
+            else:
+                running = [t for t in running if str(t.project) == str(project_id)]
         
         if operator_id and operator_id != "all":
-            query = query.filter(Task.assigned_to == operator_id)
+            running = [t for t in running if str(t.assigned_to) == str(operator_id)]
 
-        running_tasks = query.all()
-        
-        all_users = db.query(User).filter(
-            or_(User.is_deleted == False, User.is_deleted == None),
-            User.approval_status == 'approved'
-        ).all()
+        all_users = db.query(User).all()
         user_map = {u.user_id: u for u in all_users}
-        machines = db.query(Machine).all()
-        machine_map = {m.id: m for m in machines}
+        all_machines = db.query(Machine).all()
+        machine_map = {str(m.id): m for m in all_machines}
+        all_holds = db.query(TaskHold).all()
         
         task_list = []
-        for task in running_tasks:
-            operator = user_map.get(task.assigned_to)
-            machine = machine_map.get(task.machine_id)
+        for t in running:
+            operator = user_map.get(str(t.assigned_to))
+            machine = machine_map.get(str(t.machine_id))
             
-            # Calculate duration
+            # Calculate duration (simplified for SheetsDB, assuming total_duration_seconds is available or calculated)
             duration_seconds = 0
-            if task.actual_start_time or task.started_at:
-                start_time = task.actual_start_time or task.started_at
-                start_aware = make_aware(start_time)
+            if t.actual_start_time or t.started_at:
+                start_time = t.actual_start_time or t.started_at
+                start_aware = make_aware(start_time) if isinstance(start_time, datetime) else start_time # Assuming make_aware handles non-datetime
                 now = utc_now()
-                total_elapsed = int((now - start_aware).total_seconds())
-                held_seconds = task.total_held_seconds or 0
+                total_elapsed = int((now - start_aware).total_seconds()) if isinstance(start_aware, datetime) else 0
+                held_seconds = t.total_held_seconds or 0
                 duration_seconds = max(0, total_elapsed - held_seconds)
             
             # Fetch holds for this task
-            hold_history = db.query(TaskHold).filter(TaskHold.task_id == task.id).order_by(TaskHold.hold_started_at.asc()).all()
-            holds = [
+            t_holds = [h for h in all_holds if str(h.task_id) == str(t.id)]
+            holds_serialized = [
                 {
-                    "start": h.hold_started_at.isoformat() if h.hold_started_at else None,
-                    "end": h.hold_ended_at.isoformat() if h.hold_ended_at else None,
-                    "duration_seconds": safe_datetime_diff(h.hold_ended_at, h.hold_started_at) if h.hold_ended_at else 0,
+                    "start": str(h.hold_started_at) if h.hold_started_at else None,
+                    "end": str(h.hold_ended_at) if h.hold_ended_at else None,
+                    "duration_seconds": safe_datetime_diff(h.hold_ended_at, h.hold_started_at) if h.hold_ended_at and h.hold_started_at else 0,
                     "reason": h.hold_reason or ""
                 }
-                for h in hold_history
+                for h in t_holds
             ]
 
             task_list.append({
-                "id": task.id,
-                "title": task.title or "",
-                "project": task.project or "",
-                "operator_id": task.assigned_to or "",
+                "id": str(t.id),
+                "title": t.title or "",
+                "project": t.project or "",
+                "operator_id": str(t.assigned_to) if t.assigned_to else "",
                 "operator_name": operator.full_name if operator and operator.full_name else (operator.username if operator else "Unknown"),
-                "machine_id": task.machine_id or "",
+                "machine_id": str(t.machine_id) if t.machine_id else "",
                 "machine_name": machine.machine_name if machine else "Unknown",
-                "started_at": task.actual_start_time or task.started_at,
-                "actual_start_time": task.actual_start_time,
-                "expected_completion_time": task.expected_completion_time,
+                "started_at": str(t.actual_start_time) if t.actual_start_time else (str(t.started_at) if t.started_at else None),
+                "actual_start_time": str(t.actual_start_time) if t.actual_start_time else None,
+                "expected_completion_time": t.expected_completion_time,
                 "duration_seconds": duration_seconds,
-                "total_held_seconds": task.total_held_seconds or 0,
-                "holds": holds,
-                "due_date": task.due_date,
+                "total_held_seconds": t.total_held_seconds or 0,
+                "holds": holds_serialized,
+                "due_date": str(t.due_date) if t.due_date else None,
                 "status": "in_progress"
             })
         
@@ -158,53 +139,49 @@ async def get_running_tasks(
 async def get_task_status(
     operator_id: Optional[str] = None, 
     project_id: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: any = Depends(get_db)
 ):
     """Get task status breakdown for graph, optionally filtered"""
     try:
         # Get base list of operators
-        operators_query = db.query(User).filter(
-            User.role == 'operator',
-            or_(User.is_deleted == False, User.is_deleted == None),
-            User.approval_status == 'approved'
-        )
+        all_users = db.query(User).all()
+        operators = [u for u in all_users if not u.is_deleted and u.approval_status == 'approved' and u.role == 'operator']
         
         if operator_id and operator_id != "all":
-            operators_query = operators_query.filter(User.user_id == operator_id)
+            operators = [u for u in operators if str(u.user_id) == str(operator_id)]
             
-        operators = operators_query.all()
-        
         # Get Tasks to aggregate
-        tasks_query = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None))
+        all_tasks = db.query(Task).all()
+        tasks_filtered_by_deleted = [t for t in all_tasks if not t.is_deleted]
         
         if project_id and project_id != "all":
+            # Check if project_id is a UUID or a project name
+            is_uuid = False
             try:
                 uuid.UUID(str(project_id))
-                tasks_query = tasks_query.filter(Task.project_id == project_id)
+                is_uuid = True
             except ValueError:
-                tasks_query = tasks_query.filter(Task.project == project_id)
+                pass
+
+            if is_uuid:
+                tasks_filtered_by_deleted = [t for t in tasks_filtered_by_deleted if str(t.project_id) == str(project_id)]
+            else:
+                tasks_filtered_by_deleted = [t for t in tasks_filtered_by_deleted if str(t.project) == str(project_id)]
             
-        all_tasks = tasks_query.all()
-        
         operator_stats = []
         for operator in operators:
             # Filter tasks for this operator from the pre-filtered list
-            operator_tasks = [t for t in all_tasks if t.assigned_to == operator.user_id]
+            operator_tasks = [t for t in tasks_filtered_by_deleted if str(t.assigned_to) == str(operator.user_id)]
             
             completed = len([t for t in operator_tasks if t.status == 'completed'])
             in_progress = len([t for t in operator_tasks if t.status == 'in_progress'])
             pending = len([t for t in operator_tasks if t.status == 'pending'])
             
-            # Don't show operators with zero tasks if filtering by project (unless they are the selected operator)
             total = completed + in_progress + pending
-            # Don't show operators with zero tasks if filtering by project (unless they are the selected operator)
-            total = completed + in_progress + pending
-            # if total == 0 and project_id and project_id != "all" and not operator_id:
-            #      continue
 
             operator_stats.append({
                 "operator": operator.full_name if operator.full_name else operator.username,
-                "operator_id": operator.user_id,
+                "operator_id": str(operator.user_id),
                 "completed": completed,
                 "in_progress": in_progress,
                 "pending": pending,
@@ -219,14 +196,10 @@ async def get_task_status(
 
 
 @router.get("/projects-summary")
-async def get_projects_summary(db: Session = Depends(get_db)):
+async def get_projects_summary(db: any = Depends(get_db)):
     """Get project status distribution for pie chart"""
     try:
-        tasks_with_projects = db.query(Task).filter(
-            Task.project != None, 
-            Task.project != '',
-            or_(Task.is_deleted == False, Task.is_deleted == None)
-        ).all()
+        tasks_with_projects = [t for t in db.query(Task).all() if not t.is_deleted and t.project]
         
         project_map = {}
         for task in tasks_with_projects:
@@ -249,7 +222,7 @@ async def get_projects_summary(db: Session = Depends(get_db)):
             elif all(s == 'pending' for s in statuses):
                 yet_to_start += 1
             else:
-                in_progress += 1
+                in_progress += 1 # Default to in_progress if mixed statuses and not all completed/pending/on_hold
         
         return {
             "yet_to_start": yet_to_start,
@@ -265,45 +238,38 @@ async def get_projects_summary(db: Session = Depends(get_db)):
 async def get_task_stats(
     project: Optional[str] = None, 
     operator_id: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: any = Depends(get_db)
 ):
     """Get task statistics, optionally filtered by project and operator"""
     try:
-        query = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None))
-        
-        # Note: 'project' param refers to project_id in frontend logic usually, but here it was comparing to Task.project (name)
-        # We need to support both or stick to one. The frontend likely sends ID now. 
-        # But wait, looking at the previous code: `query.filter(Task.project == project)` -> this implies Name filtering?
-        # Let's check the Task model: `project = Column(String)`, `project_id = Column(UUID)`.
-        # If frontend sends ID, we should use project_id.
-        # SAFE AUTO-DETECT: Check if 'project' looks like UUID, else use name.
+        all_tasks = db.query(Task).all()
+        tasks_filtered = [t for t in all_tasks if not t.is_deleted]
         
         if project and project != "all":
+            is_uuid = False
             try:
                 uuid.UUID(str(project))
-                query = query.filter(Task.project_id == project)
+                is_uuid = True
             except ValueError:
-                query = query.filter(Task.project == project)
+                pass
+            
+            if is_uuid:
+                tasks_filtered = [t for t in tasks_filtered if str(t.project_id) == str(project)]
+            else:
+                tasks_filtered = [t for t in tasks_filtered if str(t.project) == str(project)]
         
         if operator_id and operator_id != "all":
-             query = query.filter(Task.assigned_to == operator_id)
+             tasks_filtered = [t for t in tasks_filtered if str(t.assigned_to) == str(operator_id)]
 
-        all_tasks = query.all()
+        total = len(tasks_filtered)
+        pending = len([t for t in tasks_filtered if t.status == 'pending'])
+        in_progress = len([t for t in tasks_filtered if t.status == 'in_progress'])
+        completed = len([t for t in tasks_filtered if t.status == 'completed'])
+        on_hold = len([t for t in tasks_filtered if t.status == 'on_hold'])
         
-        total = len(all_tasks)
-        pending = len([t for t in all_tasks if t.status == 'pending'])
-        in_progress = len([t for t in all_tasks if t.status == 'in_progress'])
-        completed = len([t for t in all_tasks if t.status == 'completed'])
-        on_hold = len([t for t in all_tasks if t.status == 'on_hold'])
-        
-        # Get list of all projects for dropdown (Always return ALL available projects, not filtered ones)
-        # Using project_id and project name
         # Get list of all projects for dropdown from Project table
-        projects_query = db.query(Project.project_name).filter(
-             or_(Project.is_deleted == False, Project.is_deleted == None)
-        ).distinct().all()
-        
-        project_names = [p[0] for p in projects_query if p[0]]
+        all_projects = db.query(Project).all()
+        project_names = sorted(list(set([p.project_name for p in all_projects if not p.is_deleted and p.project_name])))
         
         return {
             "total_tasks": total,
@@ -321,16 +287,16 @@ async def get_task_stats(
 @router.post("/assign-task")
 async def assign_task(
     request: AssignTaskRequest, 
-    db: Session = Depends(get_db),
+    db: any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Assign a task to an operator"""
     try:
-        task = db.query(Task).filter(Task.id == request.task_id).first()
+        task = db.query(Task).filter(id=request.task_id).first()
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
         
-        operator = db.query(User).filter(User.user_id == request.operator_id).first()
+        operator = db.query(User).filter(user_id=request.operator_id).first()
         if not operator:
             raise HTTPException(status_code=404, detail="Operator not found")
         
@@ -348,36 +314,31 @@ async def assign_task(
         if request.expected_completion_time is not None:
             task.expected_completion_time = request.expected_completion_time
         if request.due_date:
-            task.due_date = request.due_date
+            task.due_date = request.due_date.isoformat() # Store as ISO string
         
-        db.commit()
-        db.refresh(task)
+        db.commit() # Assuming commit handles updates to existing objects
         
         return {
             "message": "Task assigned successfully",
             "task": {
-                "id": task.id,
+                "id": str(task.id),
                 "title": task.title,
-                "assigned_to": task.assigned_to,
+                "assigned_to": str(task.assigned_to),
                 "status": task.status
             }
         }
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
+        db.rollback() # Assuming SheetsDB has a rollback mechanism
         raise HTTPException(status_code=500, detail=f"Failed to assign task: {str(e)}")
 
 
 @router.get("/project-summary")
-async def get_project_summary(db: Session = Depends(get_db)):
+async def get_project_summary(db: any = Depends(get_db)):
     """Get project summary metrics"""
     try:
-        tasks_with_projects = db.query(Task).filter(
-            Task.project != None, 
-            Task.project != '',
-            or_(Task.is_deleted == False, Task.is_deleted == None)
-        ).all()
+        tasks_with_projects = [t for t in db.query(Task).all() if not t.is_deleted and t.project]
         
         project_map = {}
         for task in tasks_with_projects:
@@ -398,7 +359,7 @@ async def get_project_summary(db: Session = Depends(get_db)):
             elif all(s == 'pending' for s in statuses):
                 pending_projects += 1
             else:
-                active_projects += 1
+                active_projects += 1 # Mixed statuses, not all pending, not all completed
         
         return {
             "total_projects": total_projects,
@@ -411,21 +372,15 @@ async def get_project_summary(db: Session = Depends(get_db)):
 
 
 @router.get("/priority-task-status")
-async def get_priority_task_status(db: Session = Depends(get_db)):
+async def get_priority_task_status(db: any = Depends(get_db)):
     """Get task counts by priority level"""
     try:
-        high = db.query(Task).filter(
-            func.upper(Task.priority) == 'HIGH',
-            or_(Task.is_deleted == False, Task.is_deleted == None)
-        ).count()
-        medium = db.query(Task).filter(
-            func.upper(Task.priority) == 'MEDIUM',
-            or_(Task.is_deleted == False, Task.is_deleted == None)
-        ).count()
-        low = db.query(Task).filter(
-            func.upper(Task.priority) == 'LOW',
-            or_(Task.is_deleted == False, Task.is_deleted == None)
-        ).count()
+        all_tasks = db.query(Task).all()
+        tasks_filtered = [t for t in all_tasks if not t.is_deleted]
+
+        high = len([t for t in tasks_filtered if str(t.priority).upper() == 'HIGH'])
+        medium = len([t for t in tasks_filtered if str(t.priority).upper() == 'MEDIUM'])
+        low = len([t for t in tasks_filtered if str(t.priority).upper() == 'LOW'])
         
         return {
             "high": high,

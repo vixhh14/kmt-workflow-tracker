@@ -1,22 +1,19 @@
-"""
-User Skills Router - API endpoints for user-machine skill mapping
-"""
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime
-from sqlalchemy.orm import Session
+import uuid
 from ..core.database import get_db
 from ..models.models_db import UserMachine as UserMachineModel
 
 router = APIRouter(prefix="/api/user-skills", tags=["user-skills"])
 
 class UserMachine(BaseModel):
-    id: int
+    id: str
     user_id: str
     machine_id: str
     skill_level: str
-    created_at: Optional[datetime] = None
+    created_at: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -28,29 +25,31 @@ class UserMachinesBulk(BaseModel):
     machines: List[UserMachineCreate]
 
 @router.get("/{user_id}/machines", response_model=List[UserMachine])
-async def get_user_machines(user_id: str, db: Session = Depends(get_db)):
+async def get_user_machines(user_id: str, db: Any = Depends(get_db)):
     """Get all machines a user can operate"""
-    machines = db.query(UserMachineModel).filter(UserMachineModel.user_id == user_id).all()
+    all_skills = db.query(UserMachineModel).all()
+    machines = [s for s in all_skills if str(s.user_id) == str(user_id)]
+    for m in machines:
+        m.id = str(m.id)
     return machines
 
 @router.post("/{user_id}/machines")
-async def add_user_machines(user_id: str, data: UserMachinesBulk, db: Session = Depends(get_db)):
+async def add_user_machines(user_id: str, data: UserMachinesBulk, db: Any = Depends(get_db)):
     """Add multiple machine skills for a user"""
     try:
+        all_skills = db.query(UserMachineModel).all()
         for machine in data.machines:
-            # Check if exists
-            existing = db.query(UserMachineModel).filter(
-                UserMachineModel.user_id == user_id,
-                UserMachineModel.machine_id == machine.machine_id
-            ).first()
+            existing = next((s for s in all_skills if str(s.user_id) == str(user_id) and str(s.machine_id) == str(machine.machine_id)), None)
             
             if existing:
                 existing.skill_level = machine.skill_level
             else:
                 new_skill = UserMachineModel(
+                    id=str(uuid.uuid4()),
                     user_id=user_id,
                     machine_id=machine.machine_id,
-                    skill_level=machine.skill_level
+                    skill_level=machine.skill_level,
+                    created_at=datetime.now().isoformat()
                 )
                 db.add(new_skill)
         
@@ -61,16 +60,10 @@ async def add_user_machines(user_id: str, data: UserMachinesBulk, db: Session = 
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.delete("/{user_id}/machines/{machine_id}")
-async def remove_user_machine(user_id: str, machine_id: str, db: Session = Depends(get_db)):
+async def remove_user_machine(user_id: str, machine_id: str, db: Any = Depends(get_db)):
     """Remove a machine skill from user"""
-    # Note: machine_id in path is str, but in model it is String.
-    # The original code had machine_id: int in the function signature but the SQL used it as is.
-    # Machines table id is String. UserMachine machine_id is String.
-    
-    skill = db.query(UserMachineModel).filter(
-        UserMachineModel.user_id == user_id,
-        UserMachineModel.machine_id == machine_id
-    ).first()
+    all_skills = db.query(UserMachineModel).all()
+    skill = next((s for s in all_skills if str(s.user_id) == str(user_id) and str(s.machine_id) == str(machine_id)), None)
     
     if skill:
         db.delete(skill)

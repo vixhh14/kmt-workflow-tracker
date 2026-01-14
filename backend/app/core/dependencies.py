@@ -1,20 +1,14 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
-from sqlalchemy import or_
 from app.core.database import get_db
 from app.core.auth_utils import decode_access_token
 from app.models.models_db import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-
-# -------------------------
-# Base Authentication: Check JWT and return logged-in user
-# -------------------------
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+    db: any = Depends(get_db)
 ):
     payload = decode_access_token(token)
     
@@ -34,10 +28,8 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    user = db.query(User).filter(
-        User.username == username, 
-        or_(User.is_deleted == False, User.is_deleted == None)
-    ).first()
+    all_users = db.query(User).all()
+    user = next((u for u in all_users if u.username == username and not u.is_deleted), None)
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

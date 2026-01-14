@@ -1,80 +1,71 @@
-from sqlalchemy.orm import Session, aliased
-from sqlalchemy import and_, or_, func
-from datetime import datetime, date
-from app.models.models_db import Attendance, User
-from typing import Optional
-from app.core.time_utils import get_current_time_ist, get_today_date_ist
 
-def mark_present(db: Session, user_id: str, ip_address: Optional[str] = None) -> dict:
+from datetime import datetime, date
+from typing import Optional, List, Dict, Any
+from app.models.models_db import Attendance, User
+from app.core.time_utils import get_current_time_ist, get_today_date_ist
+from app.core.sheets_db import SheetsDB
+
+def mark_present(db: SheetsDB, user_id: str, ip_address: Optional[str] = None) -> dict:
     """
     Mark user as present for today (IST). Idempotent.
     """
     try:
         today = get_today_date_ist()
         now_ist = get_current_time_ist()
+        today_str = today.isoformat()
         
         # Check if attendance record already exists for this user today
-        existing_attendance = db.query(Attendance).filter(
-            and_(
-                Attendance.user_id == user_id,
-                Attendance.date == today
-            )
-        ).first()
-        
-        # Note: We now store Aware IST time in DateTime(timezone=True) column
+        all_att = db.query(Attendance).all()
+        # Note: Sheets store dates as strings often
+        existing_attendance = next((a for a in all_att if str(a.user_id) == str(user_id) and str(a.date).split('T')[0] == today_str), None)
         
         if existing_attendance:
             # Update existing record
             existing_attendance.login_time = now_ist
             existing_attendance.status = 'Present'
             
-            # Set check_in only if not already set
             if not existing_attendance.check_in:
                 existing_attendance.check_in = now_ist
             
-            # Update IP if provided
             if ip_address:
                 existing_attendance.ip_address = ip_address
             
             db.commit()
-            db.refresh(existing_attendance)
             
             return {
                 "success": True,
                 "message": "Attendance updated",
                 "is_new": False,
                 "attendance_id": existing_attendance.id,
-                "date": today.isoformat(),
-                "check_in": existing_attendance.check_in.isoformat() if existing_attendance.check_in else None,
-                "login_time": existing_attendance.login_time.isoformat() if existing_attendance.login_time else None
+                "date": today_str,
+                "check_in": existing_attendance.check_in.isoformat() if hasattr(existing_attendance.check_in, "isoformat") else str(existing_attendance.check_in),
+                "login_time": existing_attendance.login_time.isoformat() if hasattr(existing_attendance.login_time, "isoformat") else str(existing_attendance.login_time)
             }
         else:
             # Create new attendance record
-            new_attendance = Attendance(
-                user_id=user_id,
-                date=today,
-                check_in=now_ist,
-                login_time=now_ist,
-                status='Present',
-                ip_address=ip_address
-            )
-            
-            db.add(new_attendance)
-            db.commit()
-            db.refresh(new_attendance)
+            new_id = f"att_{int(datetime.now().timestamp())}_{user_id}"
+            new_data = {
+                "id": new_id,
+                "user_id": user_id,
+                "date": today_str,
+                "check_in": now_ist.isoformat(),
+                "login_time": now_ist.isoformat(),
+                "status": 'Present',
+                "ip_address": ip_address
+            }
+            db.add({"__tablename__": "Attendance", **new_data})
             
             return {
                 "success": True,
                 "message": "Attendance recorded",
                 "is_new": True,
-                "attendance_id": new_attendance.id,
-                "date": today.isoformat(),
-                "check_in": new_attendance.check_in.isoformat() if new_attendance.check_in else None,
-                "login_time": new_attendance.login_time.isoformat() if new_attendance.login_time else None
+                "attendance_id": new_id,
+                "date": today_str,
+                "check_in": now_ist.isoformat(),
+                "login_time": now_ist.isoformat()
             }
     
     except Exception as e:
-        db.rollback()
         return {
             "success": False,
             "message": f"Failed to mark attendance: {str(e)}",
@@ -82,20 +73,17 @@ def mark_present(db: Session, user_id: str, ip_address: Optional[str] = None) ->
         }
 
 
-def mark_checkout(db: Session, user_id: str) -> dict:
+def mark_checkout(db: SheetsDB, user_id: str) -> dict:
     """
     Mark user as checked out for today (IST).
     """
     try:
         today = get_today_date_ist()
         now_ist = get_current_time_ist()
+        today_str = today.isoformat()
         
-        attendance = db.query(Attendance).filter(
-            and_(
-                Attendance.user_id == user_id,
-                Attendance.date == today
-            )
-        ).first()
+        all_att = db.query(Attendance).all()
+        attendance = next((a for a in all_att if str(a.user_id) == str(user_id) and str(a.date).split('T')[0] == today_str), None)
         
         if not attendance:
             return {
@@ -103,29 +91,25 @@ def mark_checkout(db: Session, user_id: str) -> dict:
                 "message": "No attendance record found for today"
             }
         
-        # Only set check_out if not already set
         if not attendance.check_out:
             attendance.check_out = now_ist
-            
             db.commit()
-            db.refresh(attendance)
             
             return {
                 "success": True,
                 "message": "Check-out recorded",
                 "attendance_id": attendance.id,
-                "check_out": attendance.check_out.isoformat() if attendance.check_out else None
+                "check_out": now_ist.isoformat()
             }
         else:
             return {
                 "success": True,
                 "message": "Already checked out",
                 "attendance_id": attendance.id,
-                "check_out": attendance.check_out.isoformat() if attendance.check_out else None
+                "check_out": str(attendance.check_out)
             }
     
     except Exception as e:
-        db.rollback()
         return {
             "success": False,
             "message": f"Failed to record check-out: {str(e)}",
@@ -133,91 +117,68 @@ def mark_checkout(db: Session, user_id: str) -> dict:
         }
 
 
-def get_attendance_summary(db: Session, target_date: Optional[date] = None) -> dict:
+def get_attendance_summary(db: SheetsDB, target_date: Optional[date] = None) -> dict:
     """
     Get attendance summary for a specific date (defaults to today IST).
-    Uses Left Join to get all users and their attendance.
     """
     try:
         if target_date is None:
             target_date = get_today_date_ist()
-            
-        # Join User and Attendance
-        # We want ALL relevant active users and their attendance for the target date.
-        # Enforcing is_deleted = False strictly.
-        results = db.query(User, Attendance).outerjoin(
-            Attendance, 
-            and_(
-                User.user_id == Attendance.user_id,
-                Attendance.date == target_date
-            )
-        ).filter(
-            or_(User.is_deleted == False, User.is_deleted == None),
-            User.approval_status == 'approved',
-            func.lower(User.role).in_(['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master'])
-        ).all()
         
-        print(f"📊 Attendance Scan for {target_date}: Found {len(results)} active users in tracked roles.")
+        target_date_str = target_date.isoformat()
+            
+        # Get all users and filter by tracked roles
+        tracked_roles = ['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master']
+        all_users = db.query(User).filter(is_deleted=False, approval_status='approved').all()
+        active_users = [u for u in all_users if str(u.role).lower() in tracked_roles]
+        
+        # Get all attendance for target date
+        all_att = db.query(Attendance).all()
+        attendance_map = {str(a.user_id): a for a in all_att if str(a.date).split('T')[0] == target_date_str}
         
         present_users = []
         absent_users = []
         records = []
         
-        present_count = 0
-        seen_user_ids = set()
-        
-        for user, attendance in results:
-            # Prevent duplicate counting/listing if join returns multiple rows for same user
-            if user.user_id in seen_user_ids:
-                continue
-            seen_user_ids.add(user.user_id)
-            
+        for user in active_users:
+            user_id_str = str(user.user_id)
             user_info = {
-                "id": user.user_id,
+                "id": user_id_str,
                 "name": user.full_name if user.full_name else user.username,
                 "username": user.username,
                 "role": user.role,
                 "unit_id": user.unit_id
             }
             
-            if attendance and attendance.status == 'Present' and attendance.date == target_date:
-                # User is present
+            attendance = attendance_map.get(user_id_str)
+            
+            if attendance and attendance.status == 'Present':
                 att_data = {
-                    "status": attendance.status,
-                    "check_in": attendance.check_in.isoformat() if attendance.check_in else None,
-                    "check_out": attendance.check_out.isoformat() if attendance.check_out else None,
-                    "login_time": attendance.login_time.isoformat() if attendance.login_time else None
+                    "status": "Present",
+                    "check_in": str(attendance.check_in) if attendance.check_in else None,
+                    "check_out": str(attendance.check_out) if attendance.check_out else None,
+                    "login_time": str(attendance.login_time) if attendance.login_time else None
                 }
-                
-                # Add to present list
-                p_user = {**user_info, **att_data}
-                present_users.append(p_user)
-                
-                # Add to records (flat list for table)
+                present_users.append({**user_info, **att_data})
                 records.append({
-                    "user_id": user.user_id,
-                    "user": user.full_name if user.full_name else user.username,
+                    "user_id": user_id_str,
+                    "user": user_info["name"],
                     "username": user.username,
                     "role": user.role,
                     "check_in": att_data['check_in'],
                     "check_out": att_data['check_out'],
-                    "status": att_data['status'],
-                    "date": target_date.isoformat()
+                    "status": "Present",
+                    "date": target_date_str
                 })
-                
-                present_count += 1
             else:
-                # User is absent
                 absent_users.append(user_info)
-        
-        total_active_users = len(seen_user_ids)
         
         return {
             "success": True,
-            "date": target_date.isoformat(),
-            "present": present_count,
+            "date": target_date_str,
+            "present": len(present_users),
             "absent": len(absent_users),
-            "total_users": total_active_users,
+            "total_users": len(active_users),
             "present_users": present_users,
             "absent_users": absent_users,
             "records": records

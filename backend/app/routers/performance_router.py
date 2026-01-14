@@ -1,116 +1,37 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import func, extract, text
 from typing import List, Optional
 from datetime import datetime
 from app.core.database import get_db
-from app.core.dependencies import get_current_active_admin
-from app.models.models_db import Task, TaskHold, User
+from app.core.dependencies import get_current_user, get_current_active_admin
+from app.models.models_db import Task, Machine, User, TaskHold
 
-router = APIRouter(
-    prefix="/admin/performance",
-    tags=["admin-performance"],
-    dependencies=[Depends(get_current_active_admin)]
-)
+router = APIRouter(prefix="/performance", tags=["Performance"])
 
-@router.get("")
-async def get_monthly_performance(
-    user_id: str,
-    year: int,
-    month: int,
-    db: Session = Depends(get_db)
-):
-    """
-    Get monthly performance report for a specific user.
-    Returns aggregated stats and per-task details.
-    """
-    # Verify user exists
-    user = db.query(User).filter(User.user_id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+@router.get("/machine/{machine_id}")
+async def get_machine_performance(machine_id: str, db: any = Depends(get_db)):
+    tasks = [t for t in db.query(Task).all() if not t.is_deleted and str(t.machine_id) == str(machine_id) and str(t.status).lower() == 'completed']
+    total_duration = sum(int(t.total_duration_seconds or 0) for t in tasks)
+    return {"machine_id": machine_id, "tasks_completed": len(tasks), "total_runtime_seconds": total_duration}
 
-    # Fetch tasks for the user in the specified month/year
-    # We filter by created_at or actual_start_time? Usually performance is based on completion or work done in that month.
-    # Let's filter by tasks that were active or completed in that month.
-    # For simplicity, let's stick to tasks *completed* in that month or *started* in that month?
-    # Request says "performance report", usually implies completed work.
-    # But let's include all tasks that have activity in that month.
-    # To keep it efficient and simple matching the request: "per-task rows... summary cards"
+@router.get("/user/{user_id}")
+async def get_user_performance(user_id: str, db: any = Depends(get_db), current_admin: User = Depends(get_current_active_admin)):
+    tasks = [t for t in db.query(Task).all() if not t.is_deleted and str(t.assigned_to) == str(user_id) and str(t.status).lower() == 'completed']
+    total_duration = sum(int(t.total_duration_seconds or 0) for t in tasks)
+    return {"user_id": user_id, "tasks_completed": len(tasks), "total_work_seconds": total_duration}
+
+@router.get("/details")
+async def get_detailed_performance(user_id: str, year: int, month: int, db: any = Depends(get_db)):
+    pat = f"{year}-{month:02d}"
+    tasks = [t for t in db.query(Task).all() if str(t.assigned_to) == str(user_id) and not t.is_deleted and str(t.created_at).startswith(pat)]
+    holds = db.query(TaskHold).all()
     
-    # Let's query tasks assigned to user and created or updated in that month
-    from sqlalchemy import or_
-    tasks_query = db.query(Task).filter(
-        Task.assigned_to == user_id,
-        extract('month', Task.created_at) == month,
-        extract('year', Task.created_at) == year,
-        or_(Task.is_deleted == False, Task.is_deleted == None)
-    ).all()
-    
-    # If we want tasks *completed* in that month regardless of creation:
-    # tasks_query = db.query(Task).filter(
-    #     Task.assigned_to == user_id,
-    #     extract('month', Task.completed_at) == month,
-    #     extract('year', Task.completed_at) == year,
-    #     Task.status == 'completed'
-    # ).all()
-    
-    # Let's stick to the user request context: "monthly performance". 
-    # Usually means what did they do this month.
-    # I will return tasks that were COMPLETED in this month, plus tasks currently IN PROGRESS or ON HOLD created this month.
-    
-    tasks = tasks_query # Using created_at filter for now as it's safer for "tasks assigned this month"
-    
-    total_tasks = len(tasks)
-    completed_tasks = [t for t in tasks if t.status == 'completed']
-    completed_count = len(completed_tasks)
-    
-    total_duration_seconds = sum(t.total_duration_seconds or 0 for t in completed_tasks)
-    total_held_seconds = sum(t.total_held_seconds or 0 for t in tasks)
-    
-    avg_completion_time = total_duration_seconds / completed_count if completed_count > 0 else 0
-    
-    # New Formula: ((completed / total) * 100) - 2
-    actual_percent = (completed_count / total_tasks * 100) if total_tasks > 0 else 0
-    completion_percentage = max(0, round(actual_percent - 2, 2)) if total_tasks > 0 else 0
-    
-    # Prepare per-task details with holds
-    task_details = []
+    res = []
     for t in tasks:
-        # Get holds for this task
-        holds = db.query(TaskHold).filter(TaskHold.task_id == t.id).all()
-        hold_data = [
-            {
-                "start": h.hold_started_at.isoformat() if h.hold_started_at else None,
-                "end": h.hold_ended_at.isoformat() if h.hold_ended_at else None,
-                "reason": h.hold_reason,
-                "duration_seconds": int((h.hold_ended_at - h.hold_started_at).total_seconds()) if h.hold_ended_at and h.hold_started_at else None
-            }
-            for h in holds
-        ]
-        
-        task_details.append({
-            "task_id": t.id,
-            "title": t.title,
-            "status": t.status,
-            "actual_start_time": t.actual_start_time.isoformat() if t.actual_start_time else None,
-            "actual_end_time": t.actual_end_time.isoformat() if t.actual_end_time else None,
-
-            "total_duration_seconds": t.total_duration_seconds,
-            "total_held_seconds": t.total_held_seconds,
-            "holds": hold_data
+        t_holds = [h for h in holds if str(h.task_id) == str(t.id)]
+        res.append({
+            "id": str(t.id), "title": str(t.title), "status": str(t.status),
+            "duration": int(t.total_duration_seconds or 0),
+            "held": int(t.total_held_seconds or 0),
+            "holds": [{"start": str(h.hold_started_at), "end": str(h.hold_ended_at), "reason": str(h.hold_reason)} for h in t_holds]
         })
-        
-    return {
-        "summary": {
-            "user_id": user.user_id,
-            "username": user.username,
-            "month": month,
-            "year": year,
-            "total_tasks": total_tasks,
-            "completed_tasks": completed_count,
-            "avg_completion_time_seconds": round(avg_completion_time, 2),
-            "total_held_seconds": total_held_seconds,
-            "completion_percentage": round(completion_percentage, 2)
-        },
-        "tasks": task_details
-    }
+    return res

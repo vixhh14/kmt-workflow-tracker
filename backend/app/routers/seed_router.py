@@ -1,9 +1,4 @@
-"""
-Router for seeding machines and migrating passwords.
-This provides admin-only endpoints for database management.
-"""
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.models_db import Machine, MachineCategory, User
 from app.core.dependencies import get_current_user
@@ -12,219 +7,92 @@ import uuid
 import secrets
 import string
 import os
+from datetime import datetime
 
 router = APIRouter(prefix="/seed", tags=["seed"])
 
-# Migration secret - set this as environment variable for security
 MIGRATION_SECRET = os.getenv("MIGRATION_SECRET", "change-this-in-production")
 
+UNIT_1_MACHINES = [
+    ("Hand Grinder", "Grinder"), ("Bench Grinder", "Grinder"), ("Tool and Cutter Grinder", "Grinder"),
+    ("Turnmaster", "Lathe"), ("Leader", "Lathe"), ("Bandsaw Cutting Manual", "Material Cutting"),
+    ("Bandsaw Cutting Auto", "Material Cutting"), ("VMC Pilot", "VMC"), ("ESTEEM DRO", "Milling"),
+    ("FW Horizontal", "Milling"), ("Arno", "Milling"), ("BFW No 2", "Milling"),
+    ("Engraving Machine", "Engraving"), ("Delapena Honing Machine", "Honing"), ("Buffing Machine", "Buffing"),
+    ("Tooth Rounding Machine", "Tooth Rounding"), ("Lapping Machine", "Lapping"), ("Hand Drilling 1", "Drilling"),
+    ("Hand Drilling 2", "Drilling"), ("Hand Grinding 1", "Grinder"), ("Hand Grinding 2", "Grinder"),
+    ("Hitachi Cutting Machine", "Material Cutting"), ("HMT Rack Cutting", "Rack Cutting"), ("L Rack Cutting", "Rack Cutting"),
+    ("Reinecker", "Lathe"), ("Zimberman", "CNC"), ("EIFCO Stationary Drilling", "Drilling")
+]
+
+UNIT_2_MACHINES = [
+    ("Gas Cutting", "Material Cutting"), ("Tig Welding", "Welding"), ("CO2 Welding LD", "Welding"),
+    ("CO2 Welding HD", "Welding"), ("PSG", "Lathe"), ("Ace Superjobber", "CNC"),
+    ("Slotting Machine", "Slotting"), ("Surface Grinding", "Grinding"), ("Thakur Drilling", "Drilling"),
+    ("Toolvasor Magnetic Drilling", "Drilling"), ("EIFCO Radial Drilling", "Drilling")
+]
 
 def generate_secure_password(length=12):
-    """Generate a secure password meeting all requirements."""
-    uppercase = string.ascii_uppercase
-    lowercase = string.ascii_lowercase
-    digits = string.digits
-    special = "!@#$%^&*"
-    
-    password = [
-        secrets.choice(uppercase),
-        secrets.choice(lowercase),
-        secrets.choice(digits),
-        secrets.choice(special),
-    ]
-    
-    all_chars = uppercase + lowercase + digits + special
-    password.extend(secrets.choice(all_chars) for _ in range(length - 4))
-    
-    password_list = list(password)
-    secrets.SystemRandom().shuffle(password_list)
-    
-    return ''.join(password_list)
+    chars = string.ascii_letters + string.digits + "!@#$%^&*"
+    return ''.join(secrets.choice(chars) for _ in range(length))
 
-
-@router.post("/migrate-passwords")
-async def migrate_passwords(
-    secret: str = Query(..., description="Migration secret key"),
-    db: Session = Depends(get_db)
-):
-    """
-    One-time endpoint to migrate demo user passwords to secure ones.
-    
-    SECURITY: Requires a secret key to execute.
-    Set MIGRATION_SECRET environment variable in production.
-    
-    Usage: POST /seed/migrate-passwords?secret=your-secret-key
-    """
-    # Verify secret
-    if secret != MIGRATION_SECRET:
-        raise HTTPException(status_code=403, detail="Invalid migration secret")
-    
-    # Fixed secure passwords (matching the ones shared with user)
-    fixed_passwords = {
-        'admin': 'Admin@Secure2024!',
-        'operator': 'Operator#Safe99',
-        'supervisor': 'Super$Visor88',
-        'planning': 'Plan%Ning77'
-    }
-    
-    demo_usernames = ['admin', 'operator', 'supervisor', 'planning']
-    migrated_users = []
-    
-    try:
-        for username in demo_usernames:
-            user = db.query(User).filter(User.username == username).first()
-            
-            if user:
-                # Use fixed secure password
-                new_password = fixed_passwords.get(username, generate_secure_password())
-                user.password_hash = hash_password(new_password)
-                
-                migrated_users.append({
-                    "username": username,
-                    "new_password": new_password,
-                    "role": user.role,
-                    "email": user.email
-                })
+def get_or_create_category(db: any, category_name: str) -> any:
+    all_cats = db.query(MachineCategory).all()
+    cat = next((c for c in all_cats if str(getattr(c, 'name', '')).lower() == category_name.lower()), None)
+    if not cat:
+        try:
+            max_id = max([int(c.id) for c in all_cats if str(getattr(c, 'id', '')).isdigit()] + [0])
+            new_id = str(max_id + 1)
+        except: new_id = str(uuid.uuid4())
         
+        cat = MachineCategory(id=new_id, name=category_name, description=f"{category_name} machines", created_at=datetime.now().isoformat())
+        db.add(cat)
         db.commit()
-        
-        return {
-            "success": True,
-            "message": "SAVE THESE CREDENTIALS! They won't be shown again.",
-            "warning": "Delete this endpoint after use for security!",
-            "migrated_count": len(migrated_users),
-            "credentials": migrated_users
-        }
-        
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
-
-# Unit 1 Machines
-UNIT_1_MACHINES = [
-    ("Hand Grinder", "Grinder"),
-    ("Bench Grinder", "Grinder"),
-    ("Tool and Cutter Grinder", "Grinder"),
-    ("Turnmaster", "Lathe"),
-    ("Leader", "Lathe"),
-    ("Bandsaw cutting Manual", "Material Cutting"),
-    ("Bandsaw cutting Auto", "Material Cutting"),
-    ("VMC Pilot", "VMC"),
-    ("ESTEEM DRO", "Milling"),
-    ("FW Horizontal", "Milling"),
-    ("Arno", "Milling"),
-    ("BFW No 2", "Milling"),
-    ("Engraving Machine", "Engraving"),
-    ("Delapena Honing Machine", "Honing"),
-    ("Buffing Machine", "Buffing"),
-    ("Tooth Rounding Machine", "Tooth Rounding"),
-    ("Lapping Machine", "Lapping"),
-    ("Hand Drilling 2", "Drilling"),
-    ("Hand Drilling 1", "Drilling"),
-    ("Hand Grinding 2", "Grinder"),
-    ("Hand Grinding 1", "Grinder"),
-    ("Hitachi Cutting Machine", "Material Cutting"),
-    ("HMT Rack Cutting", "Rack Cutting"),
-    ("L Rack Cutting", "Rack Cutting"),
-    ("Reinecker", "Lathe"),
-    ("Zimberman", "CNC"),
-    ("EIFCO Stationary Drilling", "Drilling"),
-]
-
-# Unit 2 Machines
-UNIT_2_MACHINES = [
-    ("Gas Cutting", "Material Cutting"),
-    ("Tig Welding", "Welding"),
-    ("CO2 Welding LD", "Welding"),
-    ("CO2 Welding HD", "Welding"),
-    ("PSG", "Lathe"),
-    ("Ace Superjobber", "CNC"),
-    ("Slotting Machine", "Slotting"),
-    ("Surface Grinding", "Grinding"),
-    ("Thakur Drilling", "Drilling"),
-    ("Toolvasor Magnetic Drilling", "Drilling"),
-    ("EIFCO Radial Drilling", "Drilling"),
-]
-
-
-def get_or_create_category(db: Session, category_name: str) -> MachineCategory:
-    """Get existing category or create new one."""
-    category = db.query(MachineCategory).filter(MachineCategory.name == category_name).first()
-    if not category:
-        category = MachineCategory(name=category_name, description=f"{category_name} machines")
-        db.add(category)
-        db.commit()
-        db.refresh(category)
-    return category
-
+    return cat
 
 @router.post("/machines")
-async def seed_machines(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Seed the database with production machines.
-    This will DELETE all existing machines and add the new ones.
-    Admin only endpoint.
-    """
-    # Check if user is admin
+async def seed_machines(db: any = Depends(get_db), current_user: User = Depends(get_current_user)):
     if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Only admin can seed machines")
+        raise HTTPException(status_code=403, detail="Only admin can seed")
     
     try:
-        # Step 1: Delete all existing machines
-        deleted_count = db.query(Machine).delete()
-        db.commit()
+        # Clear existing via soft delete
+        existing = db.query(Machine).all()
+        for m in existing:
+            db.delete(m, soft=False) # Hard delete for seeding? Non-destructive is better but here we usually re-init
         
-        added_machines = []
-        
-        # Step 2: Add Unit 1 machines
-        for name, category_name in UNIT_1_MACHINES:
-            category = get_or_create_category(db, category_name)
+        added = []
+        for name, cat_name in UNIT_1_MACHINES:
+            cat = get_or_create_category(db, cat_name)
+            m = Machine(id=str(uuid.uuid4()), machine_name=name, status="active", hourly_rate=0.0, category_id=str(cat.id), unit_id="1", is_deleted=False, created_at=datetime.now().isoformat())
+            db.add(m)
+            added.append(name)
             
-            machine = Machine(
-                id=str(uuid.uuid4()),
-                machine_name=name,
-                status="active",
-                hourly_rate=0.0,
-                category_id=category.id,
-                unit_id=1  # Unit 1
-            )
-            db.add(machine)
-            added_machines.append({"name": name, "category": category_name, "unit": 1})
-        
-        # Step 3: Add Unit 2 machines
-        for name, category_name in UNIT_2_MACHINES:
-            category = get_or_create_category(db, category_name)
+        for name, cat_name in UNIT_2_MACHINES:
+            cat = get_or_create_category(db, cat_name)
+            m = Machine(id=str(uuid.uuid4()), machine_name=name, status="active", hourly_rate=0.0, category_id=str(cat.id), unit_id="2", is_deleted=False, created_at=datetime.now().isoformat())
+            db.add(m)
+            added.append(name)
             
-            machine = Machine(
-                id=str(uuid.uuid4()),
-                machine_name=name,
-                status="active",
-                hourly_rate=0.0,
-                category_id=category.id,
-                unit_id=2  # Unit 2
-            )
-            db.add(machine)
-            added_machines.append({"name": name, "category": category_name, "unit": 2})
-        
         db.commit()
-        
-        # Get totals
-        total_machines = db.query(Machine).count()
-        total_categories = db.query(MachineCategory).count()
-        
-        return {
-            "success": True,
-            "message": "Machines seeded successfully",
-            "deleted_count": deleted_count,
-            "added_count": len(added_machines),
-            "total_machines": total_machines,
-            "total_categories": total_categories,
-            "machines": added_machines
-        }
-        
+        return {"count": len(added), "machines": added}
     except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to seed machines: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/migrate-passwords")
+async def migrate_passwords(secret: str = Query(..., description="Migration secret"), db: any = Depends(get_db)):
+    if secret != MIGRATION_SECRET: raise HTTPException(status_code=403, detail="Invalid secret")
+    
+    fixed = {'admin': 'Admin@Secure2024!', 'operator': 'Operator#Safe99', 'supervisor': 'Super$Visor88', 'planning': 'Plan%Ning77'}
+    all_u = db.query(User).all()
+    migrated = []
+    
+    for username, pw in fixed.items():
+        u = next((user for user in all_u if str(getattr(user, 'username', '')).lower() == username.lower()), None)
+        if u:
+            u.password_hash = hash_password(pw)
+            u.updated_at = datetime.now().isoformat()
+            migrated.append(username)
+    
+    db.commit()
+    return {"migrated": migrated}

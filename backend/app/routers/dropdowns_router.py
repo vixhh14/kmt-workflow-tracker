@@ -1,6 +1,4 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
 from app.models.models_db import Project, Machine, User
@@ -21,46 +19,34 @@ class UserDropdownItem(BaseModel):
 
 @router.get("/projects", response_model=List[DropdownItem])
 async def get_projects_dropdown(
-    db: Session = Depends(get_db),
+    db: any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Return projects where is_deleted = false"""
-    projects = db.query(Project).filter(or_(Project.is_deleted == False, Project.is_deleted == None)).all()
-    return [{"id": str(p.project_id), "name": p.project_name} for p in projects]
+    projects = [p for p in db.query(Project).all() if not p.is_deleted]
+    return [{"id": str(p.project_id), "name": str(p.project_name)} for p in projects]
 
 @router.get("/machines", response_model=List[DropdownItem])
 async def get_machines_dropdown(
-    db: Session = Depends(get_db),
+    db: any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Return machines where is_deleted = false"""
-    machines = db.query(Machine).filter(or_(Machine.is_deleted == False, Machine.is_deleted == None)).all()
-    return [{"id": str(m.id), "name": m.machine_name} for m in machines]
+    machines = [m for m in db.query(Machine).all() if not m.is_deleted]
+    return [{"id": str(m.id), "name": str(m.machine_name)} for m in machines]
 
 @router.get("/users/assignable", response_model=List[UserDropdownItem])
 async def get_assignable_users(
-    db: Session = Depends(get_db),
+    db: any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Return users with assignable roles and is_deleted = false"""
-    assignable_roles = [
-        'admin',
-        'supervisor',
-        'planning',
-        'operator',
-        'fab_master',
-        'file_master'
-    ]
-    users = db.query(User).filter(
-        User.role.in_(assignable_roles),
-        or_(User.is_deleted == False, User.is_deleted == None)
-    ).all()
+    assignable_roles = ['admin', 'supervisor', 'planning', 'operator', 'fab_master', 'file_master']
+    all_users = db.query(User).all()
+    users = [u for u in all_users if not u.is_deleted and str(u.role).lower() in assignable_roles]
     
     return [
         {
-            "user_id": u.user_id,
-            "username": u.username,
-            "full_name": u.full_name or u.username,
-            "role": u.role
+            "user_id": str(u.user_id),
+            "username": str(u.username),
+            "full_name": str(u.full_name or u.username),
+            "role": str(u.role)
         } for u in users
     ]

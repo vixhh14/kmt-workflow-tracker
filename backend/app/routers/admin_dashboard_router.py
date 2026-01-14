@@ -1,11 +1,9 @@
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import func, distinct, text, or_
-from datetime import datetime, date, timezone
 from typing import List, Optional
+from datetime import date
 from app.core.database import get_db
 from app.models.models_db import Task, User, Attendance, Project
-from app.utils.datetime_utils import utc_now, make_aware
 
 router = APIRouter(
     prefix="/admin",
@@ -14,56 +12,51 @@ router = APIRouter(
 )
 
 @router.get("/projects")
-async def get_projects(db: Session = Depends(get_db)):
-    """Get list of all unique project names"""
+async def get_projects(db: any = Depends(get_db)):
+    """Get list of all unique project names from Google Sheets."""
     try:
-        # Get projects from new table
-        db_projects = db.query(Project.project_name).filter(
-            or_(Project.is_deleted == False, Project.is_deleted == None)
-        ).all()
-        new_project_names = [p[0] for p in db_projects if p[0]]
+        all_projects = [p for p in db.query(Project).all() if not p.is_deleted]
+        project_names = [p.project_name for p in all_projects if p.project_name]
         
-        # Get legacy projects from tasks
-        legacy_projects = db.query(Task.project).filter(
-            Task.project != None,
-            Task.project != '',
-            or_(Task.is_deleted == False, Task.is_deleted == None)
-        ).distinct().all()
-        legacy_project_names = [p[0] for p in legacy_projects if p[0]]
+        # Get projects from tasks too (legacy sync)
+        all_tasks = [t for t in db.query(Task).all() if not t.is_deleted]
+        task_projects = [t.project for t in all_tasks if t.project]
         
         # Merge and sort
-        all_projects = sorted(list(set(new_project_names + legacy_project_names)))
-        return all_projects
+        unique_projects = sorted(list(set(project_names + task_projects)))
+        return unique_projects
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch projects: {str(e)}")
-
 
 from app.schemas.dashboard_schema import ProjectAnalyticsOut
 
 @router.get("/project-analytics", response_model=ProjectAnalyticsOut)
-async def get_project_analytics(project: Optional[str] = None, db: Session = Depends(get_db)):
-    """Get comprehensive project analytics including stats and chart data"""
+async def get_project_analytics(project: Optional[str] = None, db: any = Depends(get_db)):
+    """Get comprehensive project analytics using Google Sheets data."""
     try:
-        # Join with Project table to handle both legacy string and foreign key
-        query = db.query(Task).outerjoin(Project, Task.project_id == Project.project_id)
-        
-        # Filter by project if specified and not "all"
+        all_tasks = [t for t in db.query(Task).all() if not t.is_deleted]
+        all_p_objs = [p for p in db.query(Project).all() if not p.is_deleted]
+        p_map = {str(p.id): p.project_name for p in all_p_objs}
+
+        # Filter tasks by project if specified
         if project and project != 'all':
-            query = query.filter(
-                or_(
-                    Task.project == project,
-                    Project.project_name == project
-                )
-            )
-        
-        tasks = query.filter(or_(Task.is_deleted == False, Task.is_deleted == None)).all()
-        
+            tasks = []
+            for t in all_tasks:
+                t_project_name = t.project
+                if not t_project_name or t_project_name == "-":
+                    t_project_name = p_map.get(str(t.project_id))
+                
+                if t_project_name == project:
+                    tasks.append(t)
+        else:
+            tasks = all_tasks
+            
         # Calculate statistics
         total = len(tasks)
-        yet_to_start = len([t for t in tasks if t.status == 'pending'])
-        in_progress = len([t for t in tasks if t.status == 'in_progress'])
-        completed = len([t for t in tasks if t.status == 'completed'])
-        on_hold = len([t for t in tasks if t.status == 'on_hold'])
+        yet_to_start = len([t for t in tasks if str(t.status).lower() == 'pending'])
+        in_progress = len([t for t in tasks if str(t.status).lower() == 'in_progress'])
+        completed = len([t for t in tasks if str(t.status).lower() == 'completed'])
+        on_hold = len([t for t in tasks if str(t.status).lower() == 'on_hold'])
         
         return {
             "project": project if project else "all",
@@ -84,116 +77,58 @@ async def get_project_analytics(project: Optional[str] = None, db: Session = Dep
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch project analytics: {str(e)}")
 
-
 @router.get("/attendance-summary")
-async def get_attendance_summary(db: Session = Depends(get_db)):
-    """Get attendance summary using attendance service"""
+async def get_attendance_summary(db: any = Depends(get_db)):
+    """Get attendance summary using attendance service (Google Sheets backend)."""
     try:
         from app.services import attendance_service
-        
         result = attendance_service.get_attendance_summary(db=db)
         
         if not result.get("success"):
-            # Return safe fallback data
-            all_users = db.query(User).filter(
-                func.lower(User.role).in_(['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master']),
-                or_(User.is_deleted == False, User.is_deleted == None),
-                User.approval_status == 'approved'
-            ).all()
-            user_list = [
-                {
-                    "id": u.user_id,
-                    "name": u.full_name if u.full_name else u.username,
-                    "role": u.role
-                }
-                for u in all_users
-            ]
-            
+            # Fallback
+            all_users = [u for u in db.query(User).all() if not u.is_deleted and str(u.approval_status).lower() == 'approved']
             return {
                 "date": date.today().isoformat(),
                 "present": 0,
                 "absent": len(all_users),
                 "late": 0,
                 "present_users": [],
-                "absent_users": user_list,
+                "absent_users": [{"id": u.user_id, "name": u.full_name or u.username, "role": u.role} for u in all_users if str(u.role).lower() != "admin"],
                 "total_users": len(all_users),
                 "records": []
             }
         
-        # Map service result to expected frontend format
+        return result
+    except:
         return {
-            "date": result.get("date"),
-            "present": result.get("present", 0),
-            "absent": result.get("absent", 0),
-            "late": 0,
-            "present_users": result.get("present_users", []),
-            "absent_users": result.get("absent_users", []),
-            "total_users": result.get("total_users", 0),
-            "records": result.get("records", [])  # Explicit records list from service
+            "date": date.today().isoformat(),
+            "present": 0,
+            "absent": 0,
+            "total_users": 0,
+            "records": []
         }
-    except Exception as e:
-        # Return safe fallback data on error
-        try:
-            all_users = db.query(User).filter(
-                func.lower(User.role).in_(['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master']),
-                or_(User.is_deleted == False, User.is_deleted == None),
-                User.approval_status == 'approved'
-            ).all()
-            user_list = [
-                {
-                    "id": u.user_id,
-                    "name": u.full_name if u.full_name else u.username,
-                    "role": u.role
-                }
-                for u in all_users
-            ]
-            
-            return {
-                "date": date.today().isoformat(),
-                "present": 0,
-                "absent": len(all_users),
-                "late": 0,
-                "present_users": [],
-                "absent_users": user_list,
-                "total_users": len(all_users),
-                "records": []
-            }
-        except:
-            return {
-                "date": date.today().isoformat(),
-                "present": 0,
-                "absent": 0,
-                "late": 0,
-                "present_users": [],
-                "absent_users": [],
-                "total_users": 0,
-                "records": []
-            }
 
-
-# Legacy endpoints for backward compatibility
+# Legacy support
 @router.get("/overall-stats")
-async def get_overall_stats(db: Session = Depends(get_db)):
-    """Get overall project statistics (LEGACY)"""
+async def get_overall_stats(db: any = Depends(get_db)):
     analytics = await get_project_analytics(project='all', db=db)
+    all_tasks = [t for t in db.query(Task).all() if not t.is_deleted]
+    project_counts = len(set([t.project for t in all_tasks if t.project]))
+    
     return {
-        "total_projects": len(db.query(Task.project).filter(Task.project != None, Task.project != '').distinct().all()),
+        "total_projects": project_counts,
         "completed": analytics['stats']['completed'],
         "in_progress": analytics['stats']['in_progress'],
         "yet_to_start": analytics['stats']['yet_to_start'],
         "held": analytics['stats']['on_hold']
     }
 
-
 @router.get("/project-status")
-async def get_project_status(project: Optional[str] = None, db: Session = Depends(get_db)):
-    """Get project status distribution (LEGACY)"""
+async def get_project_status(project: Optional[str] = None, db: any = Depends(get_db)):
     analytics = await get_project_analytics(project=project, db=db)
     return analytics['chart']
 
-
 @router.get("/task-stats")
-async def get_task_stats(project: Optional[str] = None, db: Session = Depends(get_db)):
-    """Get task statistics (LEGACY)"""
+async def get_task_stats(project: Optional[str] = None, db: any = Depends(get_db)):
     analytics = await get_project_analytics(project=project, db=db)
     return analytics['stats']

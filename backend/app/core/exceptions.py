@@ -1,7 +1,6 @@
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
-from sqlalchemy.exc import IntegrityError, DataError, OperationalError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import traceback
 
@@ -31,51 +30,6 @@ async def response_validation_exception_handler(request: Request, exc: ResponseV
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "*",
             "Access-Control-Allow-Headers": "*"
-        }
-    )
-
-async def integrity_error_handler(request: Request, exc: IntegrityError):
-    """Handles Database Integrity Constraints (409 Conflict)"""
-    error_msg = str(exc.orig) if exc.orig else str(exc)
-    
-    if "unique constraint" in error_msg.lower():
-        msg = "A record with this unique value already exists."
-        code = "UNIQUE_VIOLATION"
-    elif "foreign key constraint" in error_msg.lower():
-        msg = "Operation failed due to referenced data. Check related fields."
-        code = "FOREIGN_KEY_VIOLATION"
-    else:
-        msg = "Database integrity error."
-        code = "INTEGRITY_ERROR"
-
-    return JSONResponse(
-        status_code=status.HTTP_409_CONFLICT,
-        content={
-            "error_code": code,
-            "message": msg,
-            "detail": error_msg
-        }
-    )
-
-async def data_error_handler(request: Request, exc: DataError):
-    """Handles Data format errors (400 Bad Request)"""
-    return JSONResponse(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        content={
-            "error_code": "DATA_ERROR",
-            "message": "Invalid data format provided.",
-            "detail": str(exc.orig) if exc.orig else str(exc)
-        }
-    )
-
-async def operational_error_handler(request: Request, exc: OperationalError):
-    """Handles Connection/Operational errors (503 Service Unavailable)"""
-    return JSONResponse(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        content={
-            "error_code": "DB_CONNECTION_ERROR",
-            "message": "Database connection failed. Please try again later.",
-            "detail": "Database connection failed."
         }
     )
 

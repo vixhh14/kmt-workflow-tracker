@@ -1,12 +1,10 @@
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
 from typing import List, Optional
 from app.core.database import get_db
 from app.models.models_db import Task, User, Machine, Project, FilingTask, FabricationTask
 from types import SimpleNamespace
 from app.services.dashboard_analytics_service import get_operations_overview
-from app.services.project_overview_service import get_project_overview_stats
 from app.schemas.dashboard_schema import AdminDashboardOut, SupervisorDashboardOut
 import uuid
 
@@ -19,224 +17,106 @@ router = APIRouter(
 async def get_admin_dashboard(
     project_id: Optional[str] = None,
     operator_id: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: any = Depends(get_db)
 ):
-    """
-    Admin Dashboard: All projects, tasks, machines, users, and operators.
-    Returns ORM objects - Pydantic handles aliasing via Field(alias=...)
-     Supports validation filtering for Project and Operator.
-    """
     try:
-        # Fetch ORM objects
-        projects = db.query(Project).filter(
-            or_(Project.is_deleted == False, Project.is_deleted == None)
-        ).all()
+        # All data in memory
+        projects = [p for p in db.query(Project).all() if not p.is_deleted]
+        machines_raw = [m for m in db.query(Machine).all() if not m.is_deleted]
+        users = [u for u in db.query(User).all() if not u.is_deleted and str(u.approval_status).lower() == 'approved']
         
-        # Machines - List all machines
-        machines = db.query(Machine).filter(
-            or_(Machine.is_deleted == False, Machine.is_deleted == None)
-        ).all()
-        
-        # Approved users for the admin dashboard
-        users = db.query(User).filter(
-            or_(User.is_deleted == False, User.is_deleted == None),
-            User.approval_status == 'approved'
-        ).all()
-        
-        # Determine project UUID for unified filtering
-        active_project_uuid = None
-        if project_id and project_id != "all":
-            try:
-                active_project_uuid = uuid.UUID(str(project_id))
-            except ValueError:
-                # Find project by name if not a UUID
-                p_obj = db.query(Project).filter(
-                    or_(Project.project_name == project_id, Project.project_code == project_id)
-                ).first()
-                if p_obj:
-                    active_project_uuid = p_obj.project_id
+        active_project_id = project_id if project_id and project_id != "all" else None
+        active_operator_id = operator_id if operator_id and operator_id != "all" else None
 
         # 1. Normal Tasks
-        tasks_query = db.query(Task).filter(or_(Task.is_deleted == False, Task.is_deleted == None))
-        if active_project_uuid:
-            tasks_query = tasks_query.filter(Task.project_id == active_project_uuid)
-        elif project_id and project_id != "all":
-            tasks_query = tasks_query.filter(Task.project == project_id)
-        if operator_id and operator_id != "all":
-            tasks_query = tasks_query.filter(Task.assigned_to == operator_id)
-        normal_tasks = tasks_query.all()
+        normal_all = [t for t in db.query(Task).all() if not t.is_deleted]
+        if active_project_id:
+            normal_all = [t for t in normal_all if str(t.project_id) == str(active_project_id) or str(t.project) == str(active_project_id)]
+        if active_operator_id:
+            normal_all = [t for t in normal_all if str(t.assigned_to) == str(active_operator_id)]
 
         # 2. Filing Tasks
-        f_query = db.query(FilingTask).filter(or_(FilingTask.is_deleted == False, FilingTask.is_deleted == None))
-        if active_project_uuid:
-            f_query = f_query.filter(FilingTask.project_id == active_project_uuid)
-        elif project_id and project_id != "all":
-            f_query = f_query.filter(False) # No legacy string project field
-        if operator_id and operator_id != "all":
-            f_query = f_query.filter(FilingTask.assigned_to == operator_id)
-        filing_tasks = f_query.all()
+        filing_all = [t for t in db.query(FilingTask).all() if not t.is_deleted]
+        if active_project_id:
+            filing_all = [t for t in filing_all if str(t.project_id) == str(active_project_id)]
+        if active_operator_id:
+            filing_all = [t for t in filing_all if str(t.assigned_to) == str(active_operator_id)]
 
         # 3. Fabrication Tasks
-        fab_query = db.query(FabricationTask).filter(or_(FabricationTask.is_deleted == False, FabricationTask.is_deleted == None))
-        if active_project_uuid:
-            fab_query = fab_query.filter(FabricationTask.project_id == active_project_uuid)
-        elif project_id and project_id != "all":
-            fab_query = fab_query.filter(False)
-        if operator_id and operator_id != "all":
-            fab_query = fab_query.filter(FabricationTask.assigned_to == operator_id)
-        fabrication_tasks = fab_query.all()
+        fab_all = [t for t in db.query(FabricationTask).all() if not t.is_deleted]
+        if active_project_id:
+            fab_all = [t for t in fab_all if str(t.project_id) == str(active_project_id)]
+        if active_operator_id:
+            fab_all = [t for t in fab_all if str(t.assigned_to) == str(active_operator_id)]
 
-        # Combine and normalize all tasks
-        tasks = []
-        for t in normal_tasks:
-            tasks.append(t)
-        for t in filing_tasks:
-            tasks.append(SimpleNamespace(
+        combined_tasks = []
+        for t in normal_all: combined_tasks.append(t)
+        for t in filing_all:
+            combined_tasks.append(SimpleNamespace(
                 id=str(t.id), title=t.part_item, status=t.status, 
                 project_id=t.project_id, machine_id=t.machine_id, 
                 assigned_to=t.assigned_to, priority=getattr(t, 'priority', 'medium')
             ))
-        for t in fabrication_tasks:
-            tasks.append(SimpleNamespace(
+        for t in fab_all:
+            combined_tasks.append(SimpleNamespace(
                 id=str(t.id), title=t.part_item, status=t.status, 
                 project_id=t.project_id, machine_id=t.machine_id, 
                 assigned_to=t.assigned_to, priority=getattr(t, 'priority', 'medium')
             ))
 
-        # Get overview stats (handles filtered recalculation)
         overview = get_operations_overview(db)
-        
-        # Only recalculate if specific filters are applied (not "all")
-        is_filtered = (project_id and project_id != "all") or (operator_id and operator_id != "all")
-        
+        is_filtered = active_project_id or active_operator_id
         if is_filtered:
             overview = {
                 "tasks": {
-                    "total": len(tasks),
-                    "pending": len([t for t in tasks if (getattr(t, 'status', '') or '').lower() == 'pending']),
-                    "in_progress": len([t for t in tasks if (getattr(t, 'status', '') or '').lower() in ('in_progress', 'in progress')]),
-                    "completed": len([t for t in tasks if (getattr(t, 'status', '') or '').lower() == 'completed']),
-                    "ended": len([t for t in tasks if (getattr(t, 'status', '') or '').lower() == 'ended']),
-                    "on_hold": len([t for t in tasks if (getattr(t, 'status', '') or '').lower() in ('on_hold', 'onhold', 'on hold')])
+                    "total": len(combined_tasks),
+                    "pending": len([t for t in combined_tasks if str(t.status).lower() == 'pending']),
+                    "in_progress": len([t for t in combined_tasks if str(t.status).lower() in ('in_progress', 'in progress')]),
+                    "completed": len([t for t in combined_tasks if str(t.status).lower() == 'completed']),
+                    "ended": len([t for t in combined_tasks if str(t.status).lower() == 'ended']),
+                    "on_hold": len([t for t in combined_tasks if str(t.status).lower() in ('on_hold', 'onhold', 'on hold')])
                 },
-                "machines": {
-                    "active": 0, # Placeholder, updated below
-                    "total": len(machines)
-                },
-                "projects": {
-                    "total": len(projects)
-                }
+                "machines": {"active": 0, "total": len(machines_raw)},
+                "projects": {"total": len(projects)}
             }
-        
-        # Machine Status Logic
-        # 1. Get all active tasks (in_progress, on_hold)
-        # 2. Filter by project/operator if provided (already done in 'tasks' list)
-        active_machine_tasks = [t for t in tasks if getattr(t, 'status', '') in ('in_progress', 'on_hold', 'onhold') and getattr(t, 'machine_id', None)]
-        
-        # Map machine_id -> status
+
         machine_status_map = {}
-        for t in active_machine_tasks:
-            mid = getattr(t, 'machine_id', None)
-            if not mid: continue
-            
-            current = machine_status_map.get(mid)
-            status = getattr(t, 'status', '')
-            if status == 'in_progress':
-                machine_status_map[mid] = 'running' # Highest priority
-            elif status in ('on_hold', 'onhold') and current != 'running':
-                machine_status_map[mid] = 'on_hold'
+        active_machine_tasks = [t for t in combined_tasks if str(t.status).lower() in ('in_progress', 'in progress', 'on_hold', 'onhold', 'on hold') and getattr(t, 'machine_id', None)]
         
-        # Update machine objects
+        for t in active_machine_tasks:
+            mid = str(t.machine_id); status = str(t.status).lower()
+            if status in ('in_progress', 'in progress'): machine_status_map[mid] = 'running'
+            elif status in ('on_hold', 'onhold', 'on hold') and machine_status_map.get(mid) != 'running': machine_status_map[mid] = 'on_hold'
+        
         machines_data = []
-        for m in machines:
-            m_status = machine_status_map.get(m.id, 'available')
+        for m in machines_raw:
             machines_data.append({
-                "id": m.id,
-                "machine_name": m.machine_name,
-                "status": m_status,
-                # Fields below exist on model but might not be in schema, keeping safe ones
-                "category_id": m.category_id,
-                "hourly_rate": m.hourly_rate,
-                "is_deleted": m.is_deleted,
-                "created_at": m.created_at,
-                "updated_at": m.updated_at
+                "id": str(m.id), "machine_name": m.machine_name,
+                "status": machine_status_map.get(str(m.id), 'available'),
+                "hourly_rate": getattr(m, 'hourly_rate', 0)
             })
             
-        active_machines_count = len([m_id for m_id, status in machine_status_map.items() if status == 'running'])
         if is_filtered and 'machines' in overview:
-             overview['machines']['active'] = active_machines_count
-        
-        # Filter operators - ALWAYS load all active operators regardless of task filters
-        # This ensures the operator dropdown is never empty
-        all_operators = db.query(User).filter(
-            User.role == 'operator',
-            or_(User.is_deleted == False, User.is_deleted == None),
-            User.approval_status == 'approved'
-        ).all()
+             overview['machines']['active'] = len([s for s in machine_status_map.values() if s == 'running'])
         
         return {
-            "projects": projects,  
-            "tasks": tasks,        
-            "machines": machines_data,  
-            "users": users,        
-            "operators": all_operators,  # CRITICAL: Load independently from filters
+            "projects": projects, "tasks": combined_tasks, "machines": machines_data,  
+            "users": users, "operators": [u for u in users if str(u.role).lower() == 'operator'],
             "overview": overview
         }
-        
     except Exception as e:
-        print(f"❌ Admin dashboard error: {e}")
-        import traceback
-        traceback.print_exc()
-        # Return empty but valid structure
-        return {
-            "projects": [],
-            "tasks": [],
-            "machines": [],
-            "users": [],
-            "operators": [],
-            "overview": {
-                "tasks": {"total": 0, "pending": 0, "in_progress": 0, "completed": 0, "ended": 0, "on_hold": 0},
-                "machines": {"active": 0, "total": 0},
-                "projects": {"total": 0}
-            }
-        }
+        print(f"Error in unified dashboard: {e}")
+        return {"projects": [], "tasks": [], "machines": [], "users": [], "operators": [], "overview": {"tasks": {"total": 0, "pending": 0, "in_progress": 0, "completed": 0, "ended": 0, "on_hold": 0}, "machines": {"active": 0, "total": 0}, "projects": {"total": 0}}}
 
 @router.get("/supervisor", response_model=SupervisorDashboardOut)
-async def get_supervisor_dashboard(
-    project_id: Optional[str] = None,
-    operator_id: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    """
-    Supervisor Dashboard: Projects, tasks, machines, operators (no user management).
-    FAIL-SAFE: Skips corrupted rows, returns partial data.
-    Supports filtering by project_id and operator_id.
-    """
+async def get_supervisor_dashboard(project_id: Optional[str] = None, operator_id: Optional[str] = None, db: any = Depends(get_db)):
     try:
-        # Reuse admin logic but exclude full user list
         admin_data = await get_admin_dashboard(project_id, operator_id, db)
-        
         return {
-            "projects": admin_data["projects"],
-            "tasks": admin_data["tasks"],
-            "machines": admin_data["machines"],
-            "operators": admin_data["operators"],
+            "projects": admin_data["projects"], "tasks": admin_data["tasks"],
+            "machines": admin_data["machines"], "operators": admin_data["operators"],
             "overview": admin_data["overview"]
         }
-        
     except Exception as e:
-        print(f"❌ Supervisor dashboard error: {e}")
-        import traceback
-        traceback.print_exc()
-        # Return empty but valid structure
-        return {
-            "projects": [],
-            "tasks": [],
-            "machines": [],
-            "operators": [],
-            "overview": {
-                "tasks": {"total": 0, "pending": 0, "in_progress": 0, "completed": 0, "ended": 0, "on_hold": 0},
-                "machines": {"active": 0, "total": 0},
-                "projects": {"total": 0}
-            }
-        }
+        print(f"Error in supervisor dashboard: {e}")
+        return {"projects": [], "tasks": [], "machines": [], "operators": [], "overview": {"tasks": {"total": 0, "pending": 0, "in_progress": 0, "completed": 0, "ended": 0, "on_hold": 0}, "machines": {"active": 0, "total": 0}, "projects": {"total": 0}}}

@@ -1,89 +1,56 @@
+
 """
-PRODUCTION STABILIZATION: Unified Dashboard Analytics Service
-Purpose: Provide accurate, consistent dashboard metrics across all roles
-Strategy: Single source of truth using canonical SQL for core metrics
-Safety: Direct DB queries, no in-memory aggregation, consistent filtering
+PRODUCTION STABILIZATION: Unified Dashboard Analytics Service (Google Sheets Edition)
+Purpose: Provide accurate, consistent dashboard metrics across all roles using Google Sheets.
+Strategy: Load relevant sheets and perform in-memory aggregation.
 """
 
-from sqlalchemy.orm import Session
-from sqlalchemy import text, func, or_
-from app.models.models_db import User, Machine, Attendance
-from typing import Dict, Any
-from app.core.time_utils import get_current_time_ist
+from typing import Dict, Any, List
+from app.models.models_db import User, Machine, Project, Task
+from app.core.sheets_db import SheetsDB
 
-def get_operations_overview(db: Session) -> Dict[str, Any]:
+def get_operations_overview(db: SheetsDB) -> Dict[str, Any]:
     """
     SINGLE SOURCE OF TRUTH for Admin, Supervisor, and Planning dashboards.
-    
-    Strict Adherence:
-    1. Canonical SQL for Project/Task counts (Fixes LEFT JOIN bug)
-    2. Attendance: Present = row exists for today
-    3. Operators: Valid 'operator' role only
-    4. Machines: Active = 'active' status
     """
     
-    # 1. CANONICAL SQL QUERY (Projects & Tasks)
-    # Fixes the bug where filtering t.is_deleted in WHERE clause excluded empty projects
-    canonical_sql = text("""
-        SELECT
-          COUNT(DISTINCT p.project_id)                                  AS total_projects,
-          COUNT(t.id)                                                   AS total_tasks,
-          COUNT(*) FILTER (WHERE t.status = 'pending')                 AS pending,
-          COUNT(*) FILTER (WHERE t.status = 'in_progress')             AS in_progress,
-          COUNT(*) FILTER (WHERE t.status = 'completed')               AS completed,
-          COUNT(*) FILTER (WHERE t.status = 'on_hold')                 AS on_hold
-        FROM projects p
-        LEFT JOIN tasks t
-          ON t.project_id = p.project_id
-          AND t.is_deleted = false
-        WHERE p.is_deleted = false;
-    """)
-    
+    # 1. Projects and Tasks Aggregation
     try:
-        result = db.execute(canonical_sql).fetchone()
+        all_projects = db.query(Project).filter(is_deleted=False).all()
+        project_ids = [str(p.project_id) for p in all_projects]
         
-        # Parse result safely
-        total_projects = result.total_projects if result else 0
-        total_tasks = result.total_tasks if result else 0
-        pending = result.pending if result else 0
-        in_progress = result.in_progress if result else 0
-        completed = result.completed if result else 0
-        on_hold = result.on_hold if result else 0
+        all_tasks = db.query(Task).filter(is_deleted=False).all()
+        # Only count tasks belonging to active projects
+        valid_tasks = [t for t in all_tasks if str(t.project_id) in project_ids]
+        
+        total_projects = len(all_projects)
+        total_tasks = len(valid_tasks)
+        
+        pending = len([t for t in valid_tasks if t.status == 'pending'])
+        in_progress = len([t for t in valid_tasks if t.status == 'in_progress'])
+        completed = len([t for t in valid_tasks if t.status == 'completed'])
+        on_hold = len([t for t in valid_tasks if t.status == 'on_hold'])
+        ended = len([t for t in valid_tasks if t.status == 'ended'])
         
     except Exception as e:
-        print(f"❌ CRITICAL: Error executing canonical overview SQL: {e}")
-        # Fallback to zeros on critical failure
-        total_projects = 0
-        total_tasks = 0
-        pending = 0
-        in_progress = 0
-        completed = 0
-        on_hold = 0
+        print(f"❌ Error aggregating projects/tasks from sheets: {e}")
+        total_projects = total_tasks = pending = in_progress = completed = on_hold = ended = 0
 
     # 2. MACHINES OVERVIEW
     try:
-        total_machines = db.query(Machine).filter(
-            or_(Machine.is_deleted == False, Machine.is_deleted == None)
-        ).count()
-        
-        active_machines = db.query(Machine).filter(
-            or_(Machine.is_deleted == False, Machine.is_deleted == None),
-            Machine.status == 'active'
-        ).count()
+        active_machines_list = db.query(Machine).filter(is_deleted=False).all()
+        total_machines = len(active_machines_list)
+        active_machines = len([m for m in active_machines_list if m.status == 'active'])
     except Exception as e:
-        print(f"❌ Error counting machines: {e}")
-        total_machines = 0
-        active_machines = 0
+        print(f"❌ Error counting machines from sheets: {e}")
+        total_machines = active_machines = 0
 
     # 3. OPERATORS OVERVIEW
     try:
-        total_operators = db.query(User).filter(
-            User.role == 'operator',
-            or_(User.is_deleted == False, User.is_deleted == None),
-            User.approval_status == 'approved'
-        ).count()
+        all_users = db.query(User).filter(is_deleted=False, role='operator', approval_status='approved').all()
+        total_operators = len(all_users)
     except Exception as e:
-        print(f"❌ Error counting operators: {e}")
+        print(f"❌ Error counting operators from sheets: {e}")
         total_operators = 0
 
     return {
@@ -93,7 +60,7 @@ def get_operations_overview(db: Session) -> Dict[str, Any]:
             "in_progress": in_progress,
             "completed": completed,
             "on_hold": on_hold,
-            "ended": 0 
+            "ended": ended
         },
         "machines": {
             "total": total_machines,
@@ -107,6 +74,5 @@ def get_operations_overview(db: Session) -> Dict[str, Any]:
         }
     }
 
-# Legacy support - redirect to new function
-def get_dashboard_overview(db: Session) -> Dict[str, Any]:
+def get_dashboard_overview(db: SheetsDB) -> Dict[str, Any]:
     return get_operations_overview(db)

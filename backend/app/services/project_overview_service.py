@@ -1,56 +1,33 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
 from app.models.models_db import Project, Task
 
-def get_project_overview_stats(db: Session):
+def get_project_overview_stats(db: any):
     """
-    Calculates unified project overview statistics.
-    Single source of truth for Admin, Planning, and Supervisor dashboards.
+    Calculates unified project overview statistics matching SheetsDB backend.
     """
-    # 1. Fetch all active projects
-    projects = db.query(Project).filter(
-        or_(Project.is_deleted == False, Project.is_deleted == None)
-    ).all()
+    projects = [p for p in db.query(Project).all() if not getattr(p, 'is_deleted', False)]
+    all_tasks = [t for t in db.query(Task).all() if not getattr(t, 'is_deleted', False)]
     
-    total_projects = len(projects)
+    stats = {"total": len(projects), "completed": 0, "in_progress": 0, "yet_to_start": 0, "held": 0}
     
-    stats = {
-        "total": total_projects,
-        "completed": 0,
-        "in_progress": 0,
-        "yet_to_start": 0,
-        "held": 0
-    }
-    
-    # 2. Iterate and determine status for each project
     for project in projects:
-        # Fetch tasks for this project
-        tasks = db.query(Task).filter(
-            Task.project_id == project.project_id,
-            or_(Task.is_deleted == False, Task.is_deleted == None)
-        ).all()
+        pid = str(getattr(project, 'project_id', ''))
+        tasks = [t for t in all_tasks if str(getattr(t, 'project_id', '')) == pid]
         
         if not tasks:
             stats["yet_to_start"] += 1
             continue
             
-        task_statuses = [t.status for t in tasks]
+        st = [str(getattr(t, 'status', '')).lower() for t in tasks]
         
-        # Logic Priority:
-        # 1. In Progress: If ANY task is running
-        if "in_progress" in task_statuses:
+        if any(s in ["in_progress", "in progress"] for s in st):
             stats["in_progress"] += 1
-        # 2. Held: If ANY task is held (and none running)
-        elif "on_hold" in task_statuses:
+        elif any(s in ["on_hold", "on hold", "onhold"] for s in st):
             stats["held"] += 1
-        # 3. Completed: If ALL tasks are completed
-        elif all(s == "completed" for s in task_statuses):
+        elif all(s == "completed" for s in st):
             stats["completed"] += 1
-        # 4. Yet to Start: If ALL tasks are pending
-        elif all(s == "pending" for s in task_statuses):
+        elif all(s == "pending" for s in st):
             stats["yet_to_start"] += 1
         else:
-            # Mixed state (e.g., some completed, some pending) -> Treat as In Progress
             stats["in_progress"] += 1
             
     return stats
