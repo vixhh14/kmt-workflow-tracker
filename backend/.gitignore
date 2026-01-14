@@ -1,5 +1,42 @@
-venv/
+# Byte-compiled / optimized / DLL files
 __pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Environment variables
 .env
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+
+# Database files (legacy)
 *.db
+*.sqlite
+*.sqlite3
+
+# Python cache
+.pytest_cache/
+.mypy_cache/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Service account (sensitive)
 service_account.json
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
