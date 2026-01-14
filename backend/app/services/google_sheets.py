@@ -36,11 +36,36 @@ class GoogleSheetsService:
 
     def _get_client(self):
         if not self._client:
-            if not os.path.exists(SERVICE_ACCOUNT_PATH):
-                raise FileNotFoundError(f"Credentials file not found at: {SERVICE_ACCOUNT_PATH}")
+            # 1. Try to load from environment variable (JSON string) - Best for Render/Cloud
+            google_json = os.getenv("GOOGLE_SHEETS_JSON")
             
-            creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_PATH, scopes=SCOPES)
-            self._client = gspread.authorize(creds)
+            if google_json:
+                try:
+                    info = json.loads(google_json)
+                    creds = Credentials.from_service_account_info(info, scopes=SCOPES)
+                    self._client = gspread.authorize(creds)
+                    print("✅ Authenticated using GOOGLE_SHEETS_JSON environment variable")
+                except Exception as e:
+                    print(f"❌ Failed to parse GOOGLE_SHEETS_JSON: {e}")
+                    raise
+            
+            # 2. Fallback to service_account.json file - Best for Local
+            else:
+                if not os.path.exists(SERVICE_ACCOUNT_PATH):
+                    # Provide an informative error for Render/Prod
+                    error_msg = (
+                        f"Credentials not found! \n"
+                        f"LOCAL: Ensure '{CREDENTIALS_FILE}' exists in the backend/ directory.\n"
+                        f"PROD (Render): Set the 'GOOGLE_SHEETS_JSON' Environment Variable with your service account JSON content.\n"
+                        f"Path checked: {SERVICE_ACCOUNT_PATH}"
+                    )
+                    print(f"❌ {error_msg}")
+                    raise FileNotFoundError(error_msg)
+                
+                creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_PATH, scopes=SCOPES)
+                self._client = gspread.authorize(creds)
+                print(f"✅ Authenticated using credentials file: {SERVICE_ACCOUNT_PATH}")
+                
         return self._client
 
     def _get_spreadsheet(self):
