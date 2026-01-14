@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional, Any
 from pydantic import BaseModel
-from app.schemas.task_schema import TaskCreate, TaskUpdate, TaskOut, TaskActionRequest
+from app.schemas.task_schema import TaskCreate, TaskUpdate, TaskOut, TaskActionRequest, RescheduleRequestModel
 from app.models.models_db import Task, TaskTimeLog, TaskHold, RescheduleRequest, MachineRuntimeLog, UserWorkLog, User
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -114,7 +114,7 @@ async def read_tasks(
 @router.post("", response_model=TaskOut, status_code=201)
 async def create_task(
     task: TaskCreate, 
-    db: Session = Depends(get_db),
+    db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     from app.models.models_db import User, Project as DBProject
@@ -174,7 +174,6 @@ async def create_task(
         
         db.add(new_task)
         db.commit()
-        db.refresh(new_task)
         
         # Return as dict to be safe with response_model=dict
         task_dict = {c.name: getattr(new_task, c.name) for c in new_task.__table__.columns}
@@ -185,8 +184,8 @@ async def create_task(
         
         return task_dict
     except Exception as e:
-        db.rollback()
-        print(f"❌ DB Error in create_task: {str(e)}")
+        # db.rollback() # SheetsDB doesn't have rollback
+        print(f"❌ Error in create_task: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Critical database error: {str(e)}")
@@ -216,7 +215,7 @@ async def get_task_time_logs(task_id: str, db: Session = Depends(get_db)):
 @router.post("/{task_id}/start")
 async def start_task(
     task_id: str, 
-    db: Session = Depends(get_db),
+    db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     task = db.query(Task).filter(Task.id == task_id).first()
@@ -287,7 +286,7 @@ async def start_task(
 async def hold_task(
     task_id: str, 
     request: TaskActionRequest, 
-    db: Session = Depends(get_db),
+    db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     task = db.query(Task).filter(Task.id == task_id).first()
@@ -353,7 +352,7 @@ async def hold_task(
 @router.post("/{task_id}/resume")
 async def resume_task(
     task_id: str, 
-    db: Session = Depends(get_db),
+    db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     return await start_task(task_id, db, current_user)
@@ -361,7 +360,7 @@ async def resume_task(
 @router.post("/{task_id}/complete")
 async def complete_task(
     task_id: str, 
-    db: Session = Depends(get_db),
+    db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     task = db.query(Task).filter(Task.id == task_id).first()
@@ -441,7 +440,7 @@ async def complete_task(
 async def request_reschedule(
     task_id: str, 
     request: RescheduleRequestModel, 
-    db: Session = Depends(get_db),
+    db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     task = db.query(Task).filter(Task.id == task_id).first()
@@ -482,7 +481,7 @@ async def deny_task(task_id: str, request: TaskActionRequest, db: Session = Depe
 async def end_task(
     task_id: str, 
     request: Optional[TaskActionRequest] = None,
-    db: Session = Depends(get_db),
+    db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Admin/Supervisor action to force-end a task"""
@@ -548,7 +547,7 @@ async def end_task(
 async def update_task(
     task_id: str, 
     task_update: TaskUpdate, 
-    db: Session = Depends(get_db),
+    db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     from app.models.models_db import Project as DBProject
@@ -583,7 +582,6 @@ async def update_task(
         setattr(db_task, key, value)
     
     db.commit()
-    db.refresh(db_task)
     return {
         "id": db_task.id,
         "title": db_task.title,
@@ -610,7 +608,7 @@ async def update_task(
 @router.delete("/{task_id}")
 async def delete_task(
     task_id: str, 
-    db: Session = Depends(get_db),
+    db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     if current_user.role not in ["admin", "supervisor", "planning"]:

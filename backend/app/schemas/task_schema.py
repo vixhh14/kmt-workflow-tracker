@@ -135,6 +135,10 @@ class TaskOut(TaskBase):
 class TaskActionRequest(BaseModel):
     reason: Optional[str] = None
 
+class RescheduleRequestModel(BaseModel):
+    requested_date: str
+    reason: Optional[str] = None
+
 # Operational Tasks (Filing/Fabrication)
 
 class OperationalTaskBase(BaseModel):
