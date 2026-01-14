@@ -84,7 +84,13 @@ class SheetRow:
 
     def __getattr__(self, key):
         if key in self._data:
-            return self._data[key]
+            value = self._data[key]
+            # Convert string boolean values to actual booleans
+            if key in ['is_deleted', 'active']:
+                if isinstance(value, str):
+                    return value.upper() in ['TRUE', '1', 'YES']
+                return bool(value)
+            return value
         return None
 
     def __getitem__(self, key):
