@@ -90,3 +90,9 @@ class Subtask(SheetsModel):
 
 class OutsourceItem(SheetsModel):
     __tablename__ = "OutsourceItems"
+
+class RescheduleRequest(SheetsModel):
+    __tablename__ = "RescheduleRequests"
+
+class PlanningTask(SheetsModel):
+    __tablename__ = "PlanningTasks"

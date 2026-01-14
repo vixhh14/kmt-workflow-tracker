@@ -7,7 +7,9 @@ from app.routers import (
     attendance_router, machines_routers, operational_tasks_router,
     unified_dashboard_router, admin_router, supervisor_router,
     planning_router, approvals_router, dropdowns_router,
-    reports_router, analytics_router, operator_router
+    reports_router, analytics_router, operator_router,
+    seed_router, subtasks_router, outsource_router,
+    machine_categories_router, units_router, user_skills_router
 )
 
 app = FastAPI(title="KMT Workflow Tracker API", version="2.0.0")
@@ -38,6 +40,12 @@ app.include_router(dropdowns_router.router)
 app.include_router(reports_router.router)
 app.include_router(analytics_router.router)
 app.include_router(operator_router.router)
+app.include_router(seed_router.router)
+app.include_router(subtasks_router.router)
+app.include_router(outsource_router.router)
+app.include_router(machine_categories_router.router)
+app.include_router(units_router.router)
+app.include_router(user_skills_router.router)
 
 @app.get("/")
 async def root():

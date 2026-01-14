@@ -50,7 +50,9 @@ SHEETS_SCHEMA = {
     "TaskTimeLog": ["id", "task_id", "action", "timestamp", "reason"],
     "TaskHold": ["id", "task_id", "user_id", "hold_reason", "hold_started_at", "hold_ended_at"],
     "MachineRuntimeLog": ["id", "machine_id", "task_id", "start_time", "end_time", "duration_seconds", "date"],
-    "UserWorkLog": ["id", "user_id", "task_id", "machine_id", "start_time", "end_time", "duration_seconds", "date"]
+    "UserWorkLog": ["id", "user_id", "task_id", "machine_id", "start_time", "end_time", "duration_seconds", "date"],
+    "RescheduleRequests": ["id", "task_id", "new_date", "reason", "status", "created_at"],
+    "PlanningTasks": ["id", "title", "description", "status", "created_at"]
 }
 
 # Mapping of Model names to Worksheet names for convenience
@@ -65,7 +67,9 @@ MODEL_MAP = {
     "TaskTimeLog": "TaskTimeLog",
     "TaskHold": "TaskHold",
     "MachineRuntimeLog": "MachineRuntimeLog",
-    "UserWorkLog": "UserWorkLog"
+    "UserWorkLog": "UserWorkLog",
+    "RescheduleRequest": "RescheduleRequests",
+    "PlanningTask": "PlanningTasks"
 }
 
 class SheetRow:
