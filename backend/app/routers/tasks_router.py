@@ -3,7 +3,7 @@ from typing import List, Optional, Any
 from pydantic import BaseModel
 from app.schemas.task_schema import TaskCreate, TaskUpdate, TaskOut, TaskActionRequest, RescheduleRequestModel
 from app.models.models_db import Task, TaskTimeLog, TaskHold, RescheduleRequest, MachineRuntimeLog, UserWorkLog, User
-from app.core.database import get_db
+from app.core.sheets_db import get_db, SHEETS_SCHEMA
 from app.core.dependencies import get_current_user
 from app.core.time_utils import get_current_time_ist, get_today_date_ist
 from app.utils.datetime_utils import safe_datetime_diff
@@ -106,7 +106,7 @@ async def read_tasks(
             }
             results.append(task_data)
         except Exception as e:
-            print(f"⚠️ Error preparing task {getattr(t, 'id', 'unknown')}: {e}")
+            print(f"⚠️ Error preparing task {getattr(t, 'task_id', 'unknown')}: {e}")
             continue
             
     return results
@@ -130,10 +130,10 @@ async def create_task(
     # 2. Assignee Resolution
     assigned_to = task.assigned_to
     if assigned_to:
-        assignee = db.query(User).filter(User.user_id == assigned_to, or_(User.is_deleted == False, User.is_deleted == None)).first()
+        assignee = db.query(User).filter(user_id=assigned_to, is_deleted=False).first()
         if not assignee:
             # Fallback: check if it's a username
-            assignee = db.query(User).filter(User.username == assigned_to, or_(User.is_deleted == False, User.is_deleted == None)).first()
+            assignee = db.query(User).filter(username=assigned_to, is_deleted=False).first()
             if assignee:
                 assigned_to = assignee.user_id 
             else:
@@ -142,7 +142,7 @@ async def create_task(
     # 3. Project Validation & Sync
     project_name = task.project.strip() if task.project else "-"
     if task.project_id:
-        project_exists = db.query(DBProject).filter(DBProject.project_id == task.project_id).first()
+        project_exists = db.query(DBProject).filter(project_id=task.project_id).first()
         if not project_exists:
             raise HTTPException(status_code=400, detail=f"Selected project (ID: {task.project_id}) not found")
         project_name = project_exists.project_name
@@ -176,7 +176,9 @@ async def create_task(
         db.commit()
         
         # Return as dict to be safe with response_model=dict
-        task_dict = {c.name: getattr(new_task, c.name) for c in new_task.__table__.columns}
+        task_dict = {k: getattr(new_task, k) for k in SHEETS_SCHEMA["Tasks"] if hasattr(new_task, k)}
+        # Set 'id' from 'task_id' for frontend compatibility if needed, or just let schema handle it
+        if "id" not in task_dict: task_dict["id"] = new_task.task_id
         # Ensure datetimes are ISO strings for the dict
         for key, value in task_dict.items():
             if isinstance(value, datetime):
@@ -192,13 +194,13 @@ async def create_task(
 
 # Get task time logs for a specific task
 @router.get("/{task_id}/time-logs", response_model=List[dict])
-async def get_task_time_logs(task_id: str, db: Session = Depends(get_db)):
+async def get_task_time_logs(task_id: str, db: Any = Depends(get_db)):
     """Get all time tracking logs for a specific task"""
-    task = db.query(Task).filter(Task.id == task_id).first()
+    task = db.query(Task).filter(task_id=task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
-    logs = db.query(TaskTimeLog).filter(TaskTimeLog.task_id == task_id).order_by(TaskTimeLog.timestamp.asc()).all()
+    logs = db.query(TaskTimeLog).filter(task_id=task_id).all()
     
     return [
         {
@@ -218,7 +220,7 @@ async def start_task(
     db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    task = db.query(Task).filter(Task.id == task_id).first()
+    task = db.query(Task).filter(task_id=task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
@@ -237,7 +239,7 @@ async def start_task(
         task.actual_start_time = now
     
     # Close any open holds (if resuming)
-    open_hold = db.query(TaskHold).filter(TaskHold.task_id == task_id, TaskHold.hold_ended_at == None).first()
+    open_hold = db.query(TaskHold).filter(task_id=task_id, hold_ended_at=None).first()
     if open_hold:
         open_hold.hold_ended_at = now
         task.total_held_seconds = (task.total_held_seconds or 0) + safe_datetime_diff(now, open_hold.hold_started_at)
@@ -308,8 +310,8 @@ async def hold_task(
         # --- LOGGING CLOSE ---
         # Close open machine logs
         open_machine_logs = db.query(MachineRuntimeLog).filter(
-            MachineRuntimeLog.task_id == task_id,
-            MachineRuntimeLog.end_time == None
+            task_id=task_id,
+            end_time=None
         ).all()
         for m_log in open_machine_logs:
             m_log.end_time = now
@@ -317,8 +319,8 @@ async def hold_task(
             
         # Close open user logs
         open_user_logs = db.query(UserWorkLog).filter(
-            UserWorkLog.task_id == task_id,
-            UserWorkLog.end_time == None
+            task_id=task_id,
+            end_time=None
         ).all()
         for u_log in open_user_logs:
             u_log.end_time = now
@@ -374,7 +376,7 @@ async def complete_task(
     if not task.actual_end_time:
         task.actual_end_time = now
         
-    open_hold = db.query(TaskHold).filter(TaskHold.task_id == task_id, TaskHold.hold_ended_at == None).first()
+    open_hold = db.query(TaskHold).filter(task_id=task_id, hold_ended_at=None).first()
     if open_hold:
         open_hold.hold_ended_at = now
         task.total_held_seconds = (task.total_held_seconds or 0) + safe_datetime_diff(now, open_hold.hold_started_at)
@@ -399,8 +401,8 @@ async def complete_task(
     # --- LOGGING CLOSE ---
     # Close open machine logs
     open_machine_logs = db.query(MachineRuntimeLog).filter(
-        MachineRuntimeLog.task_id == task_id,
-        MachineRuntimeLog.end_time == None
+        task_id=task_id,
+        end_time=None
     ).all()
     for m_log in open_machine_logs:
         m_log.end_time = now
@@ -408,8 +410,8 @@ async def complete_task(
 
     # Close open user logs
     open_user_logs = db.query(UserWorkLog).filter(
-        UserWorkLog.task_id == task_id,
-        UserWorkLog.end_time == None
+        task_id=task_id,
+        end_time=None
     ).all()
     for u_log in open_user_logs:
         u_log.end_time = now
@@ -459,8 +461,8 @@ async def request_reschedule(
     return {"message": "Reschedule request submitted"}
 
 @router.post("/{task_id}/deny")
-async def deny_task(task_id: str, request: TaskActionRequest, db: Session = Depends(get_db)):
-    task = db.query(Task).filter(Task.id == task_id).first()
+async def deny_task(task_id: str, request: TaskActionRequest, db: Any = Depends(get_db)):
+    task = db.query(Task).filter(task_id=task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
@@ -506,16 +508,16 @@ async def end_task(
             task.total_duration_seconds = (task.total_duration_seconds or 0) + duration
         
         # Close logs
-        for m_log in db.query(MachineRuntimeLog).filter(MachineRuntimeLog.task_id == task_id, MachineRuntimeLog.end_time == None).all():
+        for m_log in db.query(MachineRuntimeLog).filter(task_id=task_id, end_time=None).all():
             m_log.end_time = now
             m_log.duration_seconds = safe_datetime_diff(now, m_log.start_time)
             
-        for u_log in db.query(UserWorkLog).filter(UserWorkLog.task_id == task_id, UserWorkLog.end_time == None).all():
+        for u_log in db.query(UserWorkLog).filter(task_id=task_id, end_time=None).all():
             u_log.end_time = now
             u_log.duration_seconds = safe_datetime_diff(now, u_log.start_time)
 
     # Close open hold
-    open_hold = db.query(TaskHold).filter(TaskHold.task_id == task_id, TaskHold.hold_ended_at == None).first()
+    open_hold = db.query(TaskHold).filter(task_id=task_id, hold_ended_at=None).first()
     if open_hold:
         open_hold.hold_ended_at = now
         task.total_held_seconds = (task.total_held_seconds or 0) + safe_datetime_diff(now, open_hold.hold_started_at)
@@ -551,7 +553,7 @@ async def update_task(
     current_user: User = Depends(get_current_user)
 ):
     from app.models.models_db import Project as DBProject
-    db_task = db.query(Task).filter(Task.id == task_id).first()
+    db_task = db.query(Task).filter(task_id=task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
     
@@ -574,7 +576,7 @@ async def update_task(
 
     # Sync project name if project_id is updated
     if 'project_id' in update_data and update_data['project_id']:
-        p_obj = db.query(DBProject).filter(DBProject.project_id == update_data['project_id']).first()
+        p_obj = db.query(DBProject).filter(project_id=update_data['project_id']).first()
         if p_obj:
             update_data['project'] = p_obj.project_name
     
@@ -583,7 +585,7 @@ async def update_task(
     
     db.commit()
     return {
-        "id": db_task.id,
+        "id": db_task.task_id,
         "title": db_task.title,
         "description": db_task.description,
         "project": db_task.project,
@@ -614,7 +616,7 @@ async def delete_task(
     if current_user.role not in ["admin", "supervisor", "planning"]:
         raise HTTPException(status_code=403, detail="Not authorized to delete tasks")
         
-    db_task = db.query(Task).filter(Task.id == task_id).first()
+    db_task = db.query(Task).filter(task_id=task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
     db_task.is_deleted = True

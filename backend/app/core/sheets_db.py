@@ -10,24 +10,24 @@ from app.core.time_utils import get_current_time_ist
 SHEETS_SCHEMA = {
     "Projects": [
         "project_id", "project_name", "client_name", "project_code", 
-        "work_order_number", "is_deleted", "created_at"
+        "is_deleted", "created_at"
     ],
     "Tasks": [
-        "id", "title", "description", "project", "project_id", "part_item", 
-        "nos_unit", "status", "priority", "assigned_to", "machine_id", 
-        "assigned_by", "due_date", "is_deleted", "created_at", "started_at", 
+        "task_id", "title", "project_id", "assigned_to", "assigned_by", "status", 
+        "priority", "due_datetime", "is_deleted", "created_at", "updated_at",
+        "description", "part_item", "nos_unit", "machine_id", "started_at", 
         "completed_at", "total_duration_seconds", "hold_reason", "denial_reason", 
         "actual_start_time", "actual_end_time", "total_held_seconds", 
         "ended_by", "end_reason", "work_order_number", "expected_completion_time"
     ],
     "Users": [
-        "user_id", "username", "password_hash", "role", "email", 
-        "full_name", "machine_types", "date_of_birth", "address", 
+        "user_id", "username", "role", "email", "active", "created_at",
+        "password_hash", "full_name", "machine_types", "date_of_birth", "address", 
         "contact_number", "unit_id", "approval_status", "security_question", 
-        "security_answer", "is_deleted", "active", "created_at", "updated_at"
+        "security_answer", "is_deleted", "updated_at"
     ],
     "Attendance": [
-        "id", "user_id", "date", "check_in", "check_out", "login_time", "status", "ip_address"
+        "id", "date", "user_id", "status", "check_in", "check_out", "login_time", "ip_address"
     ],
     "FabricationTasks": [
         "id", "project_id", "part_item", "quantity", "due_date", "priority", 
@@ -44,8 +44,9 @@ SHEETS_SCHEMA = {
         "created_at", "updated_at"
     ],
     "Machines": [
-        "id", "machine_name", "status", "hourly_rate", "last_maintenance", 
-        "current_operator", "category_id", "unit_id", "is_deleted", "created_at", "updated_at"
+        "machine_id", "machine_name", "status", "is_deleted", "hourly_rate", 
+        "last_maintenance", "current_operator", "category_id", "unit_id", 
+        "created_at", "updated_at"
     ],
     "TaskTimeLog": ["id", "task_id", "action", "timestamp", "reason"],
     "TaskHold": ["id", "task_id", "user_id", "hold_reason", "hold_started_at", "hold_ended_at"],

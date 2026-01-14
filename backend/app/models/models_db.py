@@ -36,8 +36,8 @@ class Project(SheetsModel):
 class Task(SheetsModel):
     __tablename__ = "Tasks"
     def __init__(self, **kwargs):
-        if "id" not in kwargs or not kwargs["id"]:
-            kwargs["id"] = str(uuid.uuid4())
+        if "task_id" not in kwargs or not kwargs["task_id"]:
+            kwargs["task_id"] = str(uuid.uuid4())
         super().__init__(**kwargs)
 
 class Attendance(SheetsModel):
@@ -75,6 +75,10 @@ class UserWorkLog(SheetsModel):
 
 class Machine(SheetsModel):
     __tablename__ = "Machines"
+    def __init__(self, **kwargs):
+        if "machine_id" not in kwargs or not kwargs["machine_id"]:
+            kwargs["machine_id"] = str(uuid.uuid4())
+        super().__init__(**kwargs)
 
 class Unit(SheetsModel):
     __tablename__ = "Units"

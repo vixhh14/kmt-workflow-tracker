@@ -26,6 +26,7 @@ class MachineUpdate(BaseModel):
 
 class MachineOut(MachineBase):
     id: str
+    machine_id: Optional[str] = None
     unit_id: Optional[int] = None
     category_id: Optional[int] = None
     hourly_rate: Optional[float] = None

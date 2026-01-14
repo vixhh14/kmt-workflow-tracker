@@ -22,16 +22,14 @@ async def read_machines(db: Any = Depends(get_db)):
     for m in machines:
         m.unit_name = u_map.get(str(m.unit_id), "Unknown")
         m.category_name = c_map.get(str(m.category_id), "Unknown")
-        # Field alias support for id
-        m.id = str(m.id)
+        # Field alias support for id (frontend often expects 'id')
+        m.id = str(m.machine_id)
         
     return machines
 
 @router.post("", response_model=MachineOut)
 async def create_machine(machine: MachineCreate, db: Any = Depends(get_db)):
-    new_id = str(uuid.uuid4())
     new_m = Machine(
-        id=new_id,
         **machine.dict(),
         created_at=datetime.now().isoformat(),
         status="active",
@@ -43,7 +41,7 @@ async def create_machine(machine: MachineCreate, db: Any = Depends(get_db)):
 
 @router.put("/{machine_id}", response_model=MachineOut)
 async def update_machine(machine_id: str, machine_update: MachineUpdate, db: Any = Depends(get_db)):
-    m = db.query(Machine).filter(id=machine_id).first()
+    m = db.query(Machine).filter(machine_id=machine_id).first()
     if not m: raise HTTPException(status_code=404, detail="Machine not found")
     
     data = machine_update.dict(exclude_unset=True)
@@ -51,11 +49,13 @@ async def update_machine(machine_id: str, machine_update: MachineUpdate, db: Any
         setattr(m, k, v)
     m.updated_at = datetime.now().isoformat()
     db.commit()
+    # Ensure ID is set for response_model
+    m.id = m.machine_id
     return m
 
 @router.delete("/{machine_id}")
 async def delete_machine(machine_id: str, db: Any = Depends(get_db)):
-    m = db.query(Machine).filter(id=machine_id).first()
+    m = db.query(Machine).filter(machine_id=machine_id).first()
     if not m: raise HTTPException(status_code=404, detail="Machine not found")
     m.is_deleted = True
     m.updated_at = datetime.now().isoformat()
