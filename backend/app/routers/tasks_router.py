@@ -3,7 +3,8 @@ from typing import List, Optional, Any
 from pydantic import BaseModel
 from app.schemas.task_schema import TaskCreate, TaskUpdate, TaskOut, TaskActionRequest, RescheduleRequestModel
 from app.models.models_db import Task, TaskTimeLog, TaskHold, RescheduleRequest, MachineRuntimeLog, UserWorkLog, User
-from app.core.sheets_db import get_db, SHEETS_SCHEMA
+from app.core.database import get_db
+from app.core.sheets_db import SHEETS_SCHEMA
 from app.core.dependencies import get_current_user
 from app.core.time_utils import get_current_time_ist, get_today_date_ist
 from app.utils.datetime_utils import safe_datetime_diff
