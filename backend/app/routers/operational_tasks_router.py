@@ -9,7 +9,7 @@ from app.utils.datetime_utils import safe_datetime_diff
 import uuid
 from datetime import datetime
 
-router = APIRouter(prefix="/operational", tags=["Operational Tasks"])
+router = APIRouter(prefix="/operational-tasks", tags=["Operational Tasks"])
 
 @router.get("/filing", response_model=List[OperationalTaskOut])
 async def get_filing_tasks(db: Any = Depends(get_db)):

@@ -167,9 +167,27 @@ class SheetsDB:
 
     def _get_data(self, model) -> List[SheetRow]:
         sheet_name = self._get_sheet_name(model)
-        if sheet_name not in self._cache:
-            raw_data = google_sheets.read_all(sheet_name)
-            self._cache[sheet_name] = [SheetRow(row, sheet_name, self) for row in raw_data]
+        
+        # Simple time-based cache (30 seconds)
+        import time
+        now = time.time()
+        
+        if not hasattr(self, "_cache_expiry"):
+            self._cache_expiry = {}
+            
+        is_expired = now > self._cache_expiry.get(sheet_name, 0)
+        
+        if sheet_name not in self._cache or is_expired:
+            try:
+                raw_data = google_sheets.read_all(sheet_name)
+                self._cache[sheet_name] = [SheetRow(row, sheet_name, self) for row in raw_data]
+                self._cache_expiry[sheet_name] = now + 30  # Cache for 30 seconds
+                print(f"🔄 Cache Refreshed: {sheet_name} ({len(raw_data)} rows)")
+            except Exception as e:
+                print(f"❌ Cache Refresh Failed for {sheet_name}: {e}")
+                # If we have old data, keep it instead of crashing
+                if sheet_name not in self._cache:
+                    raise
         return self._cache[sheet_name]
 
     def query(self, model) -> QueryWrapper:

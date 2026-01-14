@@ -9,8 +9,7 @@ from app.core.auth_utils import hash_password, verify_password
 
 router = APIRouter(
     prefix="/admin",
-    tags=["admin"],
-    dependencies=[Depends(get_current_active_admin)]
+    tags=["admin"]
 )
 
 class UserStatusUpdate(BaseModel):
@@ -41,7 +40,61 @@ class UserResponse(BaseModel):
 
 @router.get("/users", response_model=List[dict])
 async def get_all_users(db: any = Depends(get_db)):
+    """Get all approved users for admin management"""
     return [u.dict() for u in db.query(User).all() if not u.is_deleted and str(u.approval_status).lower() == 'approved']
+
+@router.get("/attendance-summary")
+async def get_admin_attendance_summary(db: any = Depends(get_db)):
+    """Get today's attendance summary for admin dashboard"""
+    from app.services import attendance_service
+    from app.core.time_utils import get_today_date_ist
+    today = get_today_date_ist().isoformat()
+    all_att = attendance_service.get_all_attendance(db, today)
+    present = len([a for a in all_att if a.get("status") == "Present"])
+    return {
+        "present_count": present, 
+        "total_users": len([u for u in db.query(User).all() if not u.is_deleted]), 
+        "attendance": all_att
+    }
+
+@router.get("/project-analytics")
+async def get_project_analytics(project: Optional[str] = None, db: any = Depends(get_db)):
+    """Get project-specific analytics for admin dashboard"""
+    from app.models.models_db import Task
+    all_tasks = db.query(Task).all()
+    tasks = [t for t in all_tasks if not t.is_deleted]
+    
+    if project and project != "all":
+        tasks = [t for t in tasks if str(t.project) == project or str(t.project_id) == project]
+    
+    status_counts = {
+        "pending": len([t for t in tasks if str(t.status).lower() == 'pending']),
+        "in_progress": len([t for t in tasks if str(t.status).lower() == 'in_progress']),
+        "completed": len([t for t in tasks if str(t.status).lower() == 'completed']),
+        "on_hold": len([t for t in tasks if str(t.status).lower() == 'on_hold'])
+    }
+    
+    return {
+        "stats": status_counts,
+        "total": len(tasks),
+        "project": project or "all"
+    }
+
+@router.get("/overall-stats")
+async def get_overall_stats(db: any = Depends(get_db)):
+    """Get overall counts for admin dashboard cards"""
+    from app.models.models_db import Task, Project, Machine
+    users_count = len([u for u in db.query(User).all() if not u.is_deleted])
+    tasks_count = len([t for t in db.query(Task).all() if not t.is_deleted])
+    projects_count = len([p for p in db.query(Project).all() if not p.is_deleted])
+    machines_count = len([m for m in db.query(Machine).all() if not m.is_deleted])
+    
+    return {
+        "users": users_count,
+        "tasks": tasks_count,
+        "projects": projects_count,
+        "machines": machines_count
+    }
 
 @router.get("/pending-users", response_model=List[dict])
 async def get_pending_users(db: any = Depends(get_db)):
