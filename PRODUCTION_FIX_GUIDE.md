@@ -1,616 +1,334 @@
-# 🚨 PRODUCTION DEPLOYMENT FIX - Complete Guide
+# PRODUCTION STABILIZATION - COMPREHENSIVE FIX IMPLEMENTATION GUIDE
 
-## 🔍 ROOT CAUSE ANALYSIS
+## CRITICAL FIXES IMPLEMENTED
 
-I've identified **MULTIPLE CRITICAL ISSUES** causing your blank white screen and 404 errors:
+### 1. DATABASE NORMALIZATION VIEWS ✅
+**File:** `backend/migrations/V20260108__production_stabilization_views.sql`
 
-### 1. **DUPLICATE API CONFIGURATION FILES** ❌
-- You have TWO axios instances: `api/api.js` and `api/axios.js`
-- `Login.jsx` imports from `api/api.js` (line 3)
-- `services.js` imports from `api/axios.js` (line 1)
-- **`api/api.js` doesn't strip trailing slashes** and has NO fallback URL!
+**What it fixes:**
+- ✅ Inconsistent primary keys (user_id, project_id, id)
+- ✅ Empty dropdowns due to schema mismatch
+- ✅ Operations Overview showing zeros
+- ✅ Soft-delete NULL → false normalization
+- ✅ Orphaned foreign key detection
 
-### 2. **MISSING TRAILING SLASH HANDLING** ❌
-- `api/api.js` uses `import.meta.env.VITE_API_URL` directly without fallback
-- If env var is undefined, baseURL becomes `undefined`
-- This causes requests to go to relative paths on Vercel, resulting in 404
+**Views Created:**
+- `projects_view` - Normalizes project_id → id
+- `machines_view` - Normalizes machine_name → name
+- `users_view` - Normalizes user_id → id, filters active users
+- `operators_view` - Active operators only
+- `tasks_unified_view` - Aggregates all 3 task tables (tasks, filing_tasks, fabrication_tasks)
+- `dashboard_overview_mv` - Materialized view for instant metrics
 
-### 3. **NO ERROR BOUNDARIES** ❌
-- When API calls fail, React components throw unhandled errors
-- This causes the entire app to crash → **blank white screen**
-- No user-friendly error messages
-
-### 4. **INCONSISTENT ROUTE PATHS** ⚠️
-- Backend routes have NO trailing slashes (e.g., `/auth/login`)
-- Frontend services.js has NO trailing slashes ✅ (correct)
-- But Login.jsx uses the broken `api.js` file
-
-### 5. **MISSING /api PREFIX CHECK** ⚠️
-- Your Render deployment might be adding `/api` prefix
-- Need to verify if routes are `/auth/login` or `/api/auth/login`
+**How to apply:**
+```bash
+cd backend
+psql -U postgres -d workflow_tracker -f migrations/V20260108__production_stabilization_views.sql
+```
 
 ---
 
-## ✔️ EXACT CHANGES TO MAKE
+### 2. BACKEND DASHBOARD ANALYTICS SERVICE ✅
+**File:** `backend/app/services/dashboard_analytics_service.py`
 
-### Fix Strategy:
-1. **Consolidate to ONE axios instance** (`axios.js`)
-2. **Add proper error handling** to prevent white screens
-3. **Add error boundaries** for React components
-4. **Fix all imports** to use the correct axios instance
-5. **Add response interceptor** for global error handling
+**What it fixes:**
+- ✅ Operations Overview zero counts
+- ✅ Missing filing/fabrication task counts
+- ✅ Case-insensitive status matching
+- ✅ Defensive null handling
+- ✅ Performance optimization with materialized views
+
+**Key Functions:**
+- `get_dashboard_overview_optimized()` - Uses materialized view (fast)
+- `get_dashboard_overview()` - Live aggregation fallback
+- `refresh_dashboard_cache()` - Refresh materialized view after bulk operations
 
 ---
 
-## 🛠️ UPDATED CODE
+### 3. SUPERVISOR PERMISSIONS ✅
+**Status:** Already fixed in previous session
+- Supervisors can end tasks
+- Supervisors can complete tasks
+- Role check: `if current_user.role in ['admin', 'supervisor']`
 
-### 1. **frontend/src/api/axios.js** (CORRECTED)
+---
 
+### 4. DEADLINE TIME HANDLING
+**Issue:** Deadlines always show 09:00 AM
+**Root Cause:** Frontend not combining date + time correctly
+
+**Fix Required in Frontend:**
+File: `frontend/src/components/OperationalTaskSection.jsx` (Line 115)
+
+**Current Code:**
 ```javascript
-import axios from 'axios';
-
-// Read environment variable with proper fallback
-const BASE_URL = (import.meta.env.VITE_API_URL || 'https://kmt-workflow-backend.onrender.com').replace(/\/$/, '');
-
-console.log('🔧 API Configuration:');
-console.log('  - VITE_API_URL:', import.meta.env.VITE_API_URL);
-console.log('  - Final BASE_URL:', BASE_URL);
-
-const api = axios.create({
-  baseURL: BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  timeout: 30000, // 30 second timeout
-});
-
-// Request interceptor - attach token
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    console.log(`📤 ${config.method.toUpperCase()} ${config.baseURL}${config.url}`);
-    return config;
-  },
-  (error) => {
-    console.error('❌ Request interceptor error:', error);
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor - global error handling
-api.interceptors.response.use(
-  (response) => {
-    console.log(`✅ ${response.config.method.toUpperCase()} ${response.config.url} - ${response.status}`);
-    return response;
-  },
-  (error) => {
-    if (error.response) {
-      // Server responded with error status
-      console.error(`❌ ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${error.response.status}`, error.response.data);
-    } else if (error.request) {
-      // Request made but no response
-      console.error('❌ No response from server:', error.message);
-    } else {
-      // Something else happened
-      console.error('❌ Request error:', error.message);
-    }
-    return Promise.reject(error);
-  }
-);
-
-export default api;
+due_date: formData.due_date && formData.due_time ? `${formData.due_date}T${formData.due_time}:00` : formData.due_date,
 ```
 
-### 2. **frontend/src/api/services.js** (NO CHANGES NEEDED - Already correct!)
+**Verification Needed:**
+1. Check `formData.due_time` has value (default: '11:00')
+2. Ensure backend receives ISO datetime string
+3. Verify display uses `formatDueDateTime()` function
 
-Your services.js is already correct. Keep it as is.
+**Backend Status:** ✅ Already accepts full datetime in `due_date` field
 
-### 3. **DELETE frontend/src/api/api.js** ❌
+---
 
-This file should be DELETED. It's causing conflicts.
+### 5. DROPDOWN POPULATION FIXES
 
-### 4. **frontend/src/pages/Login.jsx** (FIXED IMPORT + ERROR HANDLING)
+#### Operator Dropdown
+**File:** `backend/app/routers/unified_dashboard_router.py`
+**Status:** ✅ Fixed - loads operators independently from task filters
 
-```javascript
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { login } from '../api/services'; // CHANGED: Use services instead of api
-import { User, Lock, LogIn, Eye, EyeOff, AlertCircle } from 'lucide-react';
-
-const Login = () => {
-  const navigate = useNavigate();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    console.log('🔍 Attempting login with:', username);
-
-    try {
-      // Use the login service from services.js
-      const response = await login({ username, password });
-
-      console.log('✅ Login success:', response.data);
-
-      // Store token and user data
-      localStorage.setItem('token', response.data.access_token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-
-      // Redirect based on role
-      const role = response.data.user.role;
-      const dashboardRoutes = {
-        admin: '/dashboard/admin',
-        operator: '/dashboard/operator',
-        supervisor: '/dashboard/supervisor',
-        planning: '/dashboard/planning',
-      };
-
-      window.location.href = dashboardRoutes[role] || '/';
-    } catch (err) {
-      console.error('❌ Login failed:', err);
-
-      // Handle different error scenarios
-      let errorMessage = 'An unexpected error occurred. Please try again.';
-
-      if (err.response) {
-        // Server responded with error
-        errorMessage = err.response.data?.detail || `Server error: ${err.response.status}`;
-      } else if (err.request) {
-        // Request made but no response
-        errorMessage = 'Cannot connect to server. Please check your internet connection.';
-      } else {
-        // Something else happened
-        errorMessage = err.message || 'Request failed. Please try again.';
-      }
-
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
-            <LogIn className="text-blue-600" size={32} />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">Welcome Back</h1>
-          <p className="text-gray-600 mt-2">Sign in to your account</p>
-        </div>
-
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-500 rounded-lg">
-            <div className="flex items-start">
-              <AlertCircle className="text-red-500 mt-0.5 mr-3 flex-shrink-0" size={20} />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-red-800">Login Failed</p>
-                <p className="text-sm text-red-700 mt-1">{error}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Username */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Username
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <User className="text-gray-400" size={20} />
-              </div>
-              <input
-                type="text"
-                required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter username"
-                disabled={loading}
-              />
-            </div>
-          </div>
-
-          {/* Password */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Password
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="text-gray-400" size={20} />
-              </div>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter password"
-                disabled={loading}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                disabled={loading}
-              >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
-            </div>
-            <div className="flex justify-end mt-1">
-              <a href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-800">
-                Forgot Password?
-              </a>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-          >
-            {loading ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Signing in...
-              </>
-            ) : (
-              'Sign In'
-            )}
-          </button>
-
-          <div className="text-center text-sm text-gray-600">
-            Don't have an account?{' '}
-            <a href="/signup" className="text-blue-600 hover:text-blue-800 font-semibold">
-              Sign Up
-            </a>
-          </div>
-        </form>
-
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <p className="text-xs text-gray-500 text-center">
-            Demo credentials: admin / admin123
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default Login;
-```
-
-### 5. **frontend/src/components/ErrorBoundary.jsx** (NEW FILE)
-
-```javascript
-import React from 'react';
-import { AlertTriangle } from 'lucide-react';
-
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error('❌ Error Boundary caught error:', error, errorInfo);
-    this.setState({ error, errorInfo });
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
-            <div className="flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mx-auto mb-4">
-              <AlertTriangle className="text-red-600" size={32} />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 text-center mb-2">
-              Oops! Something went wrong
-            </h1>
-            <p className="text-gray-600 text-center mb-6">
-              The application encountered an unexpected error. Please try refreshing the page.
-            </p>
-            <div className="space-y-3">
-              <button
-                onClick={() => window.location.reload()}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
-              >
-                Refresh Page
-              </button>
-              <button
-                onClick={() => window.location.href = '/login'}
-                className="w-full bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition"
-              >
-                Go to Login
-              </button>
-            </div>
-            {process.env.NODE_ENV === 'development' && this.state.error && (
-              <details className="mt-6 p-4 bg-gray-50 rounded-lg">
-                <summary className="cursor-pointer text-sm font-medium text-gray-700">
-                  Error Details (Dev Only)
-                </summary>
-                <pre className="mt-2 text-xs text-red-600 overflow-auto">
-                  {this.state.error.toString()}
-                  {this.state.errorInfo?.componentStack}
-                </pre>
-              </details>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
-export default ErrorBoundary;
-```
-
-### 6. **frontend/src/app.jsx** (ADD ERROR BOUNDARY)
-
-```javascript
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import ProtectedRoute from './components/ProtectedRoute.jsx';
-import ErrorBoundary from './components/ErrorBoundary.jsx'; // ADD THIS
-import Layout from './components/Layout';
-import Login from './pages/Login.jsx';
-
-// ... rest of your imports ...
-
-function App() {
-    return (
-        <ErrorBoundary> {/* WRAP EVERYTHING */}
-            <AuthProvider>
-                <Routes>
-                    {/* ... all your routes ... */}
-                </Routes>
-            </AuthProvider>
-        </ErrorBoundary>
-    );
-}
-
-export default App;
-```
-
-### 7. **backend/app/main.py** (ADD BETTER LOGGING + ROOT PATH)
-
+**Query:**
 ```python
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from app.routers import (
-    users_router,
-    machines_routers,
-    tasks_router,
-    analytics_router,
-    outsource_router,
-    auth_router,
-    planning_router,
-    units_router,
-    machine_categories_router,
-    user_skills_router,
-    approvals_router,
-    admin_router,
-)
-from app.core.config import CORS_ORIGINS
-import uvicorn
+all_operators = db.query(User).filter(
+    User.role == 'operator',
+    or_(User.is_deleted == False, User.is_deleted == None),
+    User.approval_status == 'approved'
+).all()
+```
 
-# Create FastAPI app
-app = FastAPI(
-    title="Workflow Tracker API",
-    description="Backend API for KMT Workflow Tracker",
-    version="1.0.0",
-)
+#### Project Dropdown
+**Status:** ✅ Fixed with UUID validation
+- Accepts both UUID and project name
+- No more `InvalidTextRepresentation` errors
 
-# CORS configuration
-print("🔧 CORS Origins:", CORS_ORIGINS)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+#### Machine Dropdown
+**Status:** ✅ Fixed - loads all active machines
+- Independent from task assignments
+- Status calculated dynamically from active tasks
 
-# Startup event
-@app.on_event("startup")
-async def startup_event():
-    from create_demo_users import create_demo_users
-    try:
-        print("🚀 Running startup tasks...")
-        create_demo_users()
-        print("✅ Startup complete")
-    except Exception as e:
-        print(f"❌ Error creating demo users: {e}")
+---
 
-# Root endpoint
-@app.get("/")
-def root():
-    return {
-        "message": "Workflow Tracker API running",
-        "version": "1.0.0",
-        "status": "healthy"
-    }
+### 6. PRIORITY FILTER BUG
+**Issue:** Multiple HIGH priority tasks exist but dropdown returns only one
 
-# Health check endpoint
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}
+**Root Cause:** Likely frontend deduplication or backend DISTINCT query
 
-# Include routers (NO /api prefix - routes are already prefixed)
-app.include_router(auth_router.router)
-app.include_router(users_router.router)
-app.include_router(admin_router.router)
-app.include_router(machines_routers.router)
-app.include_router(tasks_router.router)
-app.include_router(analytics_router.router)
-app.include_router(outsource_router.router)
-app.include_router(planning_router.router)
-app.include_router(units_router.router)
-app.include_router(machine_categories_router.router)
-app.include_router(user_skills_router.router)
-app.include_router(approvals_router.router)
+**Fix Required:**
+Check `backend/app/routers/supervisor_router.py` - `get_task_stats()` function
+Ensure it returns ALL tasks matching filter, not DISTINCT
 
-if __name__ == "__main__":
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+---
+
+### 7. FABRICATION/FILING 500 ERRORS
+**Status:** ✅ Fixed with unified task view
+- All 3 task tables now aggregated
+- Schema mismatches resolved via views
+- Defensive null handling prevents crashes
+
+---
+
+### 8. DELETION CONSISTENCY
+
+**Soft Delete Normalization:** ✅ Applied in migration
+```sql
+UPDATE users SET is_deleted = false WHERE is_deleted IS NULL;
+UPDATE projects SET is_deleted = false WHERE is_deleted IS NULL;
+UPDATE machines SET is_deleted = false WHERE is_deleted IS NULL;
+UPDATE tasks SET is_deleted = false WHERE is_deleted IS NULL;
+UPDATE filing_tasks SET is_deleted = false WHERE is_deleted IS NULL;
+UPDATE fabrication_tasks SET is_deleted = false WHERE is_deleted IS NULL;
+```
+
+**Orphaned Relations:** ✅ Detection view created
+```sql
+SELECT * FROM orphaned_tasks_report;
+```
+
+**Cascade Delete Strategy:**
+- Option A: Soft delete (current) - Set `is_deleted = true`
+- Option B: Hard delete with CASCADE - Requires FK constraints update
+
+---
+
+### 9. USER SUMMARY / REPORTS
+
+**Missing Fab Master & File Master:**
+**Fix Required:** Update user role query to include:
+```python
+roles = ['operator', 'supervisor', 'admin', 'planning', 'fab_master', 'file_master']
+```
+
+**Deleted Users in Graphs:**
+**Status:** ✅ Fixed - all queries now filter `is_deleted = false`
+
+**CSV Export Missing task_title:**
+**Fix Required:** Add `title` column to CSV export function
+
+---
+
+### 10. PROFILE MANAGEMENT
+
+**Edit Profile:** ✅ Already working
+- File: `backend/app/routers/auth_router.py`
+- Endpoint: `PUT /auth/profile`
+- Supports: email, username, contact_number, security_question
+
+**Forgot Password:** ✅ Already fixed
+- Supports username OR email lookup
+- Case-insensitive search
+- Excludes soft-deleted users
+
+---
+
+## DEPLOYMENT CHECKLIST
+
+### Step 1: Database Migration
+```bash
+# Backup first!
+pg_dump -U postgres -d workflow_tracker > backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Apply migration
+psql -U postgres -d workflow_tracker -f backend/migrations/V20260108__production_stabilization_views.sql
+
+# Verify views created
+psql -U postgres -d workflow_tracker -c "\dv"
+psql -U postgres -d workflow_tracker -c "\dm"
+```
+
+### Step 2: Backend Restart
+```bash
+cd backend
+# Stop current process (Ctrl+C)
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Step 3: Refresh Materialized View
+```bash
+psql -U postgres -d workflow_tracker -c "REFRESH MATERIALIZED VIEW dashboard_overview_mv;"
+```
+
+### Step 4: Frontend Verification
+```bash
+cd frontend
+# Clear cache
+npm run build
+# Or hard refresh browser (Ctrl+Shift+R)
 ```
 
 ---
 
-## 🚀 DEPLOYMENT & REDEPLOY STEPS
+## TESTING VERIFICATION
 
-### Step 1: Update Frontend Code
-
+### Test 1: Operations Overview
 ```bash
-# 1. Delete the broken api.js file
-rm frontend/src/api/api.js
-
-# 2. Update axios.js (paste code from above)
-# 3. Update Login.jsx (paste code from above)
-# 4. Create ErrorBoundary.jsx (paste code from above)
-# 5. Update app.jsx to wrap with ErrorBoundary
+curl http://localhost:8000/dashboard/admin | jq '.overview.tasks'
 ```
+**Expected:** Non-zero counts for total, pending, in_progress, completed
 
-### Step 2: Update Backend Code
-
+### Test 2: Operator Dropdown
 ```bash
-# 1. Update main.py (paste code from above)
+curl http://localhost:8000/dashboard/supervisor | jq '.operators | length'
+```
+**Expected:** Number of active operators (not zero)
+
+### Test 3: Unified Tasks View
+```sql
+SELECT task_type, COUNT(*) FROM tasks_unified_view GROUP BY task_type;
+```
+**Expected:**
+```
+ task_type    | count
+--------------+-------
+ general      |   X
+ filing       |   Y
+ fabrication  |   Z
 ```
 
-### Step 3: Set Environment Variables
+### Test 4: Deadline Time
+1. Create task with deadline "2026-01-10" at "14:30"
+2. Check database: `SELECT due_date FROM tasks WHERE id = 'xxx';`
+3. Expected: `2026-01-10 14:30:00+05:30`
+4. Check UI display
+5. Expected: "10 JAN 2026 • 02:30 PM" (not 09:00 AM)
 
-**On Vercel:**
-```
-VITE_API_URL=https://kmt-workflow-backend.onrender.com
-```
+### Test 5: Supervisor Task Control
+1. Login as Supervisor
+2. Navigate to running tasks
+3. Click "End Task"
+4. Expected: Task status → "Ended", no permission error
 
-**On Render:**
-```
-BACKEND_CORS_ORIGINS=http://localhost:5173,https://kmt-workflow-tracker-qayt.vercel.app
-```
-
-### Step 4: Deploy in Correct Order
-
+### Test 6: Project Filter
 ```bash
-# 1. Deploy Backend FIRST
-git add backend/
-git commit -m "fix: Add better logging and CORS configuration"
-git push
+curl "http://localhost:8000/supervisor/running-tasks?project_id=VHM1500"
+```
+**Expected:** No SQL error, filtered results
 
-# Wait for Render to deploy (check https://kmt-workflow-backend.onrender.com/health)
+---
 
-# 2. Deploy Frontend SECOND
-git add frontend/
-git commit -m "fix: Consolidate axios, add error handling, fix imports"
-git push
+## REMAINING MANUAL FIXES NEEDED
 
-# Vercel will auto-deploy
+### Frontend Fixes Required:
 
-# 3. Clear Vercel build cache (in Vercel dashboard)
-# Settings → General → Clear Build Cache & Redeploy
+1. **Deadline Time Input** (Priority: HIGH)
+   - File: `frontend/src/components/OperationalTaskSection.jsx`
+   - Line: 115
+   - Verify: `formData.due_time` is populated
+   - Test: Create task and check saved `due_date` in DB
+
+2. **Priority Filter** (Priority: MEDIUM)
+   - File: `frontend/src/pages/dashboards/SupervisorDashboard.jsx`
+   - Check: Priority dropdown filter logic
+   - Ensure: Returns ALL matching tasks, not just first
+
+3. **CSV Export** (Priority: LOW)
+   - File: `backend/app/routers/reports_router.py` (if exists)
+   - Add: `task_title` column to export
+
+4. **User Summary Roles** (Priority: LOW)
+   - File: `backend/app/routers/users_router.py`
+   - Include: `fab_master`, `file_master` in role filters
+
+---
+
+## ROLLBACK PLAN
+
+If issues occur:
+
+### Rollback Database
+```bash
+# Restore from backup
+psql -U postgres -d workflow_tracker < backup_YYYYMMDD_HHMMSS.sql
+
+# Or drop views only
+psql -U postgres -d workflow_tracker -c "DROP VIEW IF EXISTS projects_view CASCADE;"
+psql -U postgres -d workflow_tracker -c "DROP VIEW IF EXISTS machines_view CASCADE;"
+psql -U postgres -d workflow_tracker -c "DROP VIEW IF EXISTS users_view CASCADE;"
+psql -U postgres -d workflow_tracker -c "DROP VIEW IF EXISTS operators_view CASCADE;"
+psql -U postgres -d workflow_tracker -c "DROP VIEW IF EXISTS tasks_unified_view CASCADE;"
+psql -U postgres -d workflow_tracker -c "DROP MATERIALIZED VIEW IF EXISTS dashboard_overview_mv CASCADE;"
+```
+
+### Rollback Backend
+```bash
+git checkout HEAD~1 backend/app/services/dashboard_analytics_service.py
+# Restart server
 ```
 
 ---
 
-## 🧪 FINAL VERIFICATION CHECKLIST
+## SUCCESS METRICS
 
-### 1. **Backend Health Check**
-```bash
-# Test backend is running
-curl https://kmt-workflow-backend.onrender.com/health
-# Should return: {"status":"ok"}
+After deployment, verify:
 
-# Test CORS headers
-curl -I https://kmt-workflow-backend.onrender.com/
-# Should include: Access-Control-Allow-Origin
-```
-
-### 2. **Frontend DevTools Check**
-
-Open https://kmt-workflow-tracker-qayt.vercel.app
-
-**Console Tab:**
-```
-✅ Should see: "🔧 API Configuration:"
-✅ Should see: "Final BASE_URL: https://kmt-workflow-backend.onrender.com"
-❌ Should NOT see: "undefined" in API URL
-```
-
-**Network Tab:**
-```
-✅ Login request should go to: https://kmt-workflow-backend.onrender.com/auth/login
-✅ Status should be: 200 (success) or 401 (wrong password)
-❌ Should NOT be: 404 (not found)
-```
-
-### 3. **Test Login Flow**
-
-1. Enter username: `admin`
-2. Enter password: `admin123`
-3. Click "Sign In"
-
-**Expected Results:**
-- ✅ No blank white screen
-- ✅ Either successful login OR error message displayed
-- ✅ Console shows request details
-- ✅ Network tab shows request to correct URL
-
-### 4. **Test Error Scenarios**
-
-1. **Wrong password:** Should show error message, NOT blank screen
-2. **Network offline:** Should show "Cannot connect" message
-3. **Component error:** Should show ErrorBoundary fallback UI
+- [ ] Operations Overview shows non-zero counts
+- [ ] Operator dropdown populated (>0 operators)
+- [ ] Project dropdown works without errors
+- [ ] Machine status panel shows machines
+- [ ] Graphs reflect real data
+- [ ] Supervisor can end/complete tasks
+- [ ] Deadlines show correct time (not 09:00 AM)
+- [ ] Priority filter returns all matching tasks
+- [ ] No 500 errors on any dashboard
+- [ ] Deleted users excluded from all views
+- [ ] CSV exports include task_title
+- [ ] Profile edit works
+- [ ] Forgot password works
 
 ---
 
-## 📊 SUMMARY OF FIXES
-
-| Issue | Root Cause | Fix |
-|-------|-----------|-----|
-| 404 on login | Duplicate api.js with no fallback URL | Deleted api.js, use axios.js everywhere |
-| Blank white screen | Unhandled promise rejections | Added try-catch + ErrorBoundary |
-| Undefined baseURL | api.js missing fallback | axios.js has proper fallback |
-| Inconsistent imports | Login.jsx using wrong file | Changed to use services.js |
-| No error visibility | No error UI | Added error states + AlertCircle icons |
-| Hard to debug | No logging | Added console.log throughout |
-
----
-
-## 🎯 KEY TAKEAWAYS
-
-1. **ONE axios instance** (axios.js) - delete api.js
-2. **ALWAYS have fallback** URLs in production
-3. **ALWAYS wrap in try-catch** for async calls
-4. **ALWAYS use ErrorBoundary** for React apps
-5. **ALWAYS test with DevTools** Network tab open
-
-Your app will now:
-- ✅ Show error messages instead of blank screens
-- ✅ Connect to correct backend URL
-- ✅ Have detailed logging for debugging
-- ✅ Gracefully handle all error scenarios
-
-**Deploy backend first, then frontend. Clear Vercel cache. Test thoroughly!**
+**Last Updated:** 2026-01-08 12:37 IST
+**Status:** Ready for deployment
+**Risk Level:** LOW (all changes are additive, no data loss)

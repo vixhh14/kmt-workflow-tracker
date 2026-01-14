@@ -8,12 +8,24 @@ import hashlib
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against a hashed password."""
     try:
+        # Strip whitespace from hash (common issue from Google Sheets)
+        hashed_password = hashed_password.strip()
+        
         # Convert strings to bytes
         password_bytes = plain_password.encode('utf-8')
         hash_bytes = hashed_password.encode('utf-8')
-        return bcrypt.checkpw(password_bytes, hash_bytes)
+        
+        result = bcrypt.checkpw(password_bytes, hash_bytes)
+        
+        if not result:
+            print(f"⚠️  Password verification failed")
+            print(f"   Hash length: {len(hashed_password)}")
+            print(f"   Hash starts with: {hashed_password[:10]}")
+        
+        return result
     except Exception as e:
-        print(f"Password verification error: {e}")
+        print(f"❌ Password verification error: {e}")
+        print(f"   Hash provided: {hashed_password[:30] if hashed_password else 'None'}...")
         return False
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):

@@ -28,12 +28,23 @@ async def login(credentials: LoginRequest, db: any = Depends(get_db)):
     try:
         # Load all users from Sheets (cached)
         all_users = db.query(User).all()
+        print(f"📊 Total users loaded: {len(all_users)}")
         
         # Manual case-insensitive and is_deleted filter
         user = next((u for u in all_users if str(u.username).lower() == credentials.username.lower() and not u.is_deleted), None)
 
         if not user:
+            print(f"❌ User '{credentials.username}' not found or is deleted")
             raise HTTPException(status_code=401, detail="Incorrect username or password")
+        
+        print(f"✅ User found: {user.username}")
+        print(f"   Role: {user.role}")
+        print(f"   Approval: {user.approval_status}")
+        print(f"   Is Deleted: {user.is_deleted}")
+        print(f"   Has password_hash: {bool(user.password_hash)}")
+        if user.password_hash:
+            print(f"   Hash length: {len(user.password_hash)}")
+            print(f"   Hash preview: {user.password_hash[:30]}...")
         
         # Approval check
         user_role = (user.role or "operator").lower()
@@ -45,7 +56,16 @@ async def login(credentials: LoginRequest, db: any = Depends(get_db)):
                 raise HTTPException(status_code=403, detail="Account registration rejected")
         
         # Password verification
-        if not user.password_hash or not verify_password(credentials.password, user.password_hash):
+        print(f"🔐 Verifying password...")
+        if not user.password_hash:
+            print(f"❌ No password hash stored!")
+            raise HTTPException(status_code=401, detail="Incorrect username or password")
+        
+        password_valid = verify_password(credentials.password, user.password_hash)
+        print(f"   Password valid: {password_valid}")
+        
+        if not password_valid:
+            print(f"❌ Password verification failed!")
             raise HTTPException(status_code=401, detail="Incorrect username or password")
         
         # JWT Token

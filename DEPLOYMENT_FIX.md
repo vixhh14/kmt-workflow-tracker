@@ -1,178 +1,68 @@
-# Deployment Fix Guide - KMT Workflow Tracker
+# Deployment Fix Instructions
 
-## 🛠 Fix Summary
+## 1. Apply SQL Fixes
+Since the backend cannot directly execute DDL on the remote database due to network restrictions, you must run the fix script.
 
-### Issues Identified & Fixed:
-
-1. **URL Mismatch Fixed**: Frontend now consistently uses `https://kmt-workflow-backend.onrender.com`
-2. **CORS Configuration Fixed**: Backend now uses centralized CORS config with all necessary origins
-3. **Preview URL Support**: Added Vercel preview URL to CORS whitelist
-4. **Keep-Alive**: Backend already has `/health` endpoint for monitoring services
-
----
-
-## ⚙️ Deployment Steps
-
-### Step 1: Deploy Backend to Render
-
-1. **Push your code to GitHub**:
+**Option A: Run via Render Shell (Recommended)**
+1. Go to your Render Dashboard -> Select the Backend Service -> "Shell" tab.
+2. Run the following command:
    ```bash
-   git add .
-   git commit -m "fix: CORS configuration and API setup"
-   git push origin main
+   python backend/fix_attendance_db.py
    ```
+   *This will connect to the local database (localhost inside Render) and apply the fixes.*
 
-2. **In Render Dashboard** (https://dashboard.render.com):
-   - Go to your backend service
-   - Check that the service name matches: `kmt-workflow-backend`
-   - Verify your live URL is: `https://kmt-workflow-backend.onrender.com`
-   - If URL is different, update all files accordingly
+**Option B: Run via SQL Client**
+If you have an external connection string, run these SQL commands:
+```sql
+-- 1. Drop default (detach old sequence)
+ALTER TABLE attendance ALTER COLUMN id DROP DEFAULT;
 
-3. **Set Environment Variables in Render**:
-   ```
-   DATABASE_URL=sqlite:///./workflow.db
-   SECRET_KEY=<your-secret-key>
-   ALGORITHM=HS256
-   ACCESS_TOKEN_EXPIRE_MINUTES=1440
-   ```
+-- 2. Drop PK
+ALTER TABLE attendance DROP CONSTRAINT IF EXISTS attendance_pkey;
 
-4. **Redeploy** the service (Manual Deploy or push to trigger auto-deploy)
+-- 3. Create sequence
+CREATE SEQUENCE IF NOT EXISTS attendance_id_seq;
 
-5. **Test the backend**:
-   - Visit: `https://kmt-workflow-backend.onrender.com/health`
-   - Should return: `{"status": "ok"}`
+-- 4. Change to BigInt
+ALTER TABLE attendance ALTER COLUMN id TYPE BIGINT;
 
----
+-- 5. Set default
+ALTER TABLE attendance ALTER COLUMN id SET DEFAULT nextval('attendance_id_seq');
 
-### Step 2: Deploy Frontend to Vercel
+-- 6. Sync sequence
+SELECT setval('attendance_id_seq', (SELECT COALESCE(MAX(id), 0) FROM attendance) + 1, false);
 
-1. **In Vercel Dashboard** (https://vercel.com/dashboard):
-   - Go to your project: `kmt-workflow-tracker`
-   - Navigate to **Settings** → **Environment Variables**
-
-2. **Add/Update Environment Variable**:
-   ```
-   Name: VITE_API_URL
-   Value: https://kmt-workflow-backend.onrender.com
-   Environments: ✅ Production, ✅ Preview, ✅ Development
-   ```
-
-3. **Clear Build Cache & Redeploy**:
-   - Go to **Deployments** tab
-   - Click the **...** menu on the latest deployment
-   - Select **Redeploy**
-   - ✅ Check "Clear Build Cache"
-   - Click **Redeploy**
-
-4. **Wait for deployment** to complete (usually 1-2 minutes)
-
----
-
-### Step 3: Set Up Keep-Alive (Prevent Render Sleep)
-
-Free-tier Render services sleep after 15 minutes of inactivity.
-
-**Option A: Use UptimeRobot (Free)**
-1. Go to https://uptimerobot.com and create account
-2. Add New Monitor:
-   - Monitor Type: HTTP(s)
-   - Friendly Name: KMT Backend
-   - URL: `https://kmt-workflow-backend.onrender.com/health`
-   - Monitoring Interval: 5 minutes
-3. Save monitor
-
-**Option B: Use cron-job.org (Free)**
-1. Go to https://cron-job.org and create account
-2. Create new cron job:
-   - URL: `https://kmt-workflow-backend.onrender.com/health`
-   - Schedule: Every 10 minutes
-3. Save and enable
-
----
-
-## 📋 Environment Variables Reference
-
-### Frontend (.env / Vercel Dashboard)
-```env
-VITE_API_URL=https://kmt-workflow-backend.onrender.com
+-- 7. Restore PK
+ALTER TABLE attendance ADD PRIMARY KEY (id);
 ```
 
-### Backend (.env / Render Dashboard)
-```env
-DATABASE_URL=sqlite:///./workflow.db
-SECRET_KEY=<generate-secure-key>
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=1440
-BACKEND_CORS_ORIGINS=https://kmt-workflow-tracker.vercel.app,http://localhost:3000,http://localhost:5173
+## 2. Update Backend Code
+The backend code has already been updated locally:
+- `backend/app/models/models_db.py`: Updated `Attendance` model to use `BigInteger` and `autoincrement=True`.
+- `backend/fix_attendance_db.py`: Created the fix script.
+
+## 3. Push to GitHub
+Run the following commands to push the changes:
+```bash
+git add backend/app/models/models_db.py backend/fix_attendance_db.py
+git commit -m "Fix attendance table: BigInteger ID + AutoIncrement"
+git push
 ```
 
----
+## 4. Redeploy on Render
+1. The push should trigger an automatic deployment.
+2. Watch the deployment logs.
+3. Once "Live", go to the Shell and run the fix script (as described in Step 1).
 
-## 🧪 Testing Checklist
-
-### After Deployment, verify:
-
-- [ ] **Backend Health Check**
-  - Visit: `https://kmt-workflow-backend.onrender.com/health`
-  - Expected: `{"status": "ok"}`
-
-- [ ] **Backend Root Endpoint**
-  - Visit: `https://kmt-workflow-backend.onrender.com/`
-  - Expected: `{"message": "Workflow Tracker API running", "version": "1.0.0", "status": "healthy"}`
-
-- [ ] **Frontend Loads**
-  - Visit: `https://kmt-workflow-tracker.vercel.app`
-  - Expected: Login page displays without console errors
-
-- [ ] **Login Works**
-  - Open browser DevTools (F12) → Network tab
-  - Try logging in with demo credentials
-  - Check that request goes to `https://kmt-workflow-backend.onrender.com/auth/login`
-  - No CORS errors in Console tab
-
-- [ ] **Console Check**
-  - Open DevTools → Console
-  - Should see:
-    ```
-    🚀 API Service Initialized
-    📍 Mode: production
-    🔗 Base URL: https://kmt-workflow-backend.onrender.com
-    ```
-
-- [ ] **Test from Mobile/Different Network**
-  - Access the app from your phone or different device
-  - Login should work without issues
-
----
-
-## 🔧 Troubleshooting
-
-### "Cannot connect to server" Error:
-1. Check if backend is awake: visit `/health` endpoint
-2. Wait 30-60 seconds (Render cold start)
-3. Check browser console for specific error
-
-### CORS Error:
-1. Verify the frontend URL is in CORS whitelist
-2. Check `config.py` includes your Vercel URL
-3. Redeploy backend after CORS changes
-
-### 404 on Login:
-1. Check the request URL in Network tab
-2. Verify `VITE_API_URL` is set correctly
-3. Ensure no trailing slash in the URL
-
-### Render Backend Sleeping:
-1. Set up keep-alive monitoring (see Step 3)
-2. First request after sleep takes 30-60 seconds
-3. Consider upgrading to paid tier for always-on
-
----
-
-## 📝 Files Changed
-
-1. `frontend/src/api/axios.js` - Consistent API URL configuration
-2. `frontend/.env` - Updated backend URL
-3. `frontend/.env.production` - Production environment template
-4. `backend/app/main.py` - Fixed CORS to use centralized config
-5. `backend/app/core/config.py` - Added all required CORS origins
+## 5. Verify Login
+1. **Check Backend Logs**: Ensure no `UniqueViolation` errors appear.
+2. **Test Login**:
+   ```bash
+   # Admin
+   curl -X POST "https://kmt-backend.onrender.com/auth/login" \
+     -H "Content-Type: application/x-www-form-urlencoded" \
+     -d "username=Admin&password=Admin@Demo2025!"
+   ```
+3. **Verify Attendance Insert**:
+   - The login should succeed (200 OK).
+   - The `attendance` table should have a new record with a new ID (e.g., 4, 5, etc.).

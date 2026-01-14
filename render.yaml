@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: kmt-backend
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: cd backend && pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port 10000
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: RENDER
+        value: true
+      # Add your environment variables in Render Dashboard:
+      # - GOOGLE_SHEETS_JSON (your service account JSON)
+      # - GOOGLE_SHEET_ID
+      # - JWT_SECRET
