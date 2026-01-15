@@ -11,19 +11,24 @@ router = APIRouter(prefix="/machines", tags=["Machines"])
 
 @router.get("", response_model=List[MachineOut])
 async def read_machines(db: Any = Depends(get_db)):
-    machines = [m for m in db.query(Machine).all() if not getattr(m, 'is_deleted', False)]
-    # Resolve names
+    """Get all machines from cache."""
+    machines = db.query(Machine).filter(is_deleted=False).all()
+    
+    # Resolve names using cached data
     units = db.query(Unit).all()
     cats = db.query(MachineCategory).all()
     
     u_map = {str(getattr(u, 'id', '')): str(getattr(u, 'name', '')) for u in units}
     c_map = {str(getattr(c, 'id', '')): str(getattr(c, 'name', '')) for c in cats}
     
+    results = []
     for m in machines:
-        m.unit_name = u_map.get(str(getattr(m, 'unit_id', '')), "Unknown")
-        m.category_name = c_map.get(str(getattr(m, 'category_id', '')), "Unknown")
+        data = m.dict()
+        data['unit_name'] = u_map.get(str(data.get('unit_id')), "Unknown")
+        data['category_name'] = c_map.get(str(data.get('category_id')), "Unknown")
+        results.append(data)
         
-    return machines
+    return results
 
 @router.post("", response_model=MachineOut)
 async def create_machine(machine: MachineCreate, db: Any = Depends(get_db)):

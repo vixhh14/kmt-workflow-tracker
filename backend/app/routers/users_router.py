@@ -11,8 +11,8 @@ router = APIRouter(prefix="/users", tags=["Users"])
 
 @router.get("/", response_model=List[UserOut])
 async def list_users(exclude_id: Optional[str] = None, db: any = Depends(get_db)):
-    users = db.query(User).all()
-    res = [u for u in users if not getattr(u, 'is_deleted', False)]
+    """List all active users from cache."""
+    res = db.query(User).filter(is_deleted=False).all()
     if exclude_id:
         res = [u for u in res if str(getattr(u, 'id', '')) != str(exclude_id)]
     return res

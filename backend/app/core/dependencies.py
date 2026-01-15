@@ -28,13 +28,7 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    all_users = db.query(User).all()
-    user = next(
-        (u for u in all_users 
-         if str(getattr(u, 'username', '')).lower() == username.lower() 
-         and not getattr(u, 'is_deleted', False)), 
-        None
-    )
+    user = db.query(User).filter(username=username, is_deleted=False).first()
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

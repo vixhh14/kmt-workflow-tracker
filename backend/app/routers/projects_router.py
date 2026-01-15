@@ -19,14 +19,17 @@ async def read_projects(
     db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all projects."""
-    all_projects = db.query(Project).all()
-    projects = [p for p in all_projects if not getattr(p, 'is_deleted', False)]
+    """Get all projects from cache."""
+    # Query returns all non-deleted projects if we use the right filter
+    projects = db.query(Project).filter(is_deleted=False).all()
     
-    # Map attributes for frontend compatibility if needed by the schema
+    # Map attributes for frontend compatibility if needed
+    results = []
     for p in projects:
-        p.name = getattr(p, 'project_name', '')
-    return projects
+        data = p.dict()
+        data['name'] = data.get('project_name', '')
+        results.append(data)
+    return results
 
 @router.post("", response_model=ProjectOut)
 async def create_project(project: ProjectCreate, db: Any = Depends(get_db)):
@@ -91,9 +94,9 @@ async def update_project(
     
     if "project_code" in update_data and update_data["project_code"]:
         new_code = update_data["project_code"].strip()
-        all_projects = db.query(Project).all()
-        existing = next((p for p in all_projects if str(getattr(p, 'project_code', '')) == new_code and str(getattr(p, 'id', '')) != str(project_id) and not getattr(p, 'is_deleted', False)), None)
-        if existing:
+        # Use simple keyword filter for uniqueness
+        existing = db.query(Project).filter(project_code=new_code, is_deleted=False).all()
+        if any(str(getattr(p, 'id', '')) != str(project_id) for p in existing):
              raise HTTPException(status_code=409, detail=f"Project code '{new_code}' is already in use.")
         update_data["project_code"] = new_code
 
@@ -105,18 +108,20 @@ async def update_project(
         setattr(db_project, key, value)
     
     db_project.updated_at = get_current_time_ist().isoformat()
-    db.commit()
+    db.commit() # Repository will update the project cache
     
-    # Sync project name in Tasks table
-    all_tasks = db.query(Task).all()
+    # Sync project name in Tasks table (All cached)
+    # Optimization: Only sync if name changed
+    new_name = getattr(db_project, 'project_name', '')
+    all_tasks = db.query(Task).filter(project_id=project_id).all()
     for t in all_tasks:
-        if str(getattr(t, 'project_id', '')) == str(project_id):
-            t.project = db_project.project_name
+        t.project = new_name
     
-    db.commit()
+    db.commit() # Repository will update the tasks cache
     
-    db_project.name = str(db_project.project_name)
-    return db_project
+    res = db_project.dict()
+    res['name'] = res.get('project_name', '')
+    return res
 
 @router.delete("/{project_id}")
 async def delete_project(project_id: str, db: Any = Depends(get_db)):

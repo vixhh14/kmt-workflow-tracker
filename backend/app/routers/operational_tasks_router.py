@@ -13,41 +13,37 @@ router = APIRouter(prefix="/operational-tasks", tags=["Operational Tasks"])
 
 @router.get("/filing", response_model=List[OperationalTaskOut])
 async def get_filing_tasks(db: Any = Depends(get_db)):
-    tasks = [t for t in db.query(FilingTask).all() if not getattr(t, 'is_deleted', False)]
+    """Get all filing tasks from cache."""
+    tasks = db.query(FilingTask).filter(is_deleted=False).all()
+    
+    # Pre-load maps for efficiency (cached)
+    projects = {str(p.id): p.project_name for p in db.query(Project).all()}
+    machines = {str(m.id): m.machine_name for m in db.query(Machine).all()}
+
+    results = []
     for t in tasks:
-        p_id = getattr(t, 'project_id', None)
-        if p_id:
-            p = db.query(Project).filter(id=p_id).first()
-            t.project_name = getattr(p, 'project_name', 'Unknown')
-        else:
-            t.project_name = 'Unknown'
-            
-        m_id = getattr(t, 'machine_id', None)
-        if m_id:
-            m = db.query(Machine).filter(id=m_id).first()
-            t.machine_name = getattr(m, 'machine_name', 'Manual/None')
-        else:
-            t.machine_name = 'Manual/None'
-    return tasks
+        data = t.dict()
+        data['project_name'] = projects.get(str(getattr(t, 'project_id', '')), 'Unknown')
+        data['machine_name'] = machines.get(str(getattr(t, 'machine_id', '')), 'Manual/None')
+        results.append(data)
+    return results
 
 @router.get("/fabrication", response_model=List[OperationalTaskOut])
 async def get_fabrication_tasks(db: Any = Depends(get_db)):
-    tasks = [t for t in db.query(FabricationTask).all() if not getattr(t, 'is_deleted', False)]
+    """Get all fabrication tasks from cache."""
+    tasks = db.query(FabricationTask).filter(is_deleted=False).all()
+    
+    # Pre-load maps (cached)
+    projects = {str(p.id): p.project_name for p in db.query(Project).all()}
+    machines = {str(m.id): m.machine_name for m in db.query(Machine).all()}
+
+    results = []
     for t in tasks:
-        p_id = getattr(t, 'project_id', None)
-        if p_id:
-            p = db.query(Project).filter(id=p_id).first()
-            t.project_name = getattr(p, 'project_name', 'Unknown')
-        else:
-            t.project_name = 'Unknown'
-            
-        m_id = getattr(t, 'machine_id', None)
-        if m_id:
-            m = db.query(Machine).filter(id=m_id).first()
-            t.machine_name = getattr(m, 'machine_name', 'Manual/None')
-        else:
-            t.machine_name = 'Manual/None'
-    return tasks
+        data = t.dict()
+        data['project_name'] = projects.get(str(getattr(t, 'project_id', '')), 'Unknown')
+        data['machine_name'] = machines.get(str(getattr(t, 'machine_id', '')), 'Manual/None')
+        results.append(data)
+    return results
 
 @router.post("/filing", response_model=OperationalTaskOut)
 async def create_filing_task(data: OperationalTaskCreate, db: Any = Depends(get_db)):
