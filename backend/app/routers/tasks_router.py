@@ -60,15 +60,16 @@ async def read_tasks(
     
     results = []
     # Load projects once to avoid heavy lookup
-    all_projects = db.query("projects").all()
-    project_map = {str(p.project_id): p.project_name for p in all_projects}
+    all_projects = db.query(DBProject).all()
+    project_map = {str(getattr(p, 'id', '')): getattr(p, 'project_name', '') for p in all_projects if not getattr(p, 'is_deleted', False)}
 
     for t in tasks:
         try:
             # Resolve Project Name
-            resolved_project = t.project
-            if (not resolved_project or resolved_project == '-') and t.project_id:
-                resolved_project = project_map.get(str(t.project_id), "-")
+            resolved_project = getattr(t, 'project', None)
+            task_project_id = str(getattr(t, 'project_id', ''))
+            if (not resolved_project or resolved_project == '-') and task_project_id:
+                resolved_project = project_map.get(task_project_id, "-")
                 if resolved_project != "-":
                     t.project = resolved_project
                     # No need to commit immediately unless we want to sync the sheet
@@ -197,7 +198,7 @@ async def create_task(
 @router.get("/{task_id}/time-logs", response_model=List[dict])
 async def get_task_time_logs(task_id: str, db: Any = Depends(get_db)):
     """Get all time tracking logs for a specific task"""
-    task = db.query(Task).filter(task_id=task_id).first()
+    task = db.query(Task).filter(id=task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
@@ -292,7 +293,7 @@ async def hold_task(
     db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    task = db.query(Task).filter(Task.id == task_id).first()
+    task = db.query(Task).filter(task_id=task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
@@ -366,7 +367,7 @@ async def complete_task(
     db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    task = db.query(Task).filter(Task.id == task_id).first()
+    task = db.query(Task).filter(task_id=task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     if task.status != "in_progress":
@@ -494,7 +495,7 @@ async def end_task(
     if current_user.role not in ['admin', 'supervisor']:
         raise HTTPException(status_code=403, detail="Only admins and supervisors can end tasks")
 
-    task = db.query(Task).filter(Task.id == task_id).first()
+    task = db.query(Task).filter(task_id=task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     

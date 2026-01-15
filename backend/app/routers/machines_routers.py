@@ -16,14 +16,12 @@ async def read_machines(db: Any = Depends(get_db)):
     units = db.query(Unit).all()
     cats = db.query(MachineCategory).all()
     
-    u_map = {str(u.id): str(u.name) for u in units}
-    c_map = {str(c.id): str(c.name) for c in cats}
+    u_map = {str(getattr(u, 'id', '')): str(getattr(u, 'name', '')) for u in units}
+    c_map = {str(getattr(c, 'id', '')): str(getattr(c, 'name', '')) for c in cats}
     
     for m in machines:
-        m.unit_name = u_map.get(str(m.unit_id), "Unknown")
-        m.category_name = c_map.get(str(m.category_id), "Unknown")
-        # Field alias support for id (frontend often expects 'id')
-        m.id = str(m.machine_id)
+        m.unit_name = u_map.get(str(getattr(m, 'unit_id', '')), "Unknown")
+        m.category_name = c_map.get(str(getattr(m, 'category_id', '')), "Unknown")
         
     return machines
 
@@ -31,7 +29,7 @@ async def read_machines(db: Any = Depends(get_db)):
 async def create_machine(machine: MachineCreate, db: Any = Depends(get_db)):
     new_m = Machine(
         **machine.dict(),
-        created_at=datetime.now().isoformat(),
+        created_at=get_current_time_ist().isoformat(),
         status="active",
         is_deleted=False
     )
@@ -41,23 +39,21 @@ async def create_machine(machine: MachineCreate, db: Any = Depends(get_db)):
 
 @router.put("/{machine_id}", response_model=MachineOut)
 async def update_machine(machine_id: str, machine_update: MachineUpdate, db: Any = Depends(get_db)):
-    m = db.query(Machine).filter(machine_id=machine_id).first()
+    m = db.query(Machine).filter(id=machine_id).first()
     if not m: raise HTTPException(status_code=404, detail="Machine not found")
     
     data = machine_update.dict(exclude_unset=True)
     for k, v in data.items():
         setattr(m, k, v)
-    m.updated_at = datetime.now().isoformat()
+    m.updated_at = get_current_time_ist().isoformat()
     db.commit()
-    # Ensure ID is set for response_model
-    m.id = m.machine_id
     return m
 
 @router.delete("/{machine_id}")
 async def delete_machine(machine_id: str, db: Any = Depends(get_db)):
-    m = db.query(Machine).filter(machine_id=machine_id).first()
+    m = db.query(Machine).filter(id=machine_id).first()
     if not m: raise HTTPException(status_code=404, detail="Machine not found")
     m.is_deleted = True
-    m.updated_at = datetime.now().isoformat()
+    m.updated_at = get_current_time_ist().isoformat()
     db.commit()
     return {"message": "Success"}

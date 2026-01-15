@@ -15,28 +15,45 @@ router = APIRouter(prefix="/operational-tasks", tags=["Operational Tasks"])
 async def get_filing_tasks(db: Any = Depends(get_db)):
     tasks = [t for t in db.query(FilingTask).all() if not getattr(t, 'is_deleted', False)]
     for t in tasks:
-        p = db.query(Project).filter(project_id=t.project_id).first()
-        t.project_name = getattr(p, 'project_name', 'Unknown')
-        m = db.query(Machine).filter(id=t.machine_id).first()
-        t.machine_name = getattr(m, 'machine_name', 'Manual/None')
+        p_id = getattr(t, 'project_id', None)
+        if p_id:
+            p = db.query(Project).filter(id=p_id).first()
+            t.project_name = getattr(p, 'project_name', 'Unknown')
+        else:
+            t.project_name = 'Unknown'
+            
+        m_id = getattr(t, 'machine_id', None)
+        if m_id:
+            m = db.query(Machine).filter(id=m_id).first()
+            t.machine_name = getattr(m, 'machine_name', 'Manual/None')
+        else:
+            t.machine_name = 'Manual/None'
     return tasks
 
 @router.get("/fabrication", response_model=List[OperationalTaskOut])
 async def get_fabrication_tasks(db: Any = Depends(get_db)):
     tasks = [t for t in db.query(FabricationTask).all() if not getattr(t, 'is_deleted', False)]
     for t in tasks:
-        p = db.query(Project).filter(project_id=t.project_id).first()
-        t.project_name = getattr(p, 'project_name', 'Unknown')
-        m = db.query(Machine).filter(id=t.machine_id).first()
-        t.machine_name = getattr(m, 'machine_name', 'Manual/None')
+        p_id = getattr(t, 'project_id', None)
+        if p_id:
+            p = db.query(Project).filter(id=p_id).first()
+            t.project_name = getattr(p, 'project_name', 'Unknown')
+        else:
+            t.project_name = 'Unknown'
+            
+        m_id = getattr(t, 'machine_id', None)
+        if m_id:
+            m = db.query(Machine).filter(id=m_id).first()
+            t.machine_name = getattr(m, 'machine_name', 'Manual/None')
+        else:
+            t.machine_name = 'Manual/None'
     return tasks
 
 @router.post("/filing", response_model=OperationalTaskOut)
 async def create_filing_task(data: OperationalTaskCreate, db: Any = Depends(get_db)):
     new_task = FilingTask(
-        id=str(uuid.uuid4()),
         **data.dict(),
-        created_at=datetime.now().isoformat(),
+        created_at=get_current_time_ist().isoformat(),
         status="pending",
         is_deleted=False
     )
@@ -47,9 +64,8 @@ async def create_filing_task(data: OperationalTaskCreate, db: Any = Depends(get_
 @router.post("/fabrication", response_model=OperationalTaskOut)
 async def create_fab_task(data: OperationalTaskCreate, db: Any = Depends(get_db)):
     new_task = FabricationTask(
-        id=str(uuid.uuid4()),
         **data.dict(),
-        created_at=datetime.now().isoformat(),
+        created_at=get_current_time_ist().isoformat(),
         status="pending",
         is_deleted=False
     )
@@ -60,19 +76,19 @@ async def create_fab_task(data: OperationalTaskCreate, db: Any = Depends(get_db)
 @router.put("/filing/{task_id}", response_model=OperationalTaskOut)
 async def update_filing_task(task_id: str, data: OperationalTaskUpdate, db: Any = Depends(get_db)):
     task = db.query(FilingTask).filter(id=task_id).first()
-    if not task: raise HTTPException(status_code=404)
+    if not task: raise HTTPException(status_code=404, detail="Task not found")
     for k, v in data.dict(exclude_unset=True).items():
         setattr(task, k, v)
-    task.updated_at = datetime.now().isoformat()
+    task.updated_at = get_current_time_ist().isoformat()
     db.commit()
     return task
 
 @router.put("/fabrication/{task_id}", response_model=OperationalTaskOut)
 async def update_fab_task(task_id: str, data: OperationalTaskUpdate, db: Any = Depends(get_db)):
     task = db.query(FabricationTask).filter(id=task_id).first()
-    if not task: raise HTTPException(status_code=404)
+    if not task: raise HTTPException(status_code=404, detail="Task not found")
     for k, v in data.dict(exclude_unset=True).items():
         setattr(task, k, v)
-    task.updated_at = datetime.now().isoformat()
+    task.updated_at = get_current_time_ist().isoformat()
     db.commit()
     return task

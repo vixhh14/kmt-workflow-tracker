@@ -29,7 +29,12 @@ async def get_current_user(
         )
     
     all_users = db.query(User).all()
-    user = next((u for u in all_users if u.username == username and not u.is_deleted), None)
+    user = next(
+        (u for u in all_users 
+         if str(getattr(u, 'username', '')).lower() == username.lower() 
+         and not getattr(u, 'is_deleted', False)), 
+        None
+    )
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

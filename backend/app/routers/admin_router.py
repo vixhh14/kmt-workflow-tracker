@@ -26,7 +26,7 @@ class ApproveUserRequest(BaseModel):
     role: Optional[str] = "operator"
 
 class UserResponse(BaseModel):
-    user_id: str
+    id: str
     username: str
     email: Optional[str] = None
     full_name: Optional[str] = None
@@ -41,7 +41,7 @@ class UserResponse(BaseModel):
 @router.get("/users", response_model=List[dict])
 async def get_all_users(db: any = Depends(get_db)):
     """Get all approved users for admin management"""
-    return [u.dict() for u in db.query(User).all() if not u.is_deleted and str(u.approval_status).lower() == 'approved']
+    return [u.dict() for u in db.query(User).all() if not getattr(u, 'is_deleted', False) and str(getattr(u, 'approval_status', '')).lower() == 'approved']
 
 @router.get("/attendance-summary")
 async def get_admin_attendance_summary(db: any = Depends(get_db)):
@@ -49,12 +49,12 @@ async def get_admin_attendance_summary(db: any = Depends(get_db)):
     from app.services import attendance_service
     from app.core.time_utils import get_today_date_ist
     today = get_today_date_ist().isoformat()
-    all_att = attendance_service.get_all_attendance(db, today)
-    present = len([a for a in all_att if a.get("status") == "Present"])
+    # Updated signature check
+    summary_data = await attendance_service.get_attendance_summary(db, today)
     return {
-        "present_count": present, 
-        "total_users": len([u for u in db.query(User).all() if not u.is_deleted]), 
-        "attendance": all_att
+        "present_count": summary_data.get("present_count", 0), 
+        "total_users": summary_data.get("total_tracked", 0), 
+        "attendance": summary_data.get("all_records", [])
     }
 
 @router.get("/project-analytics")
@@ -62,16 +62,16 @@ async def get_project_analytics(project: Optional[str] = None, db: any = Depends
     """Get project-specific analytics for admin dashboard"""
     from app.models.models_db import Task
     all_tasks = db.query(Task).all()
-    tasks = [t for t in all_tasks if not t.is_deleted]
+    tasks = [t for t in all_tasks if not getattr(t, 'is_deleted', False)]
     
     if project and project != "all":
-        tasks = [t for t in tasks if str(t.project) == project or str(t.project_id) == project]
+        tasks = [t for t in tasks if str(getattr(t, 'project', '')) == project or str(getattr(t, 'project_id', '')) == project]
     
     status_counts = {
-        "pending": len([t for t in tasks if str(t.status).lower() == 'pending']),
-        "in_progress": len([t for t in tasks if str(t.status).lower() == 'in_progress']),
-        "completed": len([t for t in tasks if str(t.status).lower() == 'completed']),
-        "on_hold": len([t for t in tasks if str(t.status).lower() == 'on_hold'])
+        "pending": len([t for t in tasks if str(getattr(t, 'status', '')).lower() == 'pending']),
+        "in_progress": len([t for t in tasks if str(getattr(t, 'status', '')).lower() == 'in_progress']),
+        "completed": len([t for t in tasks if str(getattr(t, 'status', '')).lower() == 'completed']),
+        "on_hold": len([t for t in tasks if str(getattr(t, 'status', '')).lower() == 'on_hold'])
     }
     
     return {
@@ -84,10 +84,10 @@ async def get_project_analytics(project: Optional[str] = None, db: any = Depends
 async def get_overall_stats(db: any = Depends(get_db)):
     """Get overall counts for admin dashboard cards"""
     from app.models.models_db import Task, Project, Machine
-    users_count = len([u for u in db.query(User).all() if not u.is_deleted])
-    tasks_count = len([t for t in db.query(Task).all() if not t.is_deleted])
-    projects_count = len([p for p in db.query(Project).all() if not p.is_deleted])
-    machines_count = len([m for m in db.query(Machine).all() if not m.is_deleted])
+    users_count = len([u for u in db.query(User).all() if not getattr(u, 'is_deleted', False)])
+    tasks_count = len([t for t in db.query(Task).all() if not getattr(t, 'is_deleted', False)])
+    projects_count = len([p for p in db.query(Project).all() if not getattr(p, 'is_deleted', False)])
+    machines_count = len([m for m in db.query(Machine).all() if not getattr(m, 'is_deleted', False)])
     
     return {
         "users": users_count,
@@ -98,22 +98,23 @@ async def get_overall_stats(db: any = Depends(get_db)):
 
 @router.get("/pending-users", response_model=List[dict])
 async def get_pending_users(db: any = Depends(get_db)):
-    return [u.dict() for u in db.query(User).all() if not u.is_deleted and str(u.approval_status).lower() == 'pending']
+    return [u.dict() for u in db.query(User).all() if not getattr(u, 'is_deleted', False) and str(getattr(u, 'approval_status', '')).lower() == 'pending']
 
 @router.get("/approvals")
 async def get_admin_approvals(db: any = Depends(get_db)):
-    pending = [u.dict() for u in db.query(User).all() if not u.is_deleted and str(u.approval_status).lower() == 'pending']
+    pending = [u.dict() for u in db.query(User).all() if not getattr(u, 'is_deleted', False) and str(getattr(u, 'approval_status', '')).lower() == 'pending']
     return {"pending_users": pending}
 
 @router.put("/change-password")
 async def change_admin_password(request: ChangePasswordRequest, current_admin: User = Depends(get_current_active_admin), db: any = Depends(get_db)):
-    if not verify_password(request.old_password, current_admin.password_hash):
+    if not verify_password(request.old_password, getattr(current_admin, 'password_hash', '')):
         raise HTTPException(status_code=400, detail="Incorrect old password")
     if request.new_password != request.confirm_new_password:
         raise HTTPException(status_code=400, detail="Passwords do not match")
-    user = db.query(User).filter(user_id=current_admin.user_id).first()
+    user = db.query(User).filter(id=getattr(current_admin, 'id', '')).first()
+    if not user: raise HTTPException(status_code=404, detail="User not found")
     user.password_hash = hash_password(request.new_password)
-    user.updated_at = datetime.now().isoformat()
+    user.updated_at = get_current_time_ist().isoformat()
     db.commit()
     return {"message": "Success"}
 
@@ -125,11 +126,13 @@ async def approve_user(username: str, request: ApproveUserRequest, db: any = Dep
     user.unit_id = request.unit_id
     user.machine_types = request.machine_types
     if request.role: user.role = request.role
-    user.updated_at = datetime.now().isoformat()
+    user.updated_at = get_current_time_ist().isoformat()
     db.commit()
     try:
         from app.core.email_utils import send_approval_email
-        if user.email: send_approval_email(user.email, user.username, "https://kmt-workflow-tracker.vercel.app/login")
+        u_email = getattr(user, 'email', None)
+        if u_email: 
+            send_approval_email(u_email, getattr(user, 'username', ''), "https://kmt-workflow-tracker.vercel.app/login")
     except: pass
     return {"message": "Approved"}
 
@@ -138,24 +141,24 @@ async def reject_user(username: str, db: any = Depends(get_db)):
     user = db.query(User).filter(username=username).first()
     if not user: raise HTTPException(status_code=404, detail="Not found")
     user.approval_status = "rejected"
-    user.updated_at = datetime.now().isoformat()
+    user.updated_at = get_current_time_ist().isoformat()
     db.commit()
     return {"message": "Rejected"}
 
 @router.patch("/users/{user_id}/status")
 async def update_user_status(user_id: str, status_update: UserStatusUpdate, db: any = Depends(get_db)):
-    user = db.query(User).filter(user_id=user_id).first()
+    user = db.query(User).filter(id=user_id).first()
     if not user: raise HTTPException(status_code=404, detail="Not found")
     user.approval_status = status_update.status
-    user.updated_at = datetime.now().isoformat()
+    user.updated_at = get_current_time_ist().isoformat()
     db.commit()
     return {"message": "Updated"}
 
 @router.patch("/users/{user_id}/role")
 async def update_user_role(user_id: str, role_update: UserRoleUpdate, db: any = Depends(get_db)):
-    user = db.query(User).filter(user_id=user_id).first()
+    user = db.query(User).filter(id=user_id).first()
     if not user: raise HTTPException(status_code=404, detail="Not found")
     user.role = role_update.role
-    user.updated_at = datetime.now().isoformat()
+    user.updated_at = get_current_time_ist().isoformat()
     db.commit()
     return {"message": "Updated"}

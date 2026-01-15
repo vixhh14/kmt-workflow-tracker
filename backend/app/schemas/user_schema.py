@@ -24,8 +24,7 @@ class UserUpdate(BaseModel):
     security_answer: Optional[str] = None
 
 class UserOut(UserBase):
-    # Map database user_id to frontend id
-    id: str = Field(alias="user_id")
+    id: str
     machine_types: Optional[str] = None
     updated_at: Optional[datetime] = None
 

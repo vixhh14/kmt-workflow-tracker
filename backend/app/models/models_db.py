@@ -22,22 +22,31 @@ class SheetsModel:
 class User(SheetsModel):
     __tablename__ = "Users"
     def __init__(self, **kwargs):
-        if "user_id" not in kwargs or not kwargs["user_id"]:
-            kwargs["user_id"] = str(uuid.uuid4())
+        # Handle legacy user_id
+        if "id" not in kwargs and "user_id" in kwargs:
+            kwargs["id"] = kwargs.pop("user_id")
+        if "id" not in kwargs or not kwargs["id"]:
+            kwargs["id"] = str(uuid.uuid4())
         super().__init__(**kwargs)
 
 class Project(SheetsModel):
     __tablename__ = "Projects"
     def __init__(self, **kwargs):
-        if "project_id" not in kwargs or not kwargs["project_id"]:
-            kwargs["project_id"] = str(uuid.uuid4())
+        # Handle legacy project_id
+        if "id" not in kwargs and "project_id" in kwargs:
+            kwargs["id"] = kwargs.pop("project_id")
+        if "id" not in kwargs or not kwargs["id"]:
+            kwargs["id"] = str(uuid.uuid4())
         super().__init__(**kwargs)
 
 class Task(SheetsModel):
     __tablename__ = "Tasks"
     def __init__(self, **kwargs):
-        if "task_id" not in kwargs or not kwargs["task_id"]:
-            kwargs["task_id"] = str(uuid.uuid4())
+        # Handle legacy task_id
+        if "id" not in kwargs and "task_id" in kwargs:
+            kwargs["id"] = kwargs.pop("task_id")
+        if "id" not in kwargs or not kwargs["id"]:
+            kwargs["id"] = str(uuid.uuid4())
         super().__init__(**kwargs)
 
 class Attendance(SheetsModel):
@@ -63,21 +72,40 @@ class FilingTask(SheetsModel):
 
 class TaskTimeLog(SheetsModel):
     __tablename__ = "TaskTimeLog"
+    def __init__(self, **kwargs):
+        if "id" not in kwargs or not kwargs["id"]:
+            kwargs["id"] = str(uuid.uuid4())
+        super().__init__(**kwargs)
 
 class TaskHold(SheetsModel):
     __tablename__ = "TaskHold"
+    def __init__(self, **kwargs):
+        if "id" not in kwargs or not kwargs["id"]:
+            kwargs["id"] = str(uuid.uuid4())
+        super().__init__(**kwargs)
 
 class MachineRuntimeLog(SheetsModel):
     __tablename__ = "MachineRuntimeLog"
+    def __init__(self, **kwargs):
+        if "id" not in kwargs or not kwargs["id"]:
+            kwargs["id"] = str(uuid.uuid4())
+        super().__init__(**kwargs)
 
 class UserWorkLog(SheetsModel):
     __tablename__ = "UserWorkLog"
+    def __init__(self, **kwargs):
+        if "id" not in kwargs or not kwargs["id"]:
+            kwargs["id"] = str(uuid.uuid4())
+        super().__init__(**kwargs)
 
 class Machine(SheetsModel):
     __tablename__ = "Machines"
     def __init__(self, **kwargs):
-        if "machine_id" not in kwargs or not kwargs["machine_id"]:
-            kwargs["machine_id"] = str(uuid.uuid4())
+        # Handle legacy machine_id
+        if "id" not in kwargs and "machine_id" in kwargs:
+            kwargs["id"] = kwargs.pop("machine_id")
+        if "id" not in kwargs or not kwargs["id"]:
+            kwargs["id"] = str(uuid.uuid4())
         super().__init__(**kwargs)
 
 class Unit(SheetsModel):
@@ -97,6 +125,14 @@ class OutsourceItem(SheetsModel):
 
 class RescheduleRequest(SheetsModel):
     __tablename__ = "RescheduleRequests"
+    def __init__(self, **kwargs):
+        if "id" not in kwargs or not kwargs["id"]:
+            kwargs["id"] = str(uuid.uuid4())
+        super().__init__(**kwargs)
 
 class PlanningTask(SheetsModel):
     __tablename__ = "PlanningTasks"
+    def __init__(self, **kwargs):
+        if "id" not in kwargs or not kwargs["id"]:
+            kwargs["id"] = str(uuid.uuid4())
+        super().__init__(**kwargs)

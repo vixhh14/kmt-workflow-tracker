@@ -24,84 +24,87 @@ async def get_operator_tasks(
     current_user: User = Depends(get_current_user)
 ):
     """Get all tasks assigned to a specific operator or the current one"""
-    target_user_id = user_id if user_id else current_user.user_id
+    target_user_id = user_id if user_id else str(getattr(current_user, 'id', ''))
     
     # Permission Check: Only Admin/Supervisor can view others
-    if target_user_id != current_user.user_id:
-        if current_user.role not in ["admin", "supervisor", "planning"]:
+    if target_user_id != str(getattr(current_user, 'id', '')):
+        if getattr(current_user, 'role', '') not in ["admin", "supervisor", "planning"]:
             raise HTTPException(status_code=403, detail="Not authorized")
 
     try:
         # Load all needed data
         all_tasks = db.query(Task).all()
-        tasks = [t for t in all_tasks if str(t.assigned_to) == str(target_user_id) and not t.is_deleted]
+        tasks = [t for t in all_tasks if str(getattr(t, 'assigned_to', '')) == str(target_user_id) and not getattr(t, 'is_deleted', False)]
         
         all_users = db.query(User).all()
-        user_map = {u.user_id: u for u in all_users}
+        user_map = {str(getattr(u, 'id', '')): u for u in all_users}
         
         all_machines = db.query(Machine).all()
-        machine_map = {str(m.id): m for m in all_machines}
+        machine_map = {str(getattr(m, 'id', '')): m for m in all_machines}
         
         # Load holds for these tasks
         all_holds = db.query(TaskHold).all()
         
         task_list = []
         for task in tasks:
-            assigned_by_user = user_map.get(str(task.assigned_by))
-            assigned_by_name = assigned_by_user.username if assigned_by_user else "Unknown"
-            machine = machine_map.get(str(task.machine_id))
-            machine_name = machine.machine_name if machine else "Unknown"
+            assigned_by_user = user_map.get(str(getattr(task, 'assigned_by', '')))
+            assigned_by_name = getattr(assigned_by_user, 'username', 'Unknown') if assigned_by_user else "Unknown"
+            machine = machine_map.get(str(getattr(task, 'machine_id', '')))
+            machine_name = getattr(machine, 'machine_name', 'Unknown') if machine else "Unknown"
             
-            task_holds = [h for h in all_holds if str(h.task_id) == str(task.id)]
+            task_holds = [h for h in all_holds if str(getattr(h, 'task_id', '')) == str(getattr(task, 'id', ''))]
             holds = [
                 {
-                    "start": str(h.hold_started_at),
-                    "end": str(h.hold_ended_at) if h.hold_ended_at else None,
-                    "reason": h.hold_reason or ""
+                    "start": str(getattr(h, 'hold_started_at', '')),
+                    "end": str(getattr(h, 'hold_ended_at', '')) if getattr(h, 'hold_ended_at', None) else None,
+                    "reason": getattr(h, 'hold_reason', '') or ""
                 }
                 for h in task_holds
             ]
             
             task_list.append({
-                "id": str(task.id),
-                "title": task.title or "",
-                "project": task.project or "",
-                "description": task.description or "",
-                "part_item": task.part_item or "",
-                "nos_unit": task.nos_unit or "",
-                "status": task.status or "pending",
-                "priority": task.priority or "medium",
-                "assigned_to": str(task.assigned_to) if task.assigned_to else "",
-                "machine_id": str(task.machine_id) if task.machine_id else "",
+                "id": str(getattr(task, 'id', '')),
+                "title": getattr(task, 'title', '') or "",
+                "project": getattr(task, 'project', '') or "",
+                "description": getattr(task, 'description', '') or "",
+                "part_item": getattr(task, 'part_item', '') or "",
+                "nos_unit": getattr(task, 'nos_unit', '') or "",
+                "status": getattr(task, 'status', 'pending'),
+                "priority": getattr(task, 'priority', 'medium'),
+                "assigned_to": str(getattr(task, 'assigned_to', '')) if getattr(task, 'assigned_to', None) else "",
+                "machine_id": str(getattr(task, 'machine_id', '')) if getattr(task, 'machine_id', None) else "",
                 "machine_name": machine_name,
-                "assigned_by": str(task.assigned_by) if task.assigned_by else "",
+                "assigned_by": str(getattr(task, 'assigned_by', '')) if getattr(task, 'assigned_by', None) else "",
                 "assigned_by_name": assigned_by_name,
-                "due_date": str(task.due_date) if task.due_date else "",
-                "created_at": str(task.created_at) if task.created_at else None,
-                "started_at": str(task.started_at) if task.started_at else None,
-                "completed_at": str(task.completed_at) if task.completed_at else None,
-                "total_duration_seconds": int(task.total_duration_seconds or 0),
-                "total_held_seconds": int(task.total_held_seconds or 0),
+                "due_date": str(getattr(task, 'due_date', '')) if getattr(task, 'due_date', None) else "",
+                "created_at": str(getattr(task, 'created_at', '')) if getattr(task, 'created_at', None) else None,
+                "started_at": str(getattr(task, 'started_at', '')) if getattr(task, 'started_at', None) else None,
+                "completed_at": str(getattr(task, 'completed_at', '')) if getattr(task, 'completed_at', None) else None,
+                "total_duration_seconds": int(getattr(task, 'total_duration_seconds', 0) or 0),
+                "total_held_seconds": int(getattr(task, 'total_held_seconds', 0) or 0),
                 "holds": holds
             })
         
+        target_user = user_map.get(target_user_id)
         return {
             "tasks": task_list,
             "stats": {
                 "total_tasks": len(tasks),
-                "completed_tasks": len([t for t in tasks if t.status == 'completed']),
-                "in_progress_tasks": len([t for t in tasks if t.status == 'in_progress']),
-                "pending_tasks": len([t for t in tasks if t.status == 'pending']),
-                "on_hold_tasks": len([t for t in tasks if t.status == 'on_hold'])
+                "completed_tasks": len([t for t in tasks if getattr(t, 'status', '') == 'completed']),
+                "in_progress_tasks": len([t for t in tasks if getattr(t, 'status', '') == 'in_progress']),
+                "pending_tasks": len([t for t in tasks if getattr(t, 'status', '') == 'pending']),
+                "on_hold_tasks": len([t for t in tasks if getattr(t, 'status', '') == 'on_hold'])
             },
             "user": {
-                "user_id": str(target_user_id),
-                "username": user_map[target_user_id].username if target_user_id in user_map else "Unknown",
-                "full_name": user_map[target_user_id].full_name or user_map[target_user_id].username if target_user_id in user_map else "Unknown"
+                "id": str(target_user_id),
+                "username": getattr(target_user, 'username', 'Unknown') if target_user else "Unknown",
+                "full_name": getattr(target_user, 'full_name', '') or getattr(target_user, 'username', 'Unknown') if target_user else "Unknown"
             }
         }
     except Exception as e:
         print(f"Error in operator tasks: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/tasks/{task_id}/start")
@@ -110,15 +113,17 @@ async def start_task(
     db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    task = db.query(Task).filter(id=task_id).first()
+    task = db.query(Task).filter(Task.id==task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
-    if task.assigned_to != current_user.user_id and current_user.role != "admin":
+    current_uid = str(getattr(current_user, 'id', ''))
+    if str(getattr(task, 'assigned_to', '')) != current_uid and getattr(current_user, 'role', '') != "admin":
         raise HTTPException(status_code=403, detail="Task not assigned to you")
 
-    if task.status in ['completed', 'ended']:
-        raise HTTPException(status_code=400, detail=f"Task is already {task.status}")
+    task_status = getattr(task, 'status', 'pending')
+    if task_status in ['completed', 'ended']:
+        raise HTTPException(status_code=400, detail=f"Task is already {task_status}")
 
     now = get_current_time_ist().isoformat()
     task.status = 'in_progress'
@@ -128,9 +133,10 @@ async def start_task(
 
     # Logging
     today = get_today_date_ist().isoformat()
-    if task.machine_id:
-        db.add(MachineRuntimeLog(id=str(uuid4()), machine_id=task.machine_id, task_id=task_id, start_time=now, date=today))
-    db.add(UserWorkLog(id=str(uuid4()), user_id=task.assigned_to, task_id=task_id, machine_id=task.machine_id, start_time=now, date=today))
+    m_id = getattr(task, 'machine_id', None)
+    if m_id:
+        db.add(MachineRuntimeLog(id=str(uuid4()), machine_id=m_id, task_id=task_id, start_time=now, date=today))
+    db.add(UserWorkLog(id=str(uuid4()), user_id=getattr(task, 'assigned_to', current_uid), task_id=task_id, machine_id=m_id, start_time=now, date=today))
     db.add(TaskTimeLog(id=str(uuid4()), task_id=task_id, action='start', timestamp=now))
     
     db.commit()
@@ -142,9 +148,11 @@ async def complete_task(
     db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    task = db.query(Task).filter(id=task_id).first()
+    task = db.query(Task).filter(Task.id==task_id).first()
     if not task: raise HTTPException(status_code=404, detail="Task not found")
-    if task.assigned_to != current_user.user_id and current_user.role != "admin":
+    
+    current_uid = str(getattr(current_user, 'id', ''))
+    if str(getattr(task, 'assigned_to', '')) != current_uid and getattr(current_user, 'role', '') != "admin":
         raise HTTPException(status_code=403, detail="Task not assigned to you")
 
     now_dt = get_current_time_ist()
@@ -152,7 +160,7 @@ async def complete_task(
     
     # Close hold
     all_holds = db.query(TaskHold).all()
-    open_hold = next((h for h in all_holds if str(h.task_id) == str(task_id) and not h.hold_ended_at), None)
+    open_hold = next((h for h in all_holds if str(getattr(h, 'task_id', '')) == str(task_id) and not getattr(h, 'hold_ended_at', None)), None)
     if open_hold:
         open_hold.hold_ended_at = now_iso
         # Duration recalc could be here, but simpler to just set status
@@ -190,19 +198,21 @@ async def hold_task(
     db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    task = db.query(Task).filter(id=task_id).first()
+    task = db.query(Task).filter(Task.id==task_id).first()
     if not task: raise HTTPException(status_code=404, detail="Task not found")
-    if task.assigned_to != current_user.user_id and current_user.role != "admin":
+    
+    current_uid = str(getattr(current_user, 'id', ''))
+    if str(getattr(task, 'assigned_to', '')) != current_uid and getattr(current_user, 'role', '') != "admin":
         raise HTTPException(status_code=403, detail="Task not assigned to you")
 
-    if task.status != 'in_progress':
+    if getattr(task, 'status', '') != 'in_progress':
         raise HTTPException(status_code=400, detail="Only in-progress tasks can be put on hold")
 
     now = get_current_time_ist().isoformat()
     task.status = 'on_hold'
     task.hold_reason = hold_data.reason or "On hold"
     
-    db.add(TaskHold(id=str(uuid4()), task_id=task_id, user_id=task.assigned_to, hold_reason=task.hold_reason, hold_started_at=now))
+    db.add(TaskHold(id=str(uuid4()), task_id=task_id, user_id=getattr(task, 'assigned_to', current_uid), hold_reason=getattr(task, 'hold_reason', 'On hold'), hold_started_at=now))
     
     # Close logs (simplified for SheetsDB, assuming logs are closed by a separate process or not critical here)
     # for m_log in db.query(MachineRuntimeLog).filter(MachineRuntimeLog.task_id == task_id, MachineRuntimeLog.end_time == None).all():
@@ -223,19 +233,21 @@ async def resume_task(
     db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    task = db.query(Task).filter(id=task_id).first()
+    task = db.query(Task).filter(Task.id==task_id).first()
     if not task: raise HTTPException(status_code=404, detail="Task not found")
-    if task.assigned_to != current_user.user_id and current_user.role != "admin":
+    
+    current_uid = str(getattr(current_user, 'id', ''))
+    if str(getattr(task, 'assigned_to', '')) != current_uid and getattr(current_user, 'role', '') != "admin":
         raise HTTPException(status_code=403, detail="Task not assigned to you")
 
-    if task.status != 'on_hold':
+    if getattr(task, 'status', '') != 'on_hold':
         raise HTTPException(status_code=400, detail="Only on-hold tasks can be resumed")
 
     now_dt = get_current_time_ist()
     now = now_dt.isoformat()
     
     all_holds = db.query(TaskHold).all()
-    open_hold = next((h for h in all_holds if str(h.task_id) == str(task_id) and not h.hold_ended_at), None)
+    open_hold = next((h for h in all_holds if str(getattr(h, 'task_id', '')) == str(task_id) and not getattr(h, 'hold_ended_at', None)), None)
     if open_hold:
         open_hold.hold_ended_at = now
         # task.total_held_seconds = (task.total_held_seconds or 0) + int(safe_datetime_diff(now_dt, datetime.fromisoformat(open_hold.hold_started_at)))
@@ -244,9 +256,10 @@ async def resume_task(
     task.started_at = now
     
     today = get_today_date_ist().isoformat()
-    if task.machine_id:
-        db.add(MachineRuntimeLog(id=str(uuid4()), machine_id=task.machine_id, task_id=task_id, start_time=now, date=today))
-    db.add(UserWorkLog(id=str(uuid4()), user_id=task.assigned_to, task_id=task_id, machine_id=task.machine_id, start_time=now, date=today))
+    m_id = getattr(task, 'machine_id', None)
+    if m_id:
+        db.add(MachineRuntimeLog(id=str(uuid4()), machine_id=m_id, task_id=task_id, start_time=now, date=today))
+    db.add(UserWorkLog(id=str(uuid4()), user_id=getattr(task, 'assigned_to', current_uid), task_id=task_id, machine_id=m_id, start_time=now, date=today))
     db.add(TaskTimeLog(id=str(uuid4()), task_id=task_id, action='resume', timestamp=now))
     
     db.commit()

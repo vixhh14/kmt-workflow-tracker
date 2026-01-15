@@ -25,8 +25,7 @@ async def read_projects(
     
     # Map attributes for frontend compatibility if needed by the schema
     for p in projects:
-        p.id = str(p.project_id)
-        p.name = p.project_name
+        p.name = getattr(p, 'project_name', '')
     return projects
 
 @router.post("", response_model=ProjectOut)
@@ -39,7 +38,7 @@ async def create_project(project: ProjectCreate, db: Any = Depends(get_db)):
     
     # Check if project code already exists
     all_projects = db.query(Project).all()
-    existing = next((p for p in all_projects if str(p.project_code).strip() == project.project_code.strip()), None)
+    existing = next((p for p in all_projects if str(getattr(p, 'project_code', '')).strip() == project.project_code.strip()), None)
     
     if existing:
         status_msg = "active" if not getattr(existing, 'is_deleted', False) else "deleted"
@@ -47,12 +46,11 @@ async def create_project(project: ProjectCreate, db: Any = Depends(get_db)):
     
     try:
         new_project = Project(
-            project_id=str(uuid.uuid4()),
             project_name=project.project_name.strip(),
             work_order_number=project.work_order_number.strip() if project.work_order_number else None,
             client_name=project.client_name.strip() if project.client_name else None,
             project_code=project.project_code.strip(),
-            created_at=datetime.now().isoformat(),
+            created_at=get_current_time_ist().isoformat(),
             is_deleted=False
         )
         
@@ -60,7 +58,6 @@ async def create_project(project: ProjectCreate, db: Any = Depends(get_db)):
         db.commit()
         
         # Set convenience attributes
-        new_project.id = str(new_project.project_id)
         new_project.name = str(new_project.project_name)
         
         return new_project
@@ -71,12 +68,11 @@ async def create_project(project: ProjectCreate, db: Any = Depends(get_db)):
 @router.get("/{project_id}", response_model=ProjectOut)
 async def read_project(project_id: str, db: Any = Depends(get_db)):
     """Get a specific project by ID."""
-    project = db.query(Project).filter(project_id=project_id).first()
+    project = db.query(Project).filter(id=project_id).first()
     if not project or getattr(project, 'is_deleted', False):
         raise HTTPException(status_code=404, detail="Project not found")
     
-    project.id = str(project.project_id)
-    project.name = project.project_name
+    project.name = getattr(project, 'project_name', '')
     return project
 
 @router.put("/{project_id}", response_model=ProjectOut)
@@ -87,7 +83,7 @@ async def update_project(
     current_user: User = Depends(get_current_user)
 ):
     """Update an existing project."""
-    db_project = db.query(Project).filter(project_id=project_id).first()
+    db_project = db.query(Project).filter(id=project_id).first()
     if not db_project:
         raise HTTPException(status_code=404, detail="Project not found")
     
@@ -96,7 +92,7 @@ async def update_project(
     if "project_code" in update_data and update_data["project_code"]:
         new_code = update_data["project_code"].strip()
         all_projects = db.query(Project).all()
-        existing = next((p for p in all_projects if str(p.project_code) == new_code and str(p.project_id) != str(project_id) and not getattr(p, 'is_deleted', False)), None)
+        existing = next((p for p in all_projects if str(getattr(p, 'project_code', '')) == new_code and str(getattr(p, 'id', '')) != str(project_id) and not getattr(p, 'is_deleted', False)), None)
         if existing:
              raise HTTPException(status_code=409, detail=f"Project code '{new_code}' is already in use.")
         update_data["project_code"] = new_code
@@ -108,7 +104,7 @@ async def update_project(
     for key, value in update_data.items():
         setattr(db_project, key, value)
     
-    db_project.updated_at = datetime.now().isoformat()
+    db_project.updated_at = get_current_time_ist().isoformat()
     db.commit()
     
     # Sync project name in Tasks table
@@ -119,18 +115,17 @@ async def update_project(
     
     db.commit()
     
-    db_project.id = str(db_project.project_id)
     db_project.name = str(db_project.project_name)
     return db_project
 
 @router.delete("/{project_id}")
 async def delete_project(project_id: str, db: Any = Depends(get_db)):
     """Delete a project."""
-    project = db.query(Project).filter(project_id=project_id).first()
+    project = db.query(Project).filter(id=project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
         
     project.is_deleted = True
-    project.updated_at = datetime.now().isoformat()
+    project.updated_at = get_current_time_ist().isoformat()
     db.commit()
     return {"message": "Project deleted successfully"}

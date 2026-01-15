@@ -89,9 +89,21 @@ class GoogleSheetsService:
             raise
 
     def read_all(self, name: str) -> List[Dict[str, Any]]:
-        """Reads all records from a worksheet and returns as a list of dicts."""
+        """Reads all records and injects _row_idx for faster updates."""
         worksheet = self.get_worksheet(name)
-        return worksheet.get_all_records()
+        all_values = worksheet.get_all_values()
+        if not all_values:
+            return []
+        
+        headers = all_values[0]
+        records = []
+        for i, values in enumerate(all_values[1:]):
+            # Create dict and pad with empty strings if row is shorter than headers
+            padded_values = values + [""] * (len(headers) - len(values))
+            record = dict(zip(headers, padded_values))
+            record["_row_idx"] = i + 2 # 1-indexed, +1 for header
+            records.append(record)
+        return records
 
     def ensure_headers(self, name: str, expected_headers: List[str]):
         """Ensures that all expected headers exist in row 1."""
@@ -127,35 +139,39 @@ class GoogleSheetsService:
         
         worksheet.append_row(row)
         return True
-
+        
     def update_row(self, name: str, row_id: str, data: Dict[str, Any]):
-        """Updates a row identified by its ID (assumes ID is in the first column)."""
-        from app.core.sheets_db import SHEETS_SCHEMA
-        if name in SHEETS_SCHEMA:
-            self.ensure_headers(name, SHEETS_SCHEMA[name])
-            
+        """Updates a row identified by its ID or _row_idx using batch update."""
         worksheet = self.get_worksheet(name)
-        records = worksheet.get_all_records()
         headers = worksheet.row_values(1)
-        id_col_name = headers[0]  # Standard: First column is the ID
         
-        # Find the row index (gspread is 1-indexed, +1 for header, +1 for row)
-        row_idx = -1
-        for i, record in enumerate(records):
-            if str(record.get(id_col_name)) == str(row_id):
-                row_idx = i + 2
-                break
+        row_idx = data.get("_row_idx")
         
-        if row_idx == -1:
-            raise ValueError(f"Record with ID {row_id} not found in {name}")
+        if not row_idx:
+            # Fallback: must find row_idx by searching
+            records = self.read_all(name)
+            id_col_name = headers[0]
+            for rec in records:
+                if str(rec.get(id_col_name)) == str(row_id):
+                    row_idx = rec.get("_row_idx")
+                    break
         
-        # Update cells
+        if not row_idx:
+            print(f"⚠️ Warning: Record with ID {row_id} not found in {name}")
+            return False
+        
+        cells_to_update = []
         for key, value in data.items():
             if key in headers:
                 col_idx = headers.index(key) + 1
                 if hasattr(value, "isoformat"):
                     value = value.isoformat()
-                worksheet.update_cell(row_idx, col_idx, str(value))
+                
+                cell = gspread.cell.Cell(row=row_idx, col=col_idx, value=str(value))
+                cells_to_update.append(cell)
+        
+        if cells_to_update:
+            worksheet.update_cells(cells_to_update)
         
         return True
 

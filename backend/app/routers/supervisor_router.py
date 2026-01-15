@@ -26,26 +26,26 @@ class AssignTaskRequest(BaseModel):
 async def get_pending_tasks(db: any = Depends(get_db)):
     try:
         all_tasks = db.query(Task).all()
-        pending = [t for t in all_tasks if not t.is_deleted and (not t.assigned_to or t.status == 'pending')]
+        pending = [t for t in all_tasks if not getattr(t, 'is_deleted', False) and (not getattr(t, 'assigned_to', None) or getattr(t, 'status', '') == 'pending')]
         
         all_users = db.query(User).all()
-        user_map = {u.user_id: u for u in all_users}
+        user_map = {str(getattr(u, 'id', '')): u for u in all_users}
         all_machines = db.query(Machine).all()
-        machine_map = {str(m.id): m for m in all_machines}
+        machine_map = {str(getattr(m, 'id', '')): m for m in all_machines}
         
         return [{
-            "id": str(t.id),
-            "title": t.title or "",
-            "project": t.project or "",
-            "description": t.description or "",
-            "priority": t.priority or "medium",
-            "status": t.status or "pending",
-            "machine_id": str(t.machine_id) if t.machine_id else "",
-            "machine_name": machine_map.get(str(t.machine_id)).machine_name if str(t.machine_id) in machine_map else "",
-            "assigned_by": str(t.assigned_by) if t.assigned_by else "",
-            "assigned_by_name": user_map.get(str(t.assigned_by)).username if str(t.assigned_by) in user_map else "",
-            "due_date": str(t.due_date) if t.due_date else "",
-            "created_at": str(t.created_at) if t.created_at else None
+            "id": str(getattr(t, 'id', '')),
+            "title": getattr(t, 'title', '') or "",
+            "project": getattr(t, 'project', '') or "",
+            "description": getattr(t, 'description', '') or "",
+            "priority": getattr(t, 'priority', '') or "medium",
+            "status": getattr(t, 'status', '') or "pending",
+            "machine_id": str(getattr(t, 'machine_id', '')) if getattr(t, 'machine_id', None) else "",
+            "machine_name": getattr(machine_map.get(str(getattr(t, 'machine_id', ''))), 'machine_name', '') if str(getattr(t, 'machine_id', '')) in machine_map else "",
+            "assigned_by": str(getattr(t, 'assigned_by', '')) if getattr(t, 'assigned_by', None) else "",
+            "assigned_by_name": getattr(user_map.get(str(getattr(t, 'assigned_by', ''))), 'username', '') if str(getattr(t, 'assigned_by', '')) in user_map else "",
+            "due_date": str(getattr(t, 'due_date', '')) if getattr(t, 'due_date', None) else "",
+            "created_at": str(getattr(t, 'created_at', '')) if getattr(t, 'created_at', None) else None
         } for t in pending]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch pending tasks: {str(e)}")
@@ -60,73 +60,69 @@ async def get_running_tasks(
     """Get all currently running (in_progress) tasks, optionally filtered"""
     try:
         all_tasks = db.query(Task).all()
-        running = [t for t in all_tasks if not t.is_deleted and t.status == 'in_progress']
+        running = [t for t in all_tasks if not getattr(t, 'is_deleted', False) and getattr(t, 'status', '') == 'in_progress']
         
         if project_id and project_id != "all":
-            # Check if project_id is a UUID or a project name
-            is_uuid = False
-            try:
-                uuid.UUID(str(project_id))
-                is_uuid = True
-            except ValueError:
-                pass
+             is_uuid_val = False
+             try:
+                 uuid.UUID(str(project_id))
+                 is_uuid_val = True
+             except ValueError: pass
 
-            if is_uuid:
-                running = [t for t in running if str(t.project_id) == str(project_id)]
-            else:
-                running = [t for t in running if str(t.project) == str(project_id)]
+             if is_uuid_val:
+                 running = [t for t in running if str(getattr(t, 'project_id', '')) == str(project_id)]
+             else:
+                 running = [t for t in running if str(getattr(t, 'project', '')) == str(project_id)]
         
         if operator_id and operator_id != "all":
-            running = [t for t in running if str(t.assigned_to) == str(operator_id)]
+            running = [t for t in running if str(getattr(t, 'assigned_to', '')) == str(operator_id)]
 
         all_users = db.query(User).all()
-        user_map = {u.user_id: u for u in all_users}
+        user_map = {str(getattr(u, 'id', '')): u for u in all_users}
         all_machines = db.query(Machine).all()
-        machine_map = {str(m.id): m for m in all_machines}
+        machine_map = {str(getattr(m, 'id', '')): m for m in all_machines}
         all_holds = db.query(TaskHold).all()
         
         task_list = []
         for t in running:
-            operator = user_map.get(str(t.assigned_to))
-            machine = machine_map.get(str(t.machine_id))
+            operator = user_map.get(str(getattr(t, 'assigned_to', '')))
+            machine = machine_map.get(str(getattr(t, 'machine_id', '')))
             
-            # Calculate duration (simplified for SheetsDB, assuming total_duration_seconds is available or calculated)
             duration_seconds = 0
-            if t.actual_start_time or t.started_at:
-                start_time = t.actual_start_time or t.started_at
-                start_aware = make_aware(start_time) if isinstance(start_time, datetime) else start_time # Assuming make_aware handles non-datetime
+            start_time = getattr(t, 'actual_start_time', None) or getattr(t, 'started_at', None)
+            if start_time:
+                start_aware = make_aware(start_time) if isinstance(start_time, datetime) else start_time
                 now = utc_now()
                 total_elapsed = int((now - start_aware).total_seconds()) if isinstance(start_aware, datetime) else 0
-                held_seconds = t.total_held_seconds or 0
+                held_seconds = getattr(t, 'total_held_seconds', 0) or 0
                 duration_seconds = max(0, total_elapsed - held_seconds)
             
-            # Fetch holds for this task
-            t_holds = [h for h in all_holds if str(h.task_id) == str(t.id)]
+            t_holds = [h for h in all_holds if str(getattr(h, 'task_id', '')) == str(getattr(t, 'id', ''))]
             holds_serialized = [
                 {
-                    "start": str(h.hold_started_at) if h.hold_started_at else None,
-                    "end": str(h.hold_ended_at) if h.hold_ended_at else None,
-                    "duration_seconds": safe_datetime_diff(h.hold_ended_at, h.hold_started_at) if h.hold_ended_at and h.hold_started_at else 0,
-                    "reason": h.hold_reason or ""
+                    "start": str(getattr(h, 'hold_started_at', '')),
+                    "end": str(getattr(h, 'hold_ended_at', '')),
+                    "duration_seconds": safe_datetime_diff(getattr(h, 'hold_ended_at', None), getattr(h, 'hold_started_at', None)) if getattr(h, 'hold_ended_at', None) and getattr(h, 'hold_started_at', None) else 0,
+                    "reason": getattr(h, 'hold_reason', '') or ""
                 }
                 for h in t_holds
             ]
 
             task_list.append({
-                "id": str(t.id),
-                "title": t.title or "",
-                "project": t.project or "",
-                "operator_id": str(t.assigned_to) if t.assigned_to else "",
-                "operator_name": operator.full_name if operator and operator.full_name else (operator.username if operator else "Unknown"),
-                "machine_id": str(t.machine_id) if t.machine_id else "",
-                "machine_name": machine.machine_name if machine else "Unknown",
-                "started_at": str(t.actual_start_time) if t.actual_start_time else (str(t.started_at) if t.started_at else None),
-                "actual_start_time": str(t.actual_start_time) if t.actual_start_time else None,
-                "expected_completion_time": t.expected_completion_time,
+                "id": str(getattr(t, 'id', '')),
+                "title": getattr(t, 'title', '') or "",
+                "project": getattr(t, 'project', '') or "",
+                "operator_id": str(getattr(t, 'assigned_to', '')) if getattr(t, 'assigned_to', None) else "",
+                "operator_name": getattr(operator, 'full_name', '') if operator and getattr(operator, 'full_name', '') else (getattr(operator, 'username', 'Unknown') if operator else "Unknown"),
+                "machine_id": str(getattr(t, 'machine_id', '')) if getattr(t, 'machine_id', None) else "",
+                "machine_name": getattr(machine, 'machine_name', 'Unknown') if machine else "Unknown",
+                "started_at": str(start_time) if start_time else None,
+                "actual_start_time": str(getattr(t, 'actual_start_time', '')) if getattr(t, 'actual_start_time', None) else None,
+                "expected_completion_time": getattr(t, 'expected_completion_time', 0),
                 "duration_seconds": duration_seconds,
-                "total_held_seconds": t.total_held_seconds or 0,
+                "total_held_seconds": getattr(t, 'total_held_seconds', 0) or 0,
                 "holds": holds_serialized,
-                "due_date": str(t.due_date) if t.due_date else None,
+                "due_date": str(getattr(t, 'due_date', '')) if getattr(t, 'due_date', None) else None,
                 "status": "in_progress"
             })
         
@@ -143,45 +139,41 @@ async def get_task_status(
 ):
     """Get task status breakdown for graph, optionally filtered"""
     try:
-        # Get base list of operators
         all_users = db.query(User).all()
-        operators = [u for u in all_users if not u.is_deleted and u.approval_status == 'approved' and u.role == 'operator']
+        operators = [u for u in all_users if not getattr(u, 'is_deleted', False) and getattr(u, 'approval_status', '') == 'approved' and getattr(u, 'role', '') == 'operator']
         
         if operator_id and operator_id != "all":
-            operators = [u for u in operators if str(u.user_id) == str(operator_id)]
+            operators = [u for u in operators if str(getattr(u, 'id', '')) == str(operator_id)]
             
-        # Get Tasks to aggregate
         all_tasks = db.query(Task).all()
-        tasks_filtered_by_deleted = [t for t in all_tasks if not t.is_deleted]
+        tasks_filtered = [t for t in all_tasks if not getattr(t, 'is_deleted', False)]
         
         if project_id and project_id != "all":
-            # Check if project_id is a UUID or a project name
-            is_uuid = False
-            try:
-                uuid.UUID(str(project_id))
-                is_uuid = True
-            except ValueError:
-                pass
+             is_uuid_val = False
+             try:
+                 uuid.UUID(str(project_id))
+                 is_uuid_val = True
+             except ValueError: pass
 
-            if is_uuid:
-                tasks_filtered_by_deleted = [t for t in tasks_filtered_by_deleted if str(t.project_id) == str(project_id)]
-            else:
-                tasks_filtered_by_deleted = [t for t in tasks_filtered_by_deleted if str(t.project) == str(project_id)]
+             if is_uuid_val:
+                 tasks_filtered = [t for t in tasks_filtered if str(getattr(t, 'project_id', '')) == str(project_id)]
+             else:
+                 tasks_filtered = [t for t in tasks_filtered if str(getattr(t, 'project', '')) == str(project_id)]
             
         operator_stats = []
         for operator in operators:
-            # Filter tasks for this operator from the pre-filtered list
-            operator_tasks = [t for t in tasks_filtered_by_deleted if str(t.assigned_to) == str(operator.user_id)]
+            op_id_str = str(getattr(operator, 'id', ''))
+            operator_tasks = [t for t in tasks_filtered if str(getattr(t, 'assigned_to', '')) == op_id_str]
             
-            completed = len([t for t in operator_tasks if t.status == 'completed'])
-            in_progress = len([t for t in operator_tasks if t.status == 'in_progress'])
-            pending = len([t for t in operator_tasks if t.status == 'pending'])
+            completed = len([t for t in operator_tasks if getattr(t, 'status', '') == 'completed'])
+            in_progress = len([t for t in operator_tasks if getattr(t, 'status', '') == 'in_progress'])
+            pending = len([t for t in operator_tasks if getattr(t, 'status', '') == 'pending'])
             
             total = completed + in_progress + pending
 
             operator_stats.append({
-                "operator": operator.full_name if operator.full_name else operator.username,
-                "operator_id": str(operator.user_id),
+                "operator": getattr(operator, 'full_name', '') if getattr(operator, 'full_name', '') else getattr(operator, 'username', ''),
+                "operator_id": op_id_str,
                 "completed": completed,
                 "in_progress": in_progress,
                 "pending": pending,
@@ -189,7 +181,6 @@ async def get_task_status(
             })
         
         operator_stats.sort(key=lambda x: x['total'], reverse=True)
-        
         return operator_stats
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch task status: {str(e)}")
@@ -199,13 +190,14 @@ async def get_task_status(
 async def get_projects_summary(db: any = Depends(get_db)):
     """Get project status distribution for pie chart"""
     try:
-        tasks_with_projects = [t for t in db.query(Task).all() if not t.is_deleted and t.project]
+        tasks_with_projects = [t for t in db.query(Task).all() if not getattr(t, 'is_deleted', False) and getattr(t, 'project', None)]
         
         project_map = {}
         for task in tasks_with_projects:
-            if task.project not in project_map:
-                project_map[task.project] = []
-            project_map[task.project].append(task.status)
+            p_name = getattr(task, 'project', 'Unknown')
+            if p_name not in project_map:
+                project_map[p_name] = []
+            project_map[p_name].append(getattr(task, 'status', ''))
         
         yet_to_start = 0
         in_progress = 0
@@ -222,7 +214,7 @@ async def get_projects_summary(db: any = Depends(get_db)):
             elif all(s == 'pending' for s in statuses):
                 yet_to_start += 1
             else:
-                in_progress += 1 # Default to in_progress if mixed statuses and not all completed/pending/on_hold
+                in_progress += 1
         
         return {
             "yet_to_start": yet_to_start,
@@ -243,33 +235,31 @@ async def get_task_stats(
     """Get task statistics, optionally filtered by project and operator"""
     try:
         all_tasks = db.query(Task).all()
-        tasks_filtered = [t for t in all_tasks if not t.is_deleted]
+        tasks_filtered = [t for t in all_tasks if not getattr(t, 'is_deleted', False)]
         
         if project and project != "all":
-            is_uuid = False
+            is_uuid_val = False
             try:
                 uuid.UUID(str(project))
-                is_uuid = True
-            except ValueError:
-                pass
+                is_uuid_val = True
+            except ValueError: pass
             
-            if is_uuid:
-                tasks_filtered = [t for t in tasks_filtered if str(t.project_id) == str(project)]
+            if is_uuid_val:
+                tasks_filtered = [t for t in tasks_filtered if str(getattr(t, 'project_id', '')) == str(project)]
             else:
-                tasks_filtered = [t for t in tasks_filtered if str(t.project) == str(project)]
+                tasks_filtered = [t for t in tasks_filtered if str(getattr(t, 'project', '')) == str(project)]
         
         if operator_id and operator_id != "all":
-             tasks_filtered = [t for t in tasks_filtered if str(t.assigned_to) == str(operator_id)]
+             tasks_filtered = [t for t in tasks_filtered if str(getattr(t, 'assigned_to', '')) == str(operator_id)]
 
         total = len(tasks_filtered)
-        pending = len([t for t in tasks_filtered if t.status == 'pending'])
-        in_progress = len([t for t in tasks_filtered if t.status == 'in_progress'])
-        completed = len([t for t in tasks_filtered if t.status == 'completed'])
-        on_hold = len([t for t in tasks_filtered if t.status == 'on_hold'])
+        pending = len([t for t in tasks_filtered if getattr(t, 'status', '') == 'pending'])
+        in_progress = len([t for t in tasks_filtered if getattr(t, 'status', '') == 'in_progress'])
+        completed = len([t for t in tasks_filtered if getattr(t, 'status', '') == 'completed'])
+        on_hold = len([t for t in tasks_filtered if getattr(t, 'status', '') == 'on_hold'])
         
-        # Get list of all projects for dropdown from Project table
         all_projects = db.query(Project).all()
-        project_names = sorted(list(set([p.project_name for p in all_projects if not p.is_deleted and p.project_name])))
+        project_names = sorted(list(set([getattr(p, 'project_name', '') for p in all_projects if not getattr(p, 'is_deleted', False) and getattr(p, 'project_name', '')])))
         
         return {
             "total_tasks": total,
@@ -296,14 +286,13 @@ async def assign_task(
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
         
-        operator = db.query(User).filter(user_id=request.operator_id).first()
+        operator = db.query(User).filter(id=request.operator_id).first()
         if not operator:
             raise HTTPException(status_code=404, detail="Operator not found")
         
-        if operator.role == 'admin' and current_user.role != 'admin':
+        if getattr(operator, 'role', '') == 'admin' and getattr(current_user, 'role', '') != 'admin':
             raise HTTPException(status_code=403, detail="Only admins can assign tasks to other admins")
         
-        # Accept assignment to any valid user
         task.assigned_to = request.operator_id
         task.status = 'pending'
         
@@ -314,23 +303,21 @@ async def assign_task(
         if request.expected_completion_time is not None:
             task.expected_completion_time = request.expected_completion_time
         if request.due_date:
-            task.due_date = request.due_date.isoformat() # Store as ISO string
+            task.due_date = request.due_date.isoformat()
         
-        db.commit() # Assuming commit handles updates to existing objects
-        
+        db.commit()
         return {
             "message": "Task assigned successfully",
             "task": {
-                "id": str(task.id),
-                "title": task.title,
-                "assigned_to": str(task.assigned_to),
-                "status": task.status
+                "id": str(getattr(task, 'id', '')),
+                "title": getattr(task, 'title', ''),
+                "assigned_to": str(getattr(task, 'assigned_to', '')),
+                "status": getattr(task, 'status', '')
             }
         }
-    except HTTPException:
-        raise
+    except HTTPException: raise
     except Exception as e:
-        db.rollback() # Assuming SheetsDB has a rollback mechanism
+        db.rollback() 
         raise HTTPException(status_code=500, detail=f"Failed to assign task: {str(e)}")
 
 
@@ -338,13 +325,14 @@ async def assign_task(
 async def get_project_summary(db: any = Depends(get_db)):
     """Get project summary metrics"""
     try:
-        tasks_with_projects = [t for t in db.query(Task).all() if not t.is_deleted and t.project]
+        tasks_with_projects = [t for t in db.query(Task).all() if not getattr(t, 'is_deleted', False) and getattr(t, 'project', None)]
         
         project_map = {}
         for task in tasks_with_projects:
-            if task.project not in project_map:
-                project_map[task.project] = []
-            project_map[task.project].append(task.status)
+            p_name = getattr(task, 'project', 'Unknown')
+            if p_name not in project_map:
+                project_map[p_name] = []
+            project_map[p_name].append(getattr(task, 'status', ''))
         
         total_projects = len(project_map)
         completed_projects = 0
@@ -359,7 +347,7 @@ async def get_project_summary(db: any = Depends(get_db)):
             elif all(s == 'pending' for s in statuses):
                 pending_projects += 1
             else:
-                active_projects += 1 # Mixed statuses, not all pending, not all completed
+                active_projects += 1
         
         return {
             "total_projects": total_projects,
@@ -376,11 +364,11 @@ async def get_priority_task_status(db: any = Depends(get_db)):
     """Get task counts by priority level"""
     try:
         all_tasks = db.query(Task).all()
-        tasks_filtered = [t for t in all_tasks if not t.is_deleted]
+        tasks_filtered = [t for t in all_tasks if not getattr(t, 'is_deleted', False)]
 
-        high = len([t for t in tasks_filtered if str(t.priority).upper() == 'HIGH'])
-        medium = len([t for t in tasks_filtered if str(t.priority).upper() == 'MEDIUM'])
-        low = len([t for t in tasks_filtered if str(t.priority).upper() == 'LOW'])
+        high = len([t for t in tasks_filtered if str(getattr(t, 'priority', '')).upper() == 'HIGH'])
+        medium = len([t for t in tasks_filtered if str(getattr(t, 'priority', '')).upper() == 'MEDIUM'])
+        low = len([t for t in tasks_filtered if str(getattr(t, 'priority', '')).upper() == 'LOW'])
         
         return {
             "high": high,
