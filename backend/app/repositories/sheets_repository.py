@@ -1,15 +1,17 @@
+
 import time
 import uuid
+import threading
 from typing import List, Dict, Any, Optional
 from app.services.google_sheets import google_sheets
 from app.core.time_utils import get_current_time_ist
 
 # Global cache to persist across requests but within process
-# Using a simple dict. In a production multi-worker environment like Gunicorn, 
-# this would be per-worker. For Render free tier, it's usually one worker.
+# Thread-safe dictionary-based cache
 _GLOBAL_CACHE = {}
 _CACHE_EXPIRY = {}
-CACHE_TTL = 60  # Seconds
+_CACHE_LOCK = threading.Lock()
+CACHE_TTL = 45  # Seconds (between 30-60 as requested)
 
 class SheetsRepository:
     def __init__(self):
@@ -17,25 +19,36 @@ class SheetsRepository:
 
     def _get_sheet_data(self, sheet_name: str) -> List[Dict[str, Any]]:
         now = time.time()
+        
         # Check if we have valid cache
-        if sheet_name not in _GLOBAL_CACHE or now > _CACHE_EXPIRY.get(sheet_name, 0):
-            try:
-                # One bulk read per sheet
-                data = google_sheets.read_all(sheet_name)
+        with _CACHE_LOCK:
+            if sheet_name in _GLOBAL_CACHE and now < _CACHE_EXPIRY.get(sheet_name, 0):
+                return _GLOBAL_CACHE[sheet_name]
+
+        # Cache expired or missing, refresh it
+        try:
+            # One bulk read per sheet
+            # Move the API call outside the lock to avoid blocking other sheets
+            data = google_sheets.read_all_bulk(sheet_name)
+            
+            with _CACHE_LOCK:
                 _GLOBAL_CACHE[sheet_name] = data
                 _CACHE_EXPIRY[sheet_name] = now + CACHE_TTL
                 print(f"🔄 [SheetsRepo] Cache Refreshed: {sheet_name} ({len(data)} rows)")
-            except Exception as e:
-                print(f"❌ [SheetsRepo] Failed to fetch {sheet_name}: {e}")
+            return data
+        except Exception as e:
+            print(f"❌ [SheetsRepo] Failed to fetch {sheet_name}: {e}")
+            with _CACHE_LOCK:
                 # Fallback to expired cache if available
                 if sheet_name in _GLOBAL_CACHE:
                     return _GLOBAL_CACHE[sheet_name]
                 return []
-        return _GLOBAL_CACHE[sheet_name]
 
     def get_all(self, sheet_name: str, include_deleted: bool = False) -> List[Dict[str, Any]]:
-        """Returns all rows from a sheet, optionally filtering deleted ones."""
+        """Returns all rows from a sheet from cache, optionally filtering deleted ones."""
         data = self._get_sheet_data(sheet_name)
+        
+        # Always return deep copies to prevent external modification of cache
         if include_deleted:
             return [dict(row) for row in data]
         
@@ -46,7 +59,7 @@ class SheetsRepository:
         ]
 
     def get_by_id(self, sheet_name: str, id_value: Any) -> Optional[Dict[str, Any]]:
-        """Finds a single row by its ID."""
+        """Finds a single row by its ID from cached data."""
         headers = self.get_headers(sheet_name)
         id_col = headers[0] if headers else "id"
         
@@ -62,7 +75,7 @@ class SheetsRepository:
         return SHEETS_SCHEMA.get(sheet_name, [])
 
     def insert(self, sheet_name: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Inserts a new row and invalidates cache."""
+        """Inserts a new row, updates Sheets, and updates cache immediately."""
         headers = self.get_headers(sheet_name)
         id_col = headers[0] if headers else "id"
         
@@ -73,50 +86,140 @@ class SheetsRepository:
         now_ist = get_current_time_ist().isoformat()
         if "created_at" not in data or not data["created_at"]:
             data["created_at"] = now_ist
-        if "updated_at" not in data:
+        if "updated_at" not in data or not data["updated_at"]:
             data["updated_at"] = now_ist
         if "is_deleted" not in data:
             data["is_deleted"] = False
 
-        google_sheets.insert_row(sheet_name, data)
+        # 1. Update Sheets
+        success = google_sheets.insert_row(sheet_name, data, headers)
         
-        # Invalidate cache to force re-read on next access
-        if sheet_name in _GLOBAL_CACHE:
-            del _GLOBAL_CACHE[sheet_name]
-            
+        if success:
+            # 2. Update Cache immediately (Need to get _row_idx for the new row)
+            # Since we appended, we need to know the new row index.
+            # Easiest way is to refresh the cache for this sheet since append_row doesn't return the index.
+            # But the requirement says "Never re-read the sheet synchronously" if possible.
+            # However, for INSERT, we don't know the row index without reading or keeping track.
+            # Let's refresh cache after insert to be safe and get the correct _row_idx.
+            # Actually, we can estimate it if we have the current cache size.
+            with _CACHE_LOCK:
+                if sheet_name in _GLOBAL_CACHE:
+                    new_idx = len(_GLOBAL_CACHE[sheet_name]) + 2 # +1 for headers, +1 for 0-index vs 1-index
+                    data_with_idx = dict(data)
+                    data_with_idx["_row_idx"] = new_idx
+                    _GLOBAL_CACHE[sheet_name].append(data_with_idx)
+                    print(f"✅ [SheetsRepo] Cache Updated (Insert): {sheet_name}")
+                else:
+                    # If cache was empty, just refresh it on next read
+                    pass
+        
         return data
 
     def update(self, sheet_name: str, id_value: Any, data: Dict[str, Any]) -> bool:
-        """Updates a row and invalidates cache."""
+        """Updates a row, updates Sheets, and updates cache immediately."""
         if not id_value:
             return False
             
-        if "updated_at" not in data:
-            data["updated_at"] = get_current_time_ist().isoformat()
-
-        success = google_sheets.update_row(sheet_name, str(id_value), data)
+        headers = self.get_headers(sheet_name)
+        id_col = headers[0] if headers else "id"
         
-        # Invalidate cache
-        if success and sheet_name in _GLOBAL_CACHE:
-            del _GLOBAL_CACHE[sheet_name]
-            
+        # Find the record in cache to get _row_idx
+        cached_row = None
+        cached_idx_in_list = -1
+        
+        with _CACHE_LOCK:
+            if sheet_name in _GLOBAL_CACHE:
+                for i, row in enumerate(_GLOBAL_CACHE[sheet_name]):
+                    if str(row.get(id_col)) == str(id_value):
+                        cached_row = row
+                        cached_idx_in_list = i
+                        break
+        
+        if not cached_row:
+            # If not in cache, we might need a refresh or it doesn't exist
+            # But we should rely on cache only as per rules
+            print(f"⚠️ [SheetsRepo] Update failed: Record {id_value} not found in cache for {sheet_name}")
+            return False
+
+        row_idx = cached_row.get("_row_idx")
+        if not row_idx:
+            print(f"⚠️ [SheetsRepo] Update failed: No _row_idx for record {id_value} in {sheet_name}")
+            return False
+
+        # Prepare update data with updated_at
+        update_payload = dict(data)
+        if "updated_at" not in update_payload:
+            update_payload["updated_at"] = get_current_time_ist().isoformat()
+
+        # 1. Update Sheets
+        success = google_sheets.update_row_by_idx(sheet_name, row_idx, update_payload, headers)
+        
+        if success:
+            # 2. Update Cache immediately
+            with _CACHE_LOCK:
+                if sheet_name in _GLOBAL_CACHE and cached_idx_in_list != -1:
+                    # Update the dict in place
+                    for k, v in update_payload.items():
+                        _GLOBAL_CACHE[sheet_name][cached_idx_in_list][k] = v
+                    print(f"✅ [SheetsRepo] Cache Updated (Update): {sheet_name} row {row_idx}")
+        
         return success
 
     def soft_delete(self, sheet_name: str, id_value: Any) -> bool:
         """Sets is_deleted=True for a row."""
         return self.update(sheet_name, id_value, {"is_deleted": True})
 
+    def hard_delete(self, sheet_name: str, id_value: Any) -> bool:
+        """Physically removes a row and synchronizes cache."""
+        if not id_value:
+            return False
+            
+        headers = self.get_headers(sheet_name)
+        id_col = headers[0] if headers else "id"
+        
+        cached_row = None
+        cached_idx_in_list = -1
+        
+        with _CACHE_LOCK:
+            if sheet_name in _GLOBAL_CACHE:
+                for i, row in enumerate(_GLOBAL_CACHE[sheet_name]):
+                    if str(row.get(id_col)) == str(id_value):
+                        cached_row = row
+                        cached_idx_in_list = i
+                        break
+        
+        if not cached_row:
+            print(f"⚠️ [SheetsRepo] Hard delete failed: Record {id_value} not found in cache for {sheet_name}")
+            return False
+
+        row_idx = cached_row.get("_row_idx")
+        if not row_idx:
+            return False
+
+        # 1. Update Sheets
+        success = google_sheets.delete_row_by_idx(sheet_name, row_idx)
+        
+        if success:
+            # 2. Update Cache immediately
+            # Removing a row shifts all subsequent rows. We must re-read to be safe,
+            # or subtract 1 from all subsequent _row_idx.
+            # Rereading is safer after a hard delete to ensure indices are correct.
+            self.clear_cache(sheet_name)
+            print(f"🗑️ [SheetsRepo] Hard deleted {id_value} from {sheet_name}. Cache cleared.")
+        
+        return success
+
     def clear_cache(self, sheet_name: Optional[str] = None):
         """Clears cache for one or all sheets."""
-        global _GLOBAL_CACHE, _CACHE_EXPIRY
-        if sheet_name:
-            if sheet_name in _GLOBAL_CACHE:
-                del _GLOBAL_CACHE[sheet_name]
-            if sheet_name in _CACHE_EXPIRY:
-                del _CACHE_EXPIRY[sheet_name]
-        else:
-            _GLOBAL_CACHE = {}
-            _CACHE_EXPIRY = {}
+        with _CACHE_LOCK:
+            if sheet_name:
+                if sheet_name in _GLOBAL_CACHE:
+                    del _GLOBAL_CACHE[sheet_name]
+                if sheet_name in _CACHE_EXPIRY:
+                    del _CACHE_EXPIRY[sheet_name]
+            else:
+                _GLOBAL_CACHE.clear()
+                _CACHE_EXPIRY.clear()
 
 # Singleton instance
 sheets_repo = SheetsRepository()

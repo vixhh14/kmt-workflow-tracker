@@ -7,6 +7,7 @@ from typing import List, Optional
 from datetime import datetime
 from ..core.database import get_db
 from ..models.models_db import User as UserModel
+from ..core.time_utils import get_current_time_ist
 
 router = APIRouter(prefix="/api/approvals", tags=["approvals"])
 

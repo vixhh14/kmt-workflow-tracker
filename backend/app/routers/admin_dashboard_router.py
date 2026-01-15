@@ -79,28 +79,16 @@ async def get_project_analytics(project: Optional[str] = None, db: any = Depends
 
 @router.get("/attendance-summary")
 async def get_attendance_summary(db: any = Depends(get_db)):
-    """Get attendance summary using attendance service (Google Sheets backend)."""
+    """Get attendance summary from service."""
     try:
         from app.services import attendance_service
-        result = attendance_service.get_attendance_summary(db=db)
-        
-        if not result.get("success"):
-            # Fallback
-            all_users = [u for u in db.query(User).all() if not u.is_deleted and str(u.approval_status).lower() == 'approved']
-            return {
-                "date": date.today().isoformat(),
-                "present": 0,
-                "absent": len(all_users),
-                "late": 0,
-                "present_users": [],
-                "absent_users": [{"id": u.user_id, "name": u.full_name or u.username, "role": u.role} for u in all_users if str(u.role).lower() != "admin"],
-                "total_users": len(all_users),
-                "records": []
-            }
-        
-        return result
-    except:
+        from app.core.time_utils import get_today_date_ist
+        today = get_today_date_ist().isoformat()
+        return attendance_service.get_attendance_summary(db=db, target_date_str=today)
+    except Exception as e:
+        print(f"❌ Error in admin attendance summary: {e}")
         return {
+            "success": False,
             "date": date.today().isoformat(),
             "present": 0,
             "absent": 0,

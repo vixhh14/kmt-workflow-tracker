@@ -122,31 +122,50 @@ class QueryWrapper:
     def filter(self, *args, **kwargs):
         filtered = list(self._data)
         
-        # Keyword filters
+        # 1. Handle Keyword Filters (e.g., id=val, task_id=val)
         for key, value in kwargs.items():
-            def match(row_val, filter_val):
-                # Handle None/empty string equivalence
+            def match_kw(row_val, filter_val):
                 if filter_val is None or str(filter_val).upper() in ["NONE", "NULL", ""]:
-                    return str(row_val).upper() in ["NONE", "NULL", "", "FALSE"] if key in ['is_deleted', 'active'] else str(row_val).upper() in ["NONE", "NULL", ""]
+                    # Special handling for boolean-ish fields
+                    if key in ['is_deleted', 'active']:
+                         return str(row_val).upper() in ["NONE", "NULL", "", "FALSE", "0"]
+                    return str(row_val).upper() in ["NONE", "NULL", ""]
                 return str(row_val) == str(filter_val)
-                
-            filtered = [row for row in filtered if match(row.dict().get(key), value)]
+            
+            filtered = [row for row in filtered if match_kw(row.dict().get(key), value)]
         
-        # Positional filters (Simplified SQLAlchemy-like Expr mapping)
+        # 2. Handle Positional Expression Filters (e.g., Task.id == val)
         for arg in args:
-            arg_str = str(arg).lower()
-            # If it's a "Task.id == ..." style string from repr
+            arg_str = str(arg)
+            # Try to handle "Task.id == '...'" or "id == '...'"
+            # This is a bit of a hack to support SQLAlchemy-style expressions passed as objects
+            # that get converted to string by our mock.
             if " == " in arg_str:
                 parts = arg_str.split(" == ")
-                left = parts[0].split(".")[-1] # take 'id' from 'Task.id'
-                right = parts[1].strip("'\"")
-                filtered = [row for row in filtered if str(row.dict().get(left)) == str(right)]
-            elif "is_deleted" in arg_str:
-                if "false" in arg_str or "null" in arg_str:
-                    filtered = [row for row in filtered if str(row.dict().get("is_deleted")).upper() in ["FALSE", "0", "", "NONE", "NULL"]]
-                elif "true" in arg_str:
-                    filtered = [row for row in filtered if str(row.dict().get("is_deleted")).upper() in ["TRUE", "1"]]
+                left = parts[0].strip().split(".")[-1] # take 'id' from 'Task.id'
+                right = parts[1].strip().strip("'\"")
+                
+                if right.lower() in ["none", "null"]:
+                    filtered = [row for row in filtered if str(row.dict().get(left)).upper() in ["NONE", "NULL", ""]]
+                else:
+                    filtered = [row for row in filtered if str(row.dict().get(left)) == str(right)]
             
+            elif " != " in arg_str:
+                parts = arg_str.split(" != ")
+                left = parts[0].strip().split(".")[-1]
+                right = parts[1].strip().strip("'\"")
+                if right.lower() in ["none", "null"]:
+                    filtered = [row for row in filtered if str(row.dict().get(left)).upper() not in ["NONE", "NULL", ""]]
+                else:
+                    filtered = [row for row in filtered if str(row.dict().get(left)) != str(right)]
+
+            # Handle is_deleted specific check typically used in .filter(Task.is_deleted == False)
+            elif "is_deleted" in arg_str.lower():
+                if "false" in arg_str.lower() or "none" in arg_str.lower():
+                    filtered = [row for row in filtered if str(row.dict().get("is_deleted")).upper() in ["FALSE", "0", "", "NONE", "NULL"]]
+                elif "true" in arg_str.lower():
+                    filtered = [row for row in filtered if str(row.dict().get("is_deleted")).upper() in ["TRUE", "1"]]
+
         return QueryWrapper(filtered, self._table_name)
 
     def order_by(self, *args):
@@ -218,8 +237,7 @@ class SheetsDB:
         if soft:
             sheets_repo.soft_delete(sheet_name, id_val)
         else:
-            google_sheets.hard_delete_row(sheet_name, id_val)
-            sheets_repo.clear_cache(sheet_name)
+            sheets_repo.hard_delete(sheet_name, id_val)
 
     def rollback(self):
         self._dirty_rows = []

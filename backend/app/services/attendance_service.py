@@ -1,5 +1,5 @@
 
-from datetime import datetime, date
+from datetime import datetime
 from typing import Optional, List, Dict, Any
 from app.models.models_db import Attendance, User
 from app.core.time_utils import get_current_time_ist, get_today_date_ist
@@ -16,8 +16,12 @@ def mark_present(db: SheetsDB, user_id: str, ip_address: Optional[str] = None) -
         
         # Check if attendance record already exists for this user today
         all_att = db.query(Attendance).all()
-        # Note: Sheets store dates as strings often
-        existing_attendance = next((a for a in all_att if str(getattr(a, 'user_id', '')) == str(user_id) and str(getattr(a, 'date', '')).split('T')[0] == today_str), None)
+        # Find local record for today - safe date comparison
+        existing_attendance = next((
+            a for a in all_att 
+            if str(getattr(a, 'user_id', '')) == str(user_id) 
+            and str(getattr(a, 'date', '')).split('T')[0] == today_str
+        ), None)
         
         if existing_attendance:
             # If already logged in today, just update login_time but keep original check_in
@@ -46,6 +50,7 @@ def mark_present(db: SheetsDB, user_id: str, ip_address: Optional[str] = None) -
             return {"status": "success", "message": "Checked in successfully", "data": new_attendance.dict()}
     
     except Exception as e:
+        print(f"❌ Error in mark_present: {e}")
         return {
             "success": False,
             "message": f"Failed to mark attendance: {str(e)}",
@@ -63,8 +68,12 @@ def mark_checkout(db: SheetsDB, user_id: str) -> dict:
         today_str = today.isoformat()
         
         all_att = db.query(Attendance).all()
-        # Find local record for today
-        attendance = next((a for a in all_att if str(getattr(a, 'user_id', '')) == str(user_id) and str(getattr(a, 'date', '')).split('T')[0] == today_str), None)
+        # Find record for today
+        attendance = next((
+            a for a in all_att 
+            if str(getattr(a, 'user_id', '')) == str(user_id) 
+            and str(getattr(a, 'date', '')).split('T')[0] == today_str
+        ), None)
 
         if not attendance:
             return {"status": "error", "message": "No check-in record found for today"}
@@ -79,6 +88,7 @@ def mark_checkout(db: SheetsDB, user_id: str) -> dict:
         return {"status": "success", "message": "Checked out successfully", "data": attendance.dict()}
     
     except Exception as e:
+        print(f"❌ Error in mark_checkout: {e}")
         return {
             "success": False,
             "message": f"Failed to record check-out: {str(e)}",
@@ -86,14 +96,16 @@ def mark_checkout(db: SheetsDB, user_id: str) -> dict:
         }
 
 
-# Assuming @router.get is from FastAPI, but it's not imported here.
-# For the purpose of this edit, I'll include it as a comment or remove it if it causes syntax errors.
-# @router.get("/summary", response_model=dict)
-async def get_attendance_summary(db: Any, target_date_str: str):
+def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
     """
-    Get attendance summary for a specific date (YYYY-MM-DD).
+    Get attendance summary for a specific date (YYYY-MM-DD). Defaults to today.
     """
     try:
+        if not target_date_str:
+            target_date_str = get_today_date_ist().isoformat()
+            
+        target_date_compare = str(target_date_str).split('T')[0].split(' ')[0]
+        
         # Get all users and filter by tracked roles
         tracked_roles = ['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master']
         all_users = db.query(User).all()
@@ -104,10 +116,8 @@ async def get_attendance_summary(db: Any, target_date_str: str):
             and str(getattr(u, 'role', '')).lower() in tracked_roles
         ]
         
-        # Get all attendance for target date
+        # Get all attendance
         all_att = db.query(Attendance).all()
-        # Clean target_date_str to just YYYY-MM-DD
-        target_date_compare = str(target_date_str).split('T')[0].split(' ')[0]
         
         attendance_map = {}
         for a in all_att:
@@ -134,9 +144,9 @@ async def get_attendance_summary(db: Any, target_date_str: str):
             if attendance and str(getattr(attendance, 'status', '')).lower() == 'present':
                 att_data = {
                     "status": "Present",
-                    "check_in": str(getattr(attendance, 'check_in', '')),
-                    "check_out": str(getattr(attendance, 'check_out', '')),
-                    "login_time": str(getattr(attendance, 'login_time', ''))
+                    "check_in": str(getattr(attendance, 'check_in', '') or ""),
+                    "check_out": str(getattr(attendance, 'check_out', '') or ""),
+                    "login_time": str(getattr(attendance, 'login_time', '') or "")
                 }
                 present_users.append({**user_info, **att_data})
                 records.append({
@@ -153,49 +163,38 @@ async def get_attendance_summary(db: Any, target_date_str: str):
                 absent_users.append(user_info)
 
         return {
+            "success": True,
             "date": target_date_compare,
             "total_tracked": len(active_users),
+            "present": len(present_users), # For admin dashboard consistency
+            "absent": len(absent_users),   # For admin dashboard consistency
             "present_count": len(present_users),
             "absent_count": len(absent_users),
             "present_users": present_users,
             "absent_users": absent_users,
+            "records": records,            # For admin dashboard consistency
             "all_records": records
         }
     except Exception as e:
         print(f"❌ Error in get_attendance_summary: {e}")
-        import traceback
-        traceback.print_exc()
         return {
-            "date": target_date_str,
+            "success": False,
+            "date": str(target_date_str),
             "total_tracked": 0,
-            "present_count": 0,
-            "absent_count": 0,
+            "present": 0,
+            "absent": 0,
             "present_users": [],
             "absent_users": [],
-            "all_records": []
+            "records": []
         }
 
-def get_all_attendance(db):
-    """Fetch and join all attendance with user simplified info"""
+def get_all_attendance(db: SheetsDB, target_date_str: Optional[str] = None):
+    """Fetch all attendance records for a given date or for all time."""
     try:
-        att_rows = db.query(Attendance).all()
-        users = db.query(User).all()
-        user_map = {str(getattr(u, 'id', '')): getattr(u, 'full_name', '') or getattr(u, 'username', '') for u in users}
-        
-        results = []
-        for a in att_rows:
-            u_name = user_map.get(str(getattr(a, 'user_id', '')), "Unknown User")
-            results.append({
-                "id": getattr(a, 'id', ''),
-                "user_id": getattr(a, 'user_id', ''),
-                "user_name": u_name,
-                "date": getattr(a, 'date', ''),
-                "status": getattr(a, 'status', ''),
-                "check_in": getattr(a, 'check_in', ''),
-                "check_out": getattr(a, 'check_out', ''),
-                "login_time": getattr(a, 'login_time', '')
-            })
-        return results
+        results = get_attendance_summary(db, target_date_str)
+        if results.get("success"):
+            return results.get("all_records", [])
+        return []
     except Exception as e:
         print(f"❌ Error in get_all_attendance: {e}")
         return []

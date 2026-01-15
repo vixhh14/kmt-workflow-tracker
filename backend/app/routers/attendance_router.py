@@ -22,10 +22,6 @@ async def check_out(data: AttendanceMark, db: any = Depends(get_db)):
 
 @router.get("/summary")
 async def get_summary(db: any = Depends(get_db)):
-    # Assuming attendance_service has this, if not I'll need to check
-    # But for now I'll just use what was likely there or simplified
     from app.core.time_utils import get_today_date_ist
     today = get_today_date_ist().isoformat()
-    all_att = attendance_service.get_all_attendance(db, today)
-    present = len([a for a in all_att if a.get("status") == "Present"])
-    return {"present_count": present, "total_users": len(db.query(User).all()), "attendance": all_att}
+    return attendance_service.get_attendance_summary(db, today)

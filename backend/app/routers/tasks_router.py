@@ -34,82 +34,86 @@ async def read_tasks(
 ):
     # Role-based restriction: Operators only see their own tasks
     if current_user.role == "operator":
-        assigned_to = current_user.user_id
+        assigned_to = str(getattr(current_user, 'id', ''))
 
-    # Get all tasks that are not deleted
-    tasks = db.query(Task).all()
-    tasks = [t for t in tasks if not t.is_deleted]
+    # Get all tasks that are not deleted (from cache)
+    all_tasks = db.query(Task).all()
+    tasks = [t for t in all_tasks if not getattr(t, 'is_deleted', False)]
     
-    # Filter by month and year if provided
-    if year is not None:
-        tasks = [t for t in tasks if t.created_at and t.created_at.year == year]
-    if month is not None:
-        tasks = [t for t in tasks if t.created_at and t.created_at.month == month]
+    # Filter by month and year
+    if year or month:
+        from datetime import datetime
+        filtered_tasks = []
+        for t in tasks:
+            created = getattr(t, 'created_at', None)
+            if not created: continue
+            try:
+                if isinstance(created, str):
+                    dt = datetime.fromisoformat(created.replace('Z', '+00:00'))
+                else:
+                    dt = created
+                    
+                if year and dt.year != year: continue
+                if month and dt.month != month: continue
+                filtered_tasks.append(t)
+            except:
+                filtered_tasks.append(t)
+        tasks = filtered_tasks
     
     if assigned_to:
-        tasks = [t for t in tasks if str(t.assigned_to) == str(assigned_to)]
+        tasks = [t for t in tasks if str(getattr(t, 'assigned_to', '')) == str(assigned_to)]
     
-    # Sort by deadline (closest first), then by creation date (newest first)
-    # Using a helper for sort key to handle None
+    # Sort
     def sort_key(t):
-        due = t.due_date if t.due_date else datetime(9999, 12, 31)
-        created = t.created_at if t.created_at else datetime(1970, 1, 1)
-        return (due, -created.timestamp())
+        due = str(getattr(t, 'due_date', '') or "9999-12-31")
+        created = str(getattr(t, 'created_at', '') or "1970-01-01")
+        return (due, created)
         
     tasks.sort(key=sort_key)
     
-    results = []
-    # Load projects once to avoid heavy lookup
-    all_projects = db.query(DBProject).all()
+    # Load projects once (cached)
+    all_projects = db.query("Project").all()
     project_map = {str(getattr(p, 'id', '')): getattr(p, 'project_name', '') for p in all_projects if not getattr(p, 'is_deleted', False)}
 
+    results = []
     for t in tasks:
         try:
-            # Resolve Project Name
+            # Resolve Project Name if missing
             resolved_project = getattr(t, 'project', None)
             task_project_id = str(getattr(t, 'project_id', ''))
             if (not resolved_project or resolved_project == '-') and task_project_id:
                 resolved_project = project_map.get(task_project_id, "-")
-                if resolved_project != "-":
-                    t.project = resolved_project
-                    # No need to commit immediately unless we want to sync the sheet
 
-            # Construct dictionary for TaskOut
             task_data = {
-                "id": str(t.id),
-                "title": str(t.title),
-                "description": t.description,
+                "id": str(getattr(t, 'id', '')),
+                "title": str(getattr(t, 'title', '') or ""),
+                "description": getattr(t, 'description', ''),
                 "project": resolved_project or "-",
-                "project_id": str(t.project_id) if t.project_id else None,
-                "part_item": t.part_item,
-                "nos_unit": t.nos_unit,
-                "status": t.status,
-                "priority": t.priority,
-                "assigned_by": t.assigned_by,
-                "assigned_to": t.assigned_to,
-                "machine_id": str(t.machine_id) if t.machine_id else None,
-                "due_date": t.due_date,
-
-                "created_at": t.created_at,
-                "started_at": t.started_at,
-                "completed_at": t.completed_at,
-                "total_duration_seconds": t.total_duration_seconds or 0,
-                "hold_reason": t.hold_reason,
-                "denial_reason": t.denial_reason,
-                "actual_start_time": t.actual_start_time,
-                "actual_end_time": t.actual_end_time,
-                "total_held_seconds": t.total_held_seconds or 0,
-                "work_order_number": t.work_order_number,
-                
-                # Audit and Timing Info
-                "ended_by": t.ended_by,
-                "end_reason": t.end_reason,
-                "expected_completion_time": t.expected_completion_time or 0
+                "project_id": task_project_id if task_project_id else None,
+                "part_item": getattr(t, 'part_item', ''),
+                "nos_unit": getattr(t, 'nos_unit', ''),
+                "status": getattr(t, 'status', 'pending'),
+                "priority": getattr(t, 'priority', 'MEDIUM'),
+                "assigned_by": getattr(t, 'assigned_by', ''),
+                "assigned_to": getattr(t, 'assigned_to', ''),
+                "machine_id": str(getattr(t, 'machine_id', '')) if getattr(t, 'machine_id', None) else None,
+                "due_date": getattr(t, 'due_date', None),
+                "created_at": getattr(t, 'created_at', None),
+                "started_at": getattr(t, 'started_at', None),
+                "completed_at": getattr(t, 'completed_at', None),
+                "total_duration_seconds": int(getattr(t, 'total_duration_seconds', 0) or 0),
+                "hold_reason": getattr(t, 'hold_reason', None),
+                "denial_reason": getattr(t, 'denial_reason', None),
+                "actual_start_time": getattr(t, 'actual_start_time', None),
+                "actual_end_time": getattr(t, 'actual_end_time', None),
+                "total_held_seconds": int(getattr(t, 'total_held_seconds', 0) or 0),
+                "work_order_number": getattr(t, 'work_order_number', ''),
+                "ended_by": getattr(t, 'ended_by', None),
+                "end_reason": getattr(t, 'end_reason', None),
+                "expected_completion_time": int(getattr(t, 'expected_completion_time', 0) or 0)
             }
             results.append(task_data)
-        except Exception as e:
-            print(f"⚠️ Error preparing task {getattr(t, 'task_id', 'unknown')}: {e}")
-            continue
+        except: continue
             
     return results
 

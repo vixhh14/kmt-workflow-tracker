@@ -49,8 +49,7 @@ async def get_admin_attendance_summary(db: any = Depends(get_db)):
     from app.services import attendance_service
     from app.core.time_utils import get_today_date_ist
     today = get_today_date_ist().isoformat()
-    # Updated signature check
-    summary_data = await attendance_service.get_attendance_summary(db, today)
+    summary_data = attendance_service.get_attendance_summary(db, today)
     return {
         "present_count": summary_data.get("present_count", 0), 
         "total_users": summary_data.get("total_tracked", 0), 

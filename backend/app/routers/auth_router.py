@@ -14,8 +14,10 @@ router = APIRouter(
     tags=["authentication"],
 )
 
+from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
+
 @router.post("/login", response_model=LoginResponse)
-async def login(credentials: LoginRequest, db: any = Depends(get_db)):
+async def login(credentials: LoginRequest, background_tasks: BackgroundTasks, db: any = Depends(get_db)):
     """
     Authenticate user and return JWT token using Google Sheets Backend.
     """
@@ -36,10 +38,10 @@ async def login(credentials: LoginRequest, db: any = Depends(get_db)):
         # Approval check
         user_role = (getattr(user, 'role', 'operator') or "operator").lower()
         if user_role != 'admin':
-            status = str(getattr(user, 'approval_status', 'pending') or 'pending').lower()
-            if status == 'pending':
+            status_val = str(getattr(user, 'approval_status', 'pending') or 'pending').lower()
+            if status_val == 'pending':
                 raise HTTPException(status_code=403, detail="Account awaiting admin approval")
-            elif status == 'rejected':
+            elif status_val == 'rejected':
                 raise HTTPException(status_code=403, detail="Account registration rejected")
         
         # Password verification
@@ -55,12 +57,17 @@ async def login(credentials: LoginRequest, db: any = Depends(get_db)):
         token_data = {"sub": str(getattr(user, 'username', '')), "id": u_id, "role": str(user_role)}
         access_token = create_access_token(data=token_data)
         
-        # Mark Attendance (IST)
-        try:
-            from app.services import attendance_service
-            attendance_service.mark_present(db=db, user_id=u_id)
-        except Exception as e:
-            print(f"⚠️ Attendance mark failed: {e}")
+        # Mark Attendance (IST) in background so login is NOT blocked by Sheets API
+        def mark_attendance_bg(uid):
+             try:
+                 from app.services import attendance_service
+                 from app.core.sheets_db import get_sheets_db
+                 new_db = get_sheets_db()
+                 attendance_service.mark_present(db=new_db, user_id=uid)
+             except Exception as e:
+                 print(f"⚠️ Background Attendance mark failed: {e}")
+
+        background_tasks.add_task(mark_attendance_bg, u_id)
  
         return LoginResponse(
             access_token=access_token,
