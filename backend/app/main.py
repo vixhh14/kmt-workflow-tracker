@@ -2,6 +2,7 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import CORS_ORIGINS
 from app.routers import (
     auth_router, users_router, tasks_router, projects_router,
     attendance_router, machines_routers, operational_tasks_router,
@@ -17,7 +18,7 @@ app = FastAPI(title="KMT Workflow Tracker API", version="2.0.0")
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust in production
+    allow_origins=CORS_ORIGINS or ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

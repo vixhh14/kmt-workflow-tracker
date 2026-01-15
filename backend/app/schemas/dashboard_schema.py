@@ -22,7 +22,7 @@ class DashboardProject(BaseModel):
     )
 
 class DashboardTask(BaseModel):
-    id: str
+    id: str = Field(alias="task_id")
     title: str
     status: str
     
@@ -32,7 +32,7 @@ class DashboardTask(BaseModel):
     )
 
 class DashboardMachine(BaseModel):
-    id: str
+    id: str = Field(alias="machine_id")
     machine_name: str
     
     model_config = ConfigDict(

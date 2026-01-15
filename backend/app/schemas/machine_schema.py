@@ -11,7 +11,7 @@ class MachineBase(BaseModel):
 
 class MachineCreate(MachineBase):
     unit_id: int
-    category_id: int
+    category_id: Optional[int] = None
     hourly_rate: Optional[float] = None # Added based on router usage often passing it
 
 class MachineUpdate(BaseModel):

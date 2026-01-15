@@ -53,13 +53,13 @@ async def get_admin_dashboard(
         for t in normal_all: combined_tasks.append(t)
         for t in filing_all:
             combined_tasks.append(SimpleNamespace(
-                id=str(t.id), title=t.part_item, status=t.status, 
+                task_id=str(t.id), title=t.part_item, status=t.status, 
                 project_id=t.project_id, machine_id=t.machine_id, 
                 assigned_to=t.assigned_to, priority=getattr(t, 'priority', 'medium')
             ))
         for t in fab_all:
             combined_tasks.append(SimpleNamespace(
-                id=str(t.id), title=t.part_item, status=t.status, 
+                task_id=str(t.id), title=t.part_item, status=t.status, 
                 project_id=t.project_id, machine_id=t.machine_id, 
                 assigned_to=t.assigned_to, priority=getattr(t, 'priority', 'medium')
             ))
@@ -91,8 +91,8 @@ async def get_admin_dashboard(
         machines_data = []
         for m in machines_raw:
             machines_data.append({
-                "id": str(m.id), "machine_name": m.machine_name,
-                "status": machine_status_map.get(str(m.id), 'available'),
+                "machine_id": str(m.machine_id), "machine_name": m.machine_name,
+                "status": machine_status_map.get(str(m.machine_id), 'available'),
                 "hourly_rate": getattr(m, 'hourly_rate', 0)
             })
             
