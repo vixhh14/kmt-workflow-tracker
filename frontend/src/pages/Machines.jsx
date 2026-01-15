@@ -106,11 +106,13 @@ const Machines = () => {
             // Actually, `machines` list contains `unit_id` and `category_id`.
             // We can build a map from Name -> ID.
 
-            await createMachine({
+            const payload = {
                 ...formData,
-                unit_id: parseInt(formData.unit_id),
-                category_id: parseInt(formData.category_id)
-            });
+                unit_id: formData.unit_id ? parseInt(formData.unit_id) : null,
+                category_id: formData.category_id ? parseInt(formData.category_id) : null
+            };
+
+            await createMachine(payload);
 
             setFormData({ machine_name: '', type: '', status: 'active', location: '', unit_id: '', category_id: '' });
             setShowForm(false);
@@ -350,9 +352,8 @@ const Machines = () => {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                                 <select
-                                    required
                                     value={formData.category_id}
                                     onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
