@@ -5,16 +5,10 @@ from uuid import UUID
 
 class DashboardProject(BaseModel):
     # Map project_id to id for frontend
-    # CRITICAL FIX: Accept UUID from database, FastAPI auto-serializes to string in JSON
-    id: UUID = Field(alias="project_id")
+    id: str = Field(alias="id")
     name: Optional[str] = Field(default=None, alias="project_name")
     code: Optional[str] = Field(default=None, alias="project_code")
     work_order: Optional[str] = Field(default=None, alias="work_order_number")
-    
-    @field_serializer('id')
-    def serialize_uuid(self, v: UUID, _info):
-        """Serialize UUID to string for JSON response"""
-        return str(v) if v else None
     
     model_config = ConfigDict(
         from_attributes=True,

@@ -10,6 +10,7 @@ from app.core.time_utils import get_current_time_ist
 # Thread-safe dictionary-based cache
 _GLOBAL_CACHE = {}
 _CACHE_EXPIRY = {}
+_RAW_HEADERS = {} # Store actual sheet headers for mapping
 _CACHE_LOCK = threading.Lock()
 CACHE_TTL = 45  # Seconds (between 30-60 as requested)
 
@@ -28,12 +29,21 @@ class SheetsRepository:
         # Cache expired or missing, refresh it
         try:
             # One bulk read per sheet
-            # Move the API call outside the lock to avoid blocking other sheets
             data = google_sheets.read_all_bulk(sheet_name)
+            
+            # Since read_all_bulk was updated to return normalized records, 
+            # we need to extract the original headers from the first record if available
+            raw_headers = []
+            if data:
+                # Our new read_all_bulk stores orig headers in keys starting with _orig_
+                first = data[0]
+                raw_headers = [v for k, v in first.items() if k.startswith("_orig_")]
             
             with _CACHE_LOCK:
                 _GLOBAL_CACHE[sheet_name] = data
                 _CACHE_EXPIRY[sheet_name] = now + CACHE_TTL
+                if raw_headers:
+                    _RAW_HEADERS[sheet_name] = raw_headers
                 print(f"🔄 [SheetsRepo] Cache Refreshed: {sheet_name} ({len(data)} rows)")
             return data
         except Exception as e:
@@ -69,14 +79,21 @@ class SheetsRepository:
                 return dict(row)
         return None
 
-    def get_headers(self, sheet_name: str) -> List[str]:
-        """Returns headers for a sheet from the schema."""
-        from app.core.sheets_db import SHEETS_SCHEMA
-        return SHEETS_SCHEMA.get(sheet_name, [])
+    def get_raw_headers(self, sheet_name: str) -> List[str]:
+        """Returns the actual raw headers from the sheet from cache."""
+        with _CACHE_LOCK:
+            if sheet_name in _RAW_HEADERS:
+                return list(_RAW_HEADERS[sheet_name])
+        
+        # Fallback: trigger a read to get headers
+        self._get_sheet_data(sheet_name)
+        with _CACHE_LOCK:
+            return list(_RAW_HEADERS.get(sheet_name, self.get_headers(sheet_name)))
 
     def insert(self, sheet_name: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Inserts a new row, updates Sheets, and updates cache immediately."""
         headers = self.get_headers(sheet_name)
+        raw_headers = self.get_raw_headers(sheet_name)
         id_col = headers[0] if headers else "id"
         
         # Ensure default fields
@@ -91,36 +108,27 @@ class SheetsRepository:
         if "is_deleted" not in data:
             data["is_deleted"] = False
 
-        # 1. Update Sheets
-        success = google_sheets.insert_row(sheet_name, data, headers)
+        # 1. Update Sheets - use raw_headers for mapping
+        success = google_sheets.insert_row(sheet_name, data, raw_headers)
         
         if success:
-            # 2. Update Cache immediately (Need to get _row_idx for the new row)
-            # Since we appended, we need to know the new row index.
-            # Easiest way is to refresh the cache for this sheet since append_row doesn't return the index.
-            # But the requirement says "Never re-read the sheet synchronously" if possible.
-            # However, for INSERT, we don't know the row index without reading or keeping track.
-            # Let's refresh cache after insert to be safe and get the correct _row_idx.
-            # Actually, we can estimate it if we have the current cache size.
+            # 2. Update Cache immediately
             with _CACHE_LOCK:
                 if sheet_name in _GLOBAL_CACHE:
-                    new_idx = len(_GLOBAL_CACHE[sheet_name]) + 2 # +1 for headers, +1 for 0-index vs 1-index
+                    new_idx = len(_GLOBAL_CACHE[sheet_name]) + 2
                     data_with_idx = dict(data)
                     data_with_idx["_row_idx"] = new_idx
                     _GLOBAL_CACHE[sheet_name].append(data_with_idx)
                     print(f"✅ [SheetsRepo] Cache Updated (Insert): {sheet_name}")
-                else:
-                    # If cache was empty, just refresh it on next read
-                    pass
         
         return data
 
     def update(self, sheet_name: str, id_value: Any, data: Dict[str, Any]) -> bool:
         """Updates a row, updates Sheets, and updates cache immediately."""
-        if not id_value:
-            return False
+        if not id_value: return False
             
         headers = self.get_headers(sheet_name)
+        raw_headers = self.get_raw_headers(sheet_name)
         id_col = headers[0] if headers else "id"
         
         # Find the record in cache to get _row_idx
@@ -136,33 +144,27 @@ class SheetsRepository:
                         break
         
         if not cached_row:
-            # If not in cache, we might need a refresh or it doesn't exist
-            # But we should rely on cache only as per rules
             print(f"⚠️ [SheetsRepo] Update failed: Record {id_value} not found in cache for {sheet_name}")
             return False
 
         row_idx = cached_row.get("_row_idx")
-        if not row_idx:
-            print(f"⚠️ [SheetsRepo] Update failed: No _row_idx for record {id_value} in {sheet_name}")
-            return False
+        if not row_idx: return False
 
-        # Prepare update data with updated_at
+        # Prepare update data
         update_payload = dict(data)
         if "updated_at" not in update_payload:
             update_payload["updated_at"] = get_current_time_ist().isoformat()
 
-        # 1. Update Sheets
-        success = google_sheets.update_row_by_idx(sheet_name, row_idx, update_payload, headers)
+        # 1. Update Sheets - use raw_headers for mapping
+        success = google_sheets.update_row_by_idx(sheet_name, row_idx, update_payload, raw_headers)
         
         if success:
             # 2. Update Cache immediately
             with _CACHE_LOCK:
                 if sheet_name in _GLOBAL_CACHE and cached_idx_in_list != -1:
-                    # Update the dict in place
                     for k, v in update_payload.items():
                         _GLOBAL_CACHE[sheet_name][cached_idx_in_list][k] = v
                     print(f"✅ [SheetsRepo] Cache Updated (Update): {sheet_name} row {row_idx}")
-        
         return success
 
     def soft_delete(self, sheet_name: str, id_value: Any) -> bool:
@@ -171,42 +173,31 @@ class SheetsRepository:
 
     def hard_delete(self, sheet_name: str, id_value: Any) -> bool:
         """Physically removes a row and synchronizes cache."""
-        if not id_value:
-            return False
+        if not id_value: return False
             
         headers = self.get_headers(sheet_name)
         id_col = headers[0] if headers else "id"
         
-        cached_row = None
         cached_idx_in_list = -1
+        row_idx = -1
         
         with _CACHE_LOCK:
             if sheet_name in _GLOBAL_CACHE:
                 for i, row in enumerate(_GLOBAL_CACHE[sheet_name]):
                     if str(row.get(id_col)) == str(id_value):
-                        cached_row = row
+                        row_idx = row.get("_row_idx", -1)
                         cached_idx_in_list = i
                         break
         
-        if not cached_row:
-            print(f"⚠️ [SheetsRepo] Hard delete failed: Record {id_value} not found in cache for {sheet_name}")
-            return False
-
-        row_idx = cached_row.get("_row_idx")
-        if not row_idx:
-            return False
+        if row_idx == -1: return False
 
         # 1. Update Sheets
         success = google_sheets.delete_row_by_idx(sheet_name, row_idx)
         
         if success:
-            # 2. Update Cache immediately
-            # Removing a row shifts all subsequent rows. We must re-read to be safe,
-            # or subtract 1 from all subsequent _row_idx.
-            # Rereading is safer after a hard delete to ensure indices are correct.
+            # 2. Update Cache immediately - Removal requires re-index or clearing
             self.clear_cache(sheet_name)
             print(f"🗑️ [SheetsRepo] Hard deleted {id_value} from {sheet_name}. Cache cleared.")
-        
         return success
 
     def clear_cache(self, sheet_name: Optional[str] = None):

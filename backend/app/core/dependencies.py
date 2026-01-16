@@ -49,7 +49,7 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
 # Admin permission check
 # -------------------------
 async def get_current_active_admin(current_user: User = Depends(get_current_active_user)):
-    if current_user.role != "admin":
+    if str(getattr(current_user, 'role', '')).lower() != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User does not have admin privileges"

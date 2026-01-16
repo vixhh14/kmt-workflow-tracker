@@ -103,69 +103,88 @@ class GoogleSheetsService:
             print(f"❌ Error getting worksheet {name}: {e}")
             raise
 
+    def _normalize_header(self, h: str) -> str:
+        """Normalizes a header for comparison (e.g., 'Project Name ' -> 'project_name')."""
+        import re
+        if not h: return ""
+        s = str(h).strip().lower()
+        s = re.sub(r'[^a-z0-9]+', '_', s)
+        return s.strip('_')
+
     def read_all_bulk(self, name: str) -> List[Dict[str, Any]]:
-        """Reads all records in one call and returns as list of dicts."""
+        """Reads all records in one call and returns as list of dicts with normalized keys."""
         worksheet = self.get_worksheet(name)
-        # get_all_records is more direct than get_all_values then manual zip
-        # but manual zip allows us to handle missing values and _row_idx
         try:
             all_values = worksheet.get_all_values()
             if not all_values:
                 return []
             
-            headers = all_values[0]
+            raw_headers = all_values[0]
+            normalized_headers = [self._normalize_header(h) for h in raw_headers]
+            
+            # Ensure at least one 'id' key for the primary column
+            if "id" not in normalized_headers and len(normalized_headers) > 0:
+                # If first column looks like an ID, alias it
+                if normalized_headers[0].endswith("_id"):
+                    normalized_headers[0] = "id"
+            
             records = []
             for i, values in enumerate(all_values[1:]):
-                # Create dict and pad with empty strings if row is shorter than headers
-                padded_values = values + [""] * (len(headers) - len(values))
-                record = dict(zip(headers, padded_values))
-                record["_row_idx"] = i + 2 # 1-indexed, +1 for header
+                padded_values = values + [""] * (len(raw_headers) - len(values))
+                record = {}
+                for rh, nh, val in zip(raw_headers, normalized_headers, padded_values):
+                    record[nh] = val
+                    record[f"_orig_{nh}"] = rh
+                
+                record["_row_idx"] = i + 2
                 records.append(record)
             return records
         except Exception as e:
             print(f"❌ Error reading all values from {name}: {e}")
             raise
 
-    def insert_row(self, name: str, data: Dict[str, Any], headers: List[str]):
-        """Inserts a new row into the specified worksheet."""
+    def insert_row(self, name: str, data: Dict[str, Any], schema_headers: List[str]):
+        """Inserts a new row using the ACTUAL worksheet headers for placement."""
         worksheet = self.get_worksheet(name)
-        
-        # Prepare row values based on provided headers
-        row = []
-        for header in headers:
-            val = data.get(header, "")
-            if hasattr(val, "isoformat"):
-                val = val.isoformat()
-            row.append(str(val))
-        
         try:
+            # We need to know the ACTUAL headers in the sheet to put data in the right place
+            actual_raw_headers = worksheet.row_values(1)
+            actual_normalized = [self._normalize_header(h) for h in actual_raw_headers]
+            
+            row = []
+            for nh in actual_normalized:
+                val = data.get(nh, "")
+                if hasattr(val, "isoformat"): val = val.isoformat()
+                row.append(str(val))
+            
             worksheet.append_row(row)
             return True
         except Exception as e:
             print(f"❌ Error inserting row into {name}: {e}")
             return False
             
-    def update_row_by_idx(self, name: str, row_idx: int, data: Dict[str, Any], headers: List[str]):
-        """Updates a row by its index using batch update."""
+    def update_row_by_idx(self, name: str, row_idx: int, data: Dict[str, Any], schema_headers: List[str]):
+        """Updates specific columns in a row based on ACTUAL worksheet match."""
         worksheet = self.get_worksheet(name)
-        
-        cells_to_update = []
-        for key, value in data.items():
-            if key in headers:
-                col_idx = headers.index(key) + 1
-                if hasattr(value, "isoformat"):
-                    value = value.isoformat()
-                
-                cell = gspread.cell.Cell(row=row_idx, col=col_idx, value=str(value))
-                cells_to_update.append(cell)
-        
-        if cells_to_update:
-            try:
+        try:
+            actual_raw_headers = worksheet.row_values(1)
+            actual_normalized = [self._normalize_header(h) for h in actual_raw_headers]
+            
+            cells_to_update = []
+            for key, value in data.items():
+                norm_key = self._normalize_header(key)
+                if norm_key in actual_normalized:
+                    col_idx = actual_normalized.index(norm_key) + 1
+                    if hasattr(value, "isoformat"): value = value.isoformat()
+                    cell = gspread.cell.Cell(row=row_idx, col=col_idx, value=str(value))
+                    cells_to_update.append(cell)
+            
+            if cells_to_update:
                 worksheet.update_cells(cells_to_update)
-                return True
-            except Exception as e:
-                print(f"❌ Error updating row {row_idx} in {name}: {e}")
-                return False
+            return True
+        except Exception as e:
+            print(f"❌ Error updating row {row_idx} in {name}: {e}")
+            return False
     def delete_row_by_idx(self, name: str, row_idx: int):
         """Physically removes a row from the worksheet."""
         worksheet = self.get_worksheet(name)
