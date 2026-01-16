@@ -6,7 +6,7 @@ from uuid import UUID
 class TaskBase(BaseModel):
     title: str
     project: Optional[str] = None
-    project_id: Optional[UUID] = None  # Expect UUID object or string
+    project_id: Optional[str] = None
     description: Optional[str] = None
     part_item: Optional[str] = None
     nos_unit: Optional[str] = None
@@ -15,7 +15,7 @@ class TaskBase(BaseModel):
     assigned_to: Optional[str] = None  # operator user_id
     machine_id: Optional[str] = None
     assigned_by: Optional[str] = None  # user_id who assigned
-    due_date: Optional[datetime] = None
+    due_date: Optional[Union[datetime, str]] = None
     expected_completion_time: Optional[int] = 0
 
     work_order_number: Optional[str] = None
@@ -101,17 +101,17 @@ class TaskUpdate(BaseModel):
         return v
 
 class TaskOut(TaskBase):
-    id: str  # UUID as string
-    created_at: datetime
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    id: str
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
+    started_at: Optional[Union[datetime, str]] = None
+    completed_at: Optional[Union[datetime, str]] = None
     total_duration_seconds: int = 0
     hold_reason: Optional[str] = None
     denial_reason: Optional[str] = None
-    actual_start_time: Optional[datetime] = None
-    actual_end_time: Optional[datetime] = None
-    today_active_duration: Optional[int] = 0 # Computed on the fly usually
-    # Audit
+    actual_start_time: Optional[Union[datetime, str]] = None
+    actual_end_time: Optional[Union[datetime, str]] = None
+    today_active_duration: Optional[int] = 0
     ended_by: Optional[str] = None
     end_reason: Optional[str] = None
     total_held_seconds: int = 0
@@ -142,10 +142,10 @@ class RescheduleRequestModel(BaseModel):
 # Operational Tasks (Filing/Fabrication)
 
 class OperationalTaskBase(BaseModel):
-    project_id: Optional[UUID] = None  # Expect UUID object or valid string
+    project_id: Optional[str] = None
     part_item: Optional[str] = None
     quantity: Optional[int] = 1
-    due_date: Optional[datetime] = None
+    due_date: Optional[Union[datetime, str]] = None
     priority: str = "MEDIUM"
     assigned_to: Optional[str] = None
     completed_quantity: int = 0
@@ -154,7 +154,7 @@ class OperationalTaskBase(BaseModel):
     machine_id: Optional[str] = None
     work_order_number: Optional[str] = None
     assigned_by: Optional[str] = None
-    task_type: Optional[str] = None  # FILING or FABRICATION
+    task_type: Optional[str] = None
 
     @field_validator('priority', mode='before')
     @classmethod
@@ -238,18 +238,17 @@ class OperationalTaskUpdate(BaseModel):
         return v
 
 class OperationalTaskOut(OperationalTaskBase):
-    id: Union[int, str]
-    created_at: datetime
-    updated_at: datetime
+    id: str
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
     
-    # Nested objects if needed
     project_name: Optional[str] = None
     machine_name: Optional[str] = None
     assignee_name: Optional[str] = None
-    started_at: Optional[datetime] = None
-    on_hold_at: Optional[datetime] = None
-    resumed_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    started_at: Optional[Union[datetime, str]] = None
+    on_hold_at: Optional[Union[datetime, str]] = None
+    resumed_at: Optional[Union[datetime, str]] = None
+    completed_at: Optional[Union[datetime, str]] = None
     total_active_duration: Optional[int] = 0
 
     model_config = ConfigDict(from_attributes=True)

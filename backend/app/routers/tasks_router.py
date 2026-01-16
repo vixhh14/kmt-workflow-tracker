@@ -136,19 +136,20 @@ async def create_task(
     # 2. Assignee Resolution
     assigned_to = task.assigned_to
     if assigned_to:
-        assignee = db.query(User).filter(user_id=assigned_to, is_deleted=False).first()
+        assignee = db.query(User).filter(id=assigned_to).filter(is_deleted=False).first()
         if not assignee:
             # Fallback: check if it's a username
-            assignee = db.query(User).filter(username=assigned_to, is_deleted=False).first()
+            assignee = db.query(User).filter(username=assigned_to).filter(is_deleted=False).first()
             if assignee:
-                assigned_to = assignee.user_id 
+                assigned_to = assignee.id 
             else:
                  raise HTTPException(status_code=400, detail=f"Assigned user '{assigned_to}' does not exist or is inactive")
 
     # 3. Project Validation & Sync
     project_name = task.project.strip() if task.project else "-"
     if task.project_id:
-        project_exists = db.query(DBProject).filter(project_id=task.project_id).first()
+        p_str = str(task.project_id)
+        project_exists = db.query(DBProject).filter(id=p_str).first()
         if not project_exists:
             raise HTTPException(status_code=400, detail=f"Selected project (ID: {task.project_id}) not found")
         project_name = project_exists.project_name
@@ -157,7 +158,7 @@ async def create_task(
     priority_norm = (task.priority or "MEDIUM").upper()
     if priority_norm not in ["LOW", "MEDIUM", "HIGH"]:
         priority_norm = "MEDIUM"
-    assigned_by = current_user.user_id
+    assigned_by = getattr(current_user, 'id', '')
 
     try:
         new_task = Task(
@@ -226,7 +227,7 @@ async def start_task(
     db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    task = db.query(Task).filter(task_id=task_id).first()
+    task = db.query(Task).filter(id=task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     

@@ -13,7 +13,37 @@ from app.routers import (
     machine_categories_router, units_router, user_skills_router
 )
 
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import logging
+import traceback
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="KMT Workflow Tracker API", version="2.0.0")
+
+# Global Exception Handler (Backend Safety Guarantee)
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"❌ UNHANDLED EXCEPTION: {str(exc)}")
+    logger.error(traceback.format_exc())
+    
+    # Ensure CORS headers are present even on errors
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal Server Error",
+            "message": str(exc),
+            "path": request.url.path
+        },
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*"
+        }
+    )
 
 # CORS configuration
 app.add_middleware(

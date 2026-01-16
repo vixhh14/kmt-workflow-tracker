@@ -10,8 +10,11 @@ class SheetsModel:
             setattr(self, key, value)
         
         # Ensure standard metadata
+        now = get_current_time_ist().isoformat()
         if not hasattr(self, "created_at") or self.created_at is None:
-            self.created_at = get_current_time_ist().isoformat()
+            self.created_at = now
+        if not hasattr(self, "updated_at") or self.updated_at is None:
+            self.updated_at = now
         if not hasattr(self, "is_deleted") or self.is_deleted is None:
             self.is_deleted = False
 
@@ -22,21 +25,21 @@ class SheetsModel:
 class User(SheetsModel):
     __tablename__ = "Users"
     def __init__(self, **kwargs):
-        # Handle legacy user_id
-        if "id" not in kwargs and "user_id" in kwargs:
-            kwargs["id"] = kwargs.pop("user_id")
-        if "id" not in kwargs or not kwargs["id"]:
-            kwargs["id"] = str(uuid.uuid4())
+        # Sync id and user_id
+        u_id = kwargs.get("id") or kwargs.get("user_id")
+        if not u_id: u_id = str(uuid.uuid4())
+        kwargs["id"] = u_id
+        kwargs["user_id"] = u_id
         super().__init__(**kwargs)
 
 class Project(SheetsModel):
     __tablename__ = "Projects"
     def __init__(self, **kwargs):
-        # Handle legacy project_id
-        if "id" not in kwargs and "project_id" in kwargs:
-            kwargs["id"] = kwargs.pop("project_id")
-        if "id" not in kwargs or not kwargs["id"]:
-            kwargs["id"] = str(uuid.uuid4())
+        # Sync id and project_id
+        p_id = kwargs.get("id") or kwargs.get("project_id")
+        if not p_id: p_id = str(uuid.uuid4())
+        kwargs["id"] = p_id
+        kwargs["project_id"] = p_id
         super().__init__(**kwargs)
 
 class Task(SheetsModel):
@@ -101,11 +104,11 @@ class UserWorkLog(SheetsModel):
 class Machine(SheetsModel):
     __tablename__ = "Machines"
     def __init__(self, **kwargs):
-        # Handle legacy machine_id
-        if "id" not in kwargs and "machine_id" in kwargs:
-            kwargs["id"] = kwargs.pop("machine_id")
-        if "id" not in kwargs or not kwargs["id"]:
-            kwargs["id"] = str(uuid.uuid4())
+        # Sync id and machine_id
+        m_id = kwargs.get("id") or kwargs.get("machine_id")
+        if not m_id: m_id = str(uuid.uuid4())
+        kwargs["id"] = m_id
+        kwargs["machine_id"] = m_id
         super().__init__(**kwargs)
 
 class Unit(SheetsModel):

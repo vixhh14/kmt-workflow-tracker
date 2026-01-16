@@ -111,17 +111,20 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         target_date_compare = str(target_date_str).split('T')[0].split(' ')[0]
         
         # Get all users and filter by tracked roles
-        tracked_roles = ['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master']
+        tracked_roles = ['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master', 'fab master', 'file master']
         all_users = db.query(User).all()
         active_users = []
         for u in all_users:
             if getattr(u, 'is_deleted', False): continue
             
-            approval_status = str(getattr(u, 'approval_status', '')).lower()
-            role = str(getattr(u, 'role', '')).lower()
+            # Use strip and lower for robust matching
+            approval_status = str(getattr(u, 'approval_status', '')).strip().lower()
+            role = str(getattr(u, 'role', '')).strip().lower()
             
-            # Simple check for active/approved
-            if approval_status == 'approved' and role in tracked_roles:
+            # Accept 'approved' or 'active' or empty/none if admin
+            is_approved = approval_status in ['approved', 'active', '1', 'true', 'yes']
+            
+            if is_approved and role in tracked_roles:
                 active_users.append(u)
         
         # Get all attendance
@@ -130,9 +133,14 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         attendance_map = {}
         for a in all_att:
             if getattr(a, 'is_deleted', False): continue
-            att_date = str(getattr(a, 'date', '')).split('T')[0].split(' ')[0]
+            
+            raw_date = str(getattr(a, 'date', '')).strip()
+            if not raw_date: continue
+            
+            att_date = raw_date.split('T')[0].split(' ')[0]
             if att_date == target_date_compare:
-                uid = str(getattr(a, 'user_id', ''))
+                uid = str(getattr(a, 'user_id', '')).strip()
+                if not uid: continue
                 # Keep the latest record if multiple exist
                 attendance_map[uid] = a
         

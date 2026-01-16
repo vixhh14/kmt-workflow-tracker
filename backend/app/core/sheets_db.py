@@ -89,16 +89,22 @@ class SheetRow:
     def __getattr__(self, key):
         if key in self._data:
             value = self._data[key]
-            # Coerce boolean strings
-            if key in ['is_deleted', 'active', 'approval_status']:
-                if isinstance(value, str):
-                    if value.lower() in ['true', '1', 'yes']: return True
-                    if value.lower() in ['false', '0', 'no', '']: return False
+            # Improved coercion for boolean-like strings
+            if isinstance(value, str):
+                low_val = value.lower()
+                if low_val in ['true', '1', 'yes']: return True
+                if low_val in ['false', '0', 'no', '']: return False
             return value
-        # Special case for 'id' if 'project_id' or 'user_id' exists
+        # Special case for IDs: bidirectional aliasing between 'id' and legacy names
+        prefix = self._name.lower()
+        if prefix.endswith('s'): prefix = prefix[:-1]
+        legacy_id_key = f"{prefix}_id"
+        
         if key == 'id':
-            for k in [f"{self._name[:-1].lower()}_id", f"{self._name.lower()}_id"]:
-                 if k in self._data: return self._data[k]
+            if legacy_id_key in self._data: return self._data[legacy_id_key]
+        if key == legacy_id_key:
+            if 'id' in self._data: return self._data['id']
+            
         return None
 
     def __getitem__(self, key):
@@ -141,6 +147,9 @@ class QueryWrapper:
                     return row_val is None or str(row_val).upper() in ["NONE", "NULL", ""]
                 
                 if isinstance(filter_val, bool):
+                    if isinstance(row_val, str):
+                        low = row_val.lower()
+                        row_val = low in ['true', '1', 'yes']
                     return bool(row_val) == filter_val
                 
                 return str(row_val) == str(filter_val)

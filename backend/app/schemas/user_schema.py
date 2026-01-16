@@ -26,10 +26,13 @@ class UserUpdate(BaseModel):
 class UserOut(UserBase):
     id: str
     machine_types: Optional[str] = None
-    updated_at: Optional[datetime] = None
+    approval_status: str = "pending"
+    active: bool = True
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
 
-    @field_serializer('updated_at')
-    def serialize_dt(self, dt: Optional[datetime], _info):
+    @field_serializer('updated_at', 'created_at')
+    def serialize_dt(self, dt: Optional[Union[datetime, str]], _info):
         if dt is None:
             return None
         if isinstance(dt, str):

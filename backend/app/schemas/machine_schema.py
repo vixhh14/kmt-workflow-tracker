@@ -27,11 +27,11 @@ class MachineUpdate(BaseModel):
 class MachineOut(MachineBase):
     id: str
     machine_id: Optional[str] = None
-    unit_id: Optional[int] = None
-    category_id: Optional[int] = None
+    unit_id: Optional[Union[int, str]] = None
+    category_id: Optional[Union[int, str]] = None
     hourly_rate: Optional[float] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: Optional[Union[datetime, str]] = None
+    updated_at: Optional[Union[datetime, str]] = None
 
     model_config = ConfigDict(
         from_attributes=True,
