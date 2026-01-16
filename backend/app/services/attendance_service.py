@@ -110,6 +110,25 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
             
         target_date_compare = str(target_date_str).split('T')[0].split(' ')[0]
         
+        # Robust date match for DD/MM/YYYY and ISO formats
+        def dates_match(row_date, target_date):
+            if not row_date or not target_date: return False
+            r_str = str(row_date).strip().split('T')[0].split(' ')[0]
+            t_str = str(target_date).strip().split('T')[0].split(' ')[0]
+            if r_str == t_str: return True
+            
+            # Alternative: Try converting DD/MM/YYYY to YYYY-MM-DD
+            try:
+                if '/' in r_str:
+                    parts = r_str.split('/')
+                    if len(parts) == 3:
+                        # Handle 15/1/2026 or 15/01/2026
+                        d, m, y = parts
+                        norm_r = f"{y}-{m.zfill(2)}-{d.zfill(2)}"
+                        if norm_r == t_str: return True
+            except: pass
+            return False
+
         # Get all users and filter by tracked roles
         tracked_roles = ['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master', 'fab master', 'file master']
         all_users = db.query(User).all()
@@ -134,11 +153,7 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         for a in all_att:
             if getattr(a, 'is_deleted', False): continue
             
-            raw_date = str(getattr(a, 'date', '')).strip()
-            if not raw_date: continue
-            
-            att_date = raw_date.split('T')[0].split(' ')[0]
-            if att_date == target_date_compare:
+            if dates_match(getattr(a, 'date', ''), target_date_compare):
                 uid = str(getattr(a, 'user_id', '')).strip()
                 if not uid: continue
                 # Keep the latest record if multiple exist

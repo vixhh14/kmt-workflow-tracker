@@ -143,6 +143,9 @@ class QueryWrapper:
             def match_kw(row, k, filter_val):
                 row_val = getattr(row, k, None)
                 
+                if row_val is None:
+                     return filter_val is None or str(filter_val).upper() in ["NONE", "NULL", ""]
+
                 if filter_val is None or str(filter_val).upper() in ["NONE", "NULL", ""]:
                     return row_val is None or str(row_val).upper() in ["NONE", "NULL", ""]
                 
@@ -237,7 +240,7 @@ class SheetsDB:
             for row in rows:
                 id_val = getattr(row, id_col)
                 # Build update dict with internal row index
-                update_entry = {"_row_idx": row.get("_row_idx")}
+                update_entry = {"_row_idx": row._data.get("_row_idx")}
                 for f in row._dirty_fields:
                     if f in headers or f == id_col:
                         update_entry[f] = getattr(row, f)
