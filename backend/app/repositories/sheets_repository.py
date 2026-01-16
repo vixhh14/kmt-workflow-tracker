@@ -11,6 +11,7 @@ from app.core.time_utils import get_current_time_ist
 _GLOBAL_CACHE = {}
 _CACHE_EXPIRY = {}
 _RAW_HEADERS = {} # Store actual sheet headers for mapping
+_NO_CACHE = {} # Store timestamps for failed fetches
 _CACHE_LOCK = threading.Lock()
 CACHE_TTL = 45  # Seconds (between 30-60 as requested)
 
@@ -18,13 +19,18 @@ class SheetsRepository:
     def __init__(self):
         pass
 
-    def _get_sheet_data(self, sheet_name: str) -> List[Dict[str, Any]]:
+    def _get_sheet_data(self, sheet_name: str, force_refresh: bool = False) -> List[Dict[str, Any]]:
         now = time.time()
         
         # Check if we have valid cache
-        with _CACHE_LOCK:
-            if sheet_name in _GLOBAL_CACHE and now < _CACHE_EXPIRY.get(sheet_name, 0):
-                return _GLOBAL_CACHE[sheet_name]
+        if not force_refresh:
+            with _CACHE_LOCK:
+                if sheet_name in _GLOBAL_CACHE and now < _CACHE_EXPIRY.get(sheet_name, 0):
+                    return _GLOBAL_CACHE[sheet_name]
+                # Negative cache check - if we failed recently, return empty to stop storms
+                if sheet_name in _NO_CACHE and now < _NO_CACHE[sheet_name]:
+                     print(f"🛑 [SheetsRepo] Skipping fetch for {sheet_name} (Negative Cache)")
+                     return []
 
         # Cache expired or missing, refresh it
         try:
@@ -41,11 +47,12 @@ class SheetsRepository:
             with _CACHE_LOCK:
                 _GLOBAL_CACHE[sheet_name] = data
                 _CACHE_EXPIRY[sheet_name] = now + CACHE_TTL
+                if sheet_name in _NO_CACHE: del _NO_CACHE[sheet_name]
+                
                 if raw_headers:
                     _RAW_HEADERS[sheet_name] = raw_headers
                 else:
                     # Fallback if sheet is empty but we need headers
-                    # This might happen on first run with empty sheet
                     try:
                         worksheet = google_sheets.get_worksheet(sheet_name)
                         _RAW_HEADERS[sheet_name] = worksheet.row_values(1)
@@ -56,6 +63,8 @@ class SheetsRepository:
         except Exception as e:
             print(f"❌ [SheetsRepo] Failed to fetch {sheet_name}: {e}")
             with _CACHE_LOCK:
+                # Set negative cache for 30 seconds
+                _NO_CACHE[sheet_name] = now + 30
                 # Fallback to expired cache if available
                 if sheet_name in _GLOBAL_CACHE:
                     return _GLOBAL_CACHE[sheet_name]
@@ -63,7 +72,7 @@ class SheetsRepository:
 
     def get_cached_records(self, sheet_name: str) -> List[Dict[str, Any]]:
         """Implementation of mandatory task: Reads entire worksheet from cache."""
-        return self.get_all(sheet_name)
+        return self._get_sheet_data(sheet_name, force_refresh=False)
 
     def get_headers(self, sheet_name: str) -> List[str]:
         """Returns normalized headers for the sheet."""
@@ -217,11 +226,37 @@ class SheetsRepository:
         return success
 
     def batch_append(self, sheet_name: str, rows: List[Dict[str, Any]]) -> bool:
-        """Updates multiple rows to Sheets and refreshes cache."""
+        """Updates multiple rows to Sheets and refreshes cache immediately."""
         raw_headers = self.get_raw_headers(sheet_name)
+        headers = self.get_headers(sheet_name)
+        
         success = google_sheets.batch_append(sheet_name, rows, raw_headers)
+        
         if success:
-            self.clear_cache(sheet_name) # Easier to reload for batch
+            with _CACHE_LOCK:
+                if sheet_name in _GLOBAL_CACHE:
+                    # Determine new row index start
+                    max_idx = 1
+                    if _GLOBAL_CACHE[sheet_name]:
+                        max_idx = max(r.get("_row_idx", 0) for r in _GLOBAL_CACHE[sheet_name])
+                    
+                    next_idx = max_idx + 1
+                    
+                    for row_data in rows:
+                        data_with_idx = dict(row_data)
+                        data_with_idx["_row_idx"] = next_idx
+                        # Add original headers mapping
+                        for h, rh in zip(headers, raw_headers):
+                            if rh: # Ensure we don't map empty headers
+                                data_with_idx[f"_orig_{h}"] = rh
+                        
+                        _GLOBAL_CACHE[sheet_name].append(data_with_idx)
+                        next_idx += 1
+                        
+                    print(f"✅ [SheetsRepo] Cache Updated (Batch Append): {sheet_name} (+{len(rows)} rows)")
+                else:
+                    # Cache empty, clear to force potential reload or leave empty
+                    self.clear_cache(sheet_name)
         return success
 
     def batch_update(self, sheet_name: str, updates: List[Dict[str, Any]]) -> bool:

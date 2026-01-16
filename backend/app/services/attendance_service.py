@@ -14,14 +14,28 @@ def mark_present(db: SheetsDB, user_id: str, ip_address: Optional[str] = None) -
         now_ist = get_current_time_ist()
         today_str = today.isoformat()
         
+        # Helper for robust date matching
+        def dates_match(row_date, target_date):
+            if not row_date: return False
+            r_str = str(row_date).strip().split('T')[0].split(' ')[0]
+            if r_str == target_date: return True
+            try:
+                if '/' in r_str:
+                    parts = r_str.split('/')
+                    if len(parts) == 3:
+                        d, m, y = parts
+                        norm_r = f"{y}-{m.zfill(2)}-{d.zfill(2)}"
+                        if norm_r == target_date: return True
+            except: pass
+            return False
+
         # Check if attendance record already exists for this user today
         all_att = db.query(Attendance).all()
         # Find local record for today - safe date comparison
         existing_attendance = None
         for a in all_att:
             if str(getattr(a, 'user_id', '')) == str(user_id):
-                att_date = str(getattr(a, 'date', '')).split('T')[0]
-                if att_date == today_str:
+                if dates_match(getattr(a, 'date', ''), today_str):
                     existing_attendance = a
                     break
         
@@ -69,13 +83,27 @@ def mark_checkout(db: SheetsDB, user_id: str) -> dict:
         now_ist = get_current_time_ist()
         today_str = today.isoformat()
         
+        # Helper for robust date matching
+        def dates_match(row_date, target_date):
+            if not row_date: return False
+            r_str = str(row_date).strip().split('T')[0].split(' ')[0]
+            if r_str == target_date: return True
+            try:
+                if '/' in r_str:
+                    parts = r_str.split('/')
+                    if len(parts) == 3:
+                        d, m, y = parts
+                        norm_r = f"{y}-{m.zfill(2)}-{d.zfill(2)}"
+                        if norm_r == target_date: return True
+            except: pass
+            return False
+
         all_att = db.query(Attendance).all()
         # Find record for today
         attendance = None
         for a in all_att:
             if str(getattr(a, 'user_id', '')) == str(user_id):
-                att_date = str(getattr(a, 'date', '')).split('T')[0]
-                if att_date == today_str:
+                if dates_match(getattr(a, 'date', ''), today_str):
                     attendance = a
                     break
 

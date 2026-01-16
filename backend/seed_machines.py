@@ -1,191 +1,141 @@
-"""
-Seed script to populate machines with categories and units.
-Run this script after deploying to add the 39 machines to the database.
-
-Usage: python seed_machines.py
-"""
-
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from sqlalchemy.orm import Session
-from app.core.database import engine, Base, get_db
-from app.models.models_db import Machine, Unit, MachineCategory
-from datetime import datetime
 import uuid
+import time
+sys.path.append(os.path.join(os.getcwd())) # Add backend root
 
-# Create tables if they don't exist
-Base.metadata.create_all(bind=engine)
+from app.core.sheets_db import get_sheets_db, SheetsDB
+from app.models.models_db import Machine
+from app.core.time_utils import get_current_time_ist
 
-# Units data
-UNITS = [
-    {"id": 1, "name": "Unit 1", "description": "Main production unit"},
-    {"id": 2, "name": "Unit 2", "description": "Secondary production unit"},
+# Data from Prompt
+UNIT_1_MACHINES = [
+    ("Hand Grinder", "Grinder"),
+    ("Bench Grinder", "Grinder"),
+    ("Tool and Cutter Grinder", "Grinder"),
+    ("Turnmaster", "Lathe"),
+    ("Leader", "Lathe"),
+    ("Bandsaw Cutting Manual", "Material Cutting"),
+    ("Bandsaw Cutting Auto", "Material Cutting"),
+    ("VMC Pilot", "VMC"),
+    ("ESTEEM DRO", "Milling"),
+    ("FW Horizontal", "Milling"),
+    ("Arno", "Milling"),
+    ("BFW No 2", "Milling"),
+    ("Engraving Machine", "Engraving"),
+    ("Delapena Honing Machine", "Honing"),
+    ("Buffing Machine", "Buffing"),
+    ("Tooth Rounding Machine", "Tooth Rounding"),
+    ("Lapping Machine", "Lapping"),
+    ("Hand Drilling 1", "Drilling"),
+    ("Hand Drilling 2", "Drilling"),
+    ("Hand Grinding 1", "Grinder"),
+    ("Hand Grinding 2", "Grinder"),
+    ("Hitachi Cutting Machine", "Material Cutting"),
+    ("HMT Rack Cutting", "Rack Cutting"),
+    ("L Rack Cutting", "Rack Cutting"),
+    ("Reinecker", "Lathe"),
+    ("Zimberman", "CNC"),
+    ("EIFCO Stationary Drilling", "Drilling")
 ]
 
-# Categories data
-CATEGORIES = [
-    {"id": 1, "name": "Material Cutting", "description": "Gas cutting and bandsaw machines"},
-    {"id": 2, "name": "Welding", "description": "Tig and CO2 welding machines"},
-    {"id": 3, "name": "Lathe", "description": "Lathe and turning machines"},
-    {"id": 4, "name": "CNC", "description": "Computer numerical control machines"},
-    {"id": 5, "name": "Slotting", "description": "Slotting machines"},
-    {"id": 6, "name": "Grinding", "description": "Surface and precision grinding"},
-    {"id": 7, "name": "Drilling", "description": "Drilling and boring machines"},
-    {"id": 8, "name": "Grinder", "description": "Hand and bench grinders"},
-    {"id": 9, "name": "VMC", "description": "Vertical machining center"},
-    {"id": 10, "name": "Milling", "description": "Milling machines"},
-    {"id": 11, "name": "Engraving", "description": "Engraving machines"},
-    {"id": 12, "name": "Honing", "description": "Honing machines"},
-    {"id": 13, "name": "Buffing", "description": "Buffing and polishing machines"},
-    {"id": 14, "name": "Tooth Rounding", "description": "Gear tooth rounding machines"},
-    {"id": 15, "name": "Lapping", "description": "Lapping machines"},
-    {"id": 16, "name": "Rack Cutting", "description": "Rack cutting machines"},
+UNIT_2_MACHINES = [
+    ("Gas Cutting", "Material Cutting"),
+    ("Tig Welding", "Welding"),
+    ("CO2 Welding LD", "Welding"),
+    ("CO2 Welding HD", "Welding"),
+    ("PSG", "Lathe"),
+    ("Ace Superjobber", "CNC"),
+    ("Slotting Machine", "Slotting"),
+    ("Surface Grinding", "Grinding"),
+    ("Thakur Drilling", "Drilling"),
+    ("Toolvasor Magnetic Drilling", "Drilling"),
+    ("EIFCO Radial Drilling", "Drilling")
 ]
 
-# Machines data - Unit 1 (11 machines)
-UNIT1_MACHINES = [
-    {"name": "Gas Cutting", "category": "Material Cutting"},
-    {"name": "Tig Welding", "category": "Welding"},
-    {"name": "CO2 Welding LD", "category": "Welding"},
-    {"name": "CO2 Welding HD", "category": "Welding"},
-    {"name": "PSG", "category": "Lathe"},
-    {"name": "Ace Superjobber", "category": "CNC"},
-    {"name": "Slotting Machine", "category": "Slotting"},
-    {"name": "Surface Grinding", "category": "Grinding"},
-    {"name": "Thakur Drilling", "category": "Drilling"},
-    {"name": "Toolvasor Magnetic Drilling", "category": "Drilling"},
-    {"name": "EIFCO Radial Drilling", "category": "Drilling"},
-]
-
-# Machines data - Unit 2 (27 machines)
-UNIT2_MACHINES = [
-    {"name": "Hand Grinder", "category": "Grinder"},
-    {"name": "Bench Grinder", "category": "Grinder"},
-    {"name": "Tool and Cutter Grinder", "category": "Grinder"},
-    {"name": "Turnmaster", "category": "Lathe"},
-    {"name": "Leader", "category": "Lathe"},
-    {"name": "Bandsaw cutting Manual", "category": "Material Cutting"},
-    {"name": "Bandsaw cutting Auto", "category": "Material Cutting"},
-    {"name": "VMC Pilot", "category": "VMC"},
-    {"name": "ESTEEM DRO", "category": "Milling"},
-    {"name": "FW Horizontal", "category": "Milling"},
-    {"name": "Arno", "category": "Milling"},
-    {"name": "BFW No 2", "category": "Milling"},
-    {"name": "Engraving Machine", "category": "Engraving"},
-    {"name": "Delapena Honing Machine", "category": "Honing"},
-    {"name": "Buffing Machine", "category": "Buffing"},
-    {"name": "Tooth Rounding Machine", "category": "Tooth Rounding"},
-    {"name": "Lapping Machine", "category": "Lapping"},
-    {"name": "Hand Drilling 2", "category": "Drilling"},
-    {"name": "Hand Drilling 1", "category": "Drilling"},
-    {"name": "Hand Grinding 2", "category": "Grinder"},
-    {"name": "Hand Grinding 1", "category": "Grinder"},
-    {"name": "Hitachi Cutting Machine", "category": "Material Cutting"},
-    {"name": "HMT Rack Cutting", "category": "Rack Cutting"},
-    {"name": "L Rack Cutting", "category": "Rack Cutting"},
-    {"name": "Reinecker", "category": "Lathe"},
-    {"name": "Zimberman", "category": "CNC"},
-    {"name": "EIFCO Stationary Drilling", "category": "Drilling"},
-]
-
-
-def seed_database():
-    """Seed the database with units, categories, and machines."""
-    db = next(get_db())
+def seed_machines():
+    print("🚀 Starting Machine Seeding Process...")
     
-    try:
-        # Create category name to id mapping
-        category_map = {cat["name"]: cat["id"] for cat in CATEGORIES}
+    db = get_sheets_db()
+    
+    # 1. Fetch Existing Machines for Idempotency
+    print("Fetching existing machines...")
+    # Trigger a read to populate cache
+    all_machines = db.query(Machine).all()
+    
+    existing_map = {} # Key: "{name}|{unit}"
+    for m in all_machines:
+        # Normalize keys for comparison
+        name = str(getattr(m, 'machine_name', '')).strip().lower()
+        unit = str(getattr(m, 'unit_id', '')).strip().lower()
+        if not getattr(m, 'is_deleted', False):
+             existing_map[f"{name}|{unit}"] = True
+             
+    print(f"Found {len(existing_map)} existing active machines.")
+    
+    machines_to_add = []
+    
+    # Helper to prepare machine dict
+    def prepare_machine(name, category, unit):
+        key = f"{name.strip().lower()}|{unit.strip().lower()}"
+        if key in existing_map:
+            print(f"  ⏭️ Skipping {name} ({unit}) - Already exists")
+            return None
         
-        # Insert Units
-        print("Inserting units...")
-        for unit_data in UNITS:
-            existing = db.query(Unit).filter(Unit.id == unit_data["id"]).first()
-            if not existing:
-                unit = Unit(**unit_data, created_at=datetime.utcnow())
-                db.add(unit)
-                print(f"  + Added: {unit_data['name']}")
-            else:
-                print(f"  - Exists: {unit_data['name']}")
-        
-        # Insert Categories
-        print("\nInserting categories...")
-        for cat_data in CATEGORIES:
-            existing = db.query(MachineCategory).filter(MachineCategory.id == cat_data["id"]).first()
-            if not existing:
-                category = MachineCategory(**cat_data, created_at=datetime.utcnow())
-                db.add(category)
-                print(f"  + Added: {cat_data['name']}")
-            else:
-                print(f"  - Exists: {cat_data['name']}")
-        
-        db.commit()
-        
-        # Insert Unit 2 Machines
-        print(f"\nInserting Unit 2 machines ({len(UNIT2_MACHINES)} machines)...")
-        for machine_data in UNIT2_MACHINES:
-            existing = db.query(Machine).filter(Machine.name == machine_data["name"]).first()
-            if not existing:
-                machine = Machine(
-                    id=str(uuid.uuid4()),
-                    name=machine_data["name"],
-                    status="active",
-                    hourly_rate=0.0,
-                    category_id=category_map.get(machine_data["category"]),
-                    unit_id=2,  # Unit 2
-                    updated_at=datetime.utcnow()
-                )
-                db.add(machine)
-                print(f"  + Added: {machine_data['name']} ({machine_data['category']})")
-            else:
-                print(f"  - Exists: {machine_data['name']}")
-        
-        # Insert Unit 1 Machines
-        print(f"\nInserting Unit 1 machines ({len(UNIT1_MACHINES)} machines)...")
-        for machine_data in UNIT1_MACHINES:
-            existing = db.query(Machine).filter(Machine.name == machine_data["name"]).first()
-            if not existing:
-                machine = Machine(
-                    id=str(uuid.uuid4()),
-                    name=machine_data["name"],
-                    status="active",
-                    hourly_rate=0.0,
-                    category_id=category_map.get(machine_data["category"]),
-                    unit_id=1,  # Unit 1
-                    updated_at=datetime.utcnow()
-                )
-                db.add(machine)
-                print(f"  + Added: {machine_data['name']} ({machine_data['category']})")
-            else:
-                print(f"  - Exists: {machine_data['name']}")
-        
-        db.commit()
-        
-        # Summary
-        total_units = db.query(Unit).count()
-        total_categories = db.query(MachineCategory).count()
-        total_machines = db.query(Machine).count()
-        
-        print("\n" + "="*50)
-        print("SEED COMPLETE!")
-        print("="*50)
-        print(f"Total Units: {total_units}")
-        print(f"Total Categories: {total_categories}")
-        print(f"Total Machines: {total_machines}")
-        print("="*50)
-        
-    except Exception as e:
-        db.rollback()
-        print(f"Error: {e}")
-        raise
-    finally:
-        db.close()
+        now = get_current_time_ist().isoformat()
+        return {
+            "id": str(uuid.uuid4()),
+            "machine_name": name.strip(),
+            "category_id": category.strip(), # Using string as requested mapping
+            "unit_id": unit.strip(),         # Using string as requested mapping
+            "status": "Active",
+            "is_deleted": False,
+            "created_at": now,
+            "updated_at": now,
+            
+            # Default empty fields to prevent irregularities
+            "hourly_rate": "",
+            "last_maintenance": "",
+            "current_operator": ""
+        }
 
+    # Process Unit 1
+    print("\nProcessing Unit 1...")
+    for name, cat in UNIT_1_MACHINES:
+        m = prepare_machine(name, cat, "Unit 1")
+        if m: machines_to_add.append(m)
+
+    # Process Unit 2
+    print("\nProcessing Unit 2...")
+    for name, cat in UNIT_2_MACHINES:
+        m = prepare_machine(name, cat, "Unit 2")
+        if m: machines_to_add.append(m)
+        
+    if not machines_to_add:
+        print("\n✅ All machines already exist. No action taken.")
+        return
+
+    # Batch Insert
+    print(f"\n📝 Inserting {len(machines_to_add)} new machines...")
+    
+    # Use repo directly for batch append since SheetsDB doesn't expose it directly yet
+    # But wait, SheetsDB abstracts repo. 
+    # sheets_repo is a singleton in sheets_repository.py, imported by sheets_db
+    
+    from app.repositories.sheets_repository import sheets_repo
+    
+    # We need to manually inject them via repo to use batch_append
+    success = sheets_repo.batch_append("Machines", machines_to_add)
+    
+    if success:
+        print("\n✅ Machines seeded successfully (Unit 1 & Unit 2)")
+        print(f"Added {len(machines_to_add)} records.")
+        # Verify cache update
+        print("Verifying cache...")
+        new_count = len(db.query(Machine).all())
+        print(f"Total machines in cache now: {new_count}")
+    else:
+        print("\n❌ Failed to batch seed machines.")
 
 if __name__ == "__main__":
-    print("="*50)
-    print("MACHINE MASTER LIST SEED SCRIPT")
-    print("="*50)
-    seed_database()
+    seed_machines()
