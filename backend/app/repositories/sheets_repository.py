@@ -260,11 +260,31 @@ class SheetsRepository:
         return success
 
     def batch_update(self, sheet_name: str, updates: List[Dict[str, Any]]) -> bool:
-        """Updates multiple rows to Sheets and refreshes cache."""
+        """Updates multiple rows to Sheets and updates cache immediately."""
         raw_headers = self.get_raw_headers(sheet_name)
         success = google_sheets.batch_update(sheet_name, updates, raw_headers)
+        
         if success:
-            self.clear_cache(sheet_name) # Reload for batch consistency
+            with _CACHE_LOCK:
+                if sheet_name in _GLOBAL_CACHE and _GLOBAL_CACHE[sheet_name]:
+                    # Map rows by _row_idx for O(1) lookup ?? No, cache is list.
+                    # We have to iterate or map.
+                    # updates is list of dicts with _row_idx
+                    
+                    # Create a map of updates by row_idx
+                    updates_map = {u["_row_idx"]: u for u in updates if "_row_idx" in u}
+                    
+                    for i, row in enumerate(_GLOBAL_CACHE[sheet_name]):
+                        r_idx = row.get("_row_idx")
+                        if r_idx in updates_map:
+                            # Update fields
+                            for k, v in updates_map[r_idx].items():
+                                if k != "_row_idx":
+                                    _GLOBAL_CACHE[sheet_name][i][k] = v
+                    
+                    print(f"✅ [SheetsRepo] Cache Updated (Batch Update): {sheet_name} ({len(updates)} rows)")
+                else:
+                    self.clear_cache(sheet_name)
         return success
 
     def soft_delete(self, sheet_name: str, id_value: Any) -> bool:
