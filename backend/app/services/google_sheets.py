@@ -130,6 +130,7 @@ class GoogleSheetsService:
             
             records = []
             for i, values in enumerate(all_values[1:]):
+                # Pad values to match header length
                 padded_values = values + [""] * (len(raw_headers) - len(values))
                 record = {}
                 for rh, nh, val in zip(raw_headers, normalized_headers, padded_values):
@@ -143,19 +144,20 @@ class GoogleSheetsService:
             print(f"❌ Error reading all values from {name}: {e}")
             raise
 
-    def insert_row(self, name: str, data: Dict[str, Any], schema_headers: List[str]):
+    def insert_row(self, name: str, data: Dict[str, Any], raw_headers: Optional[List[str]] = None):
         """Inserts a new row using the ACTUAL worksheet headers for placement."""
         worksheet = self.get_worksheet(name)
         try:
-            # We need to know the ACTUAL headers in the sheet to put data in the right place
-            actual_raw_headers = worksheet.row_values(1)
-            actual_normalized = [self._normalize_header(h) for h in actual_raw_headers]
+            if not raw_headers:
+                raw_headers = worksheet.row_values(1)
+            
+            actual_normalized = [self._normalize_header(h) for h in raw_headers]
             
             row = []
             for nh in actual_normalized:
                 val = data.get(nh, "")
                 if hasattr(val, "isoformat"): val = val.isoformat()
-                row.append(str(val))
+                row.append(str(val) if val is not None else "")
             
             worksheet.append_row(row)
             return True
@@ -163,12 +165,14 @@ class GoogleSheetsService:
             print(f"❌ Error inserting row into {name}: {e}")
             return False
             
-    def update_row_by_idx(self, name: str, row_idx: int, data: Dict[str, Any], schema_headers: List[str]):
+    def update_row_by_idx(self, name: str, row_idx: int, data: Dict[str, Any], raw_headers: Optional[List[str]] = None):
         """Updates specific columns in a row based on ACTUAL worksheet match."""
         worksheet = self.get_worksheet(name)
         try:
-            actual_raw_headers = worksheet.row_values(1)
-            actual_normalized = [self._normalize_header(h) for h in actual_raw_headers]
+            if not raw_headers:
+                raw_headers = worksheet.row_values(1)
+                
+            actual_normalized = [self._normalize_header(h) for h in raw_headers]
             
             cells_to_update = []
             for key, value in data.items():
@@ -176,7 +180,7 @@ class GoogleSheetsService:
                 if norm_key in actual_normalized:
                     col_idx = actual_normalized.index(norm_key) + 1
                     if hasattr(value, "isoformat"): value = value.isoformat()
-                    cell = gspread.cell.Cell(row=row_idx, col=col_idx, value=str(value))
+                    cell = gspread.cell.Cell(row=row_idx, col=col_idx, value=str(value) if value is not None else "")
                     cells_to_update.append(cell)
             
             if cells_to_update:
@@ -185,6 +189,66 @@ class GoogleSheetsService:
         except Exception as e:
             print(f"❌ Error updating row {row_idx} in {name}: {e}")
             return False
+
+    def batch_append(self, name: str, rows_data: List[Dict[str, Any]], raw_headers: Optional[List[str]] = None):
+        """Appends multiple rows in one call."""
+        if not rows_data: return True
+        worksheet = self.get_worksheet(name)
+        try:
+            if not raw_headers:
+                raw_headers = worksheet.row_values(1)
+            
+            actual_normalized = [self._normalize_header(h) for h in raw_headers]
+            
+            all_rows = []
+            for data in rows_data:
+                row = []
+                for nh in actual_normalized:
+                    val = data.get(nh, "")
+                    if hasattr(val, "isoformat"): val = val.isoformat()
+                    row.append(str(val) if val is not None else "")
+                all_rows.append(row)
+            
+            worksheet.append_rows(all_rows)
+            return True
+        except Exception as e:
+            print(f"❌ Error batch appending to {name}: {e}")
+            return False
+
+    def batch_update(self, name: str, updates: List[Dict[str, Any]], raw_headers: Optional[List[str]] = None):
+        """
+        Updates multiple rows in one call. 
+        Each update dict must contain '_row_idx' and the fields to update.
+        """
+        if not updates: return True
+        worksheet = self.get_worksheet(name)
+        try:
+            if not raw_headers:
+                raw_headers = worksheet.row_values(1)
+                
+            actual_normalized = [self._normalize_header(h) for h in raw_headers]
+            
+            cells_to_update = []
+            for entry in updates:
+                row_idx = entry.get("_row_idx")
+                if not row_idx: continue
+                
+                for key, value in entry.items():
+                    if key.startswith("_"): continue
+                    norm_key = self._normalize_header(key)
+                    if norm_key in actual_normalized:
+                        col_idx = actual_normalized.index(norm_key) + 1
+                        if hasattr(value, "isoformat"): value = value.isoformat()
+                        cell = gspread.cell.Cell(row=row_idx, col=col_idx, value=str(value) if value is not None else "")
+                        cells_to_update.append(cell)
+            
+            if cells_to_update:
+                worksheet.update_cells(cells_to_update)
+            return True
+        except Exception as e:
+            print(f"❌ Error batch updating {name}: {e}")
+            return False
+
     def delete_row_by_idx(self, name: str, row_idx: int):
         """Physically removes a row from the worksheet."""
         worksheet = self.get_worksheet(name)

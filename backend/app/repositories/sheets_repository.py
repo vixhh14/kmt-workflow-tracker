@@ -31,12 +31,11 @@ class SheetsRepository:
             # One bulk read per sheet
             data = google_sheets.read_all_bulk(sheet_name)
             
-            # Since read_all_bulk was updated to return normalized records, 
-            # we need to extract the original headers from the first record if available
+            # Extract raw headers for mapping
             raw_headers = []
             if data:
-                # Our new read_all_bulk stores orig headers in keys starting with _orig_
                 first = data[0]
+                # Filter out internal keys like _row_idx, etc.
                 raw_headers = [v for k, v in first.items() if k.startswith("_orig_")]
             
             with _CACHE_LOCK:
@@ -44,6 +43,14 @@ class SheetsRepository:
                 _CACHE_EXPIRY[sheet_name] = now + CACHE_TTL
                 if raw_headers:
                     _RAW_HEADERS[sheet_name] = raw_headers
+                else:
+                    # Fallback if sheet is empty but we need headers
+                    # This might happen on first run with empty sheet
+                    try:
+                        worksheet = google_sheets.get_worksheet(sheet_name)
+                        _RAW_HEADERS[sheet_name] = worksheet.row_values(1)
+                    except:
+                        pass
                 print(f"🔄 [SheetsRepo] Cache Refreshed: {sheet_name} ({len(data)} rows)")
             return data
         except Exception as e:
@@ -53,6 +60,16 @@ class SheetsRepository:
                 if sheet_name in _GLOBAL_CACHE:
                     return _GLOBAL_CACHE[sheet_name]
                 return []
+
+    def get_cached_records(self, sheet_name: str) -> List[Dict[str, Any]]:
+        """Implementation of mandatory task: Reads entire worksheet from cache."""
+        return self.get_all(sheet_name)
+
+    def get_headers(self, sheet_name: str) -> List[str]:
+        """Returns normalized headers for the sheet."""
+        # Using a fixed mapping or fetching from raw headers
+        raw = self.get_raw_headers(sheet_name)
+        return [google_sheets._normalize_header(h) for h in raw]
 
     def get_all(self, sheet_name: str, include_deleted: bool = False) -> List[Dict[str, Any]]:
         """Returns all rows from a sheet from cache, optionally filtering deleted ones."""
@@ -70,10 +87,16 @@ class SheetsRepository:
 
     def get_by_id(self, sheet_name: str, id_value: Any) -> Optional[Dict[str, Any]]:
         """Finds a single row by its ID from cached data."""
-        headers = self.get_headers(sheet_name)
-        id_col = headers[0] if headers else "id"
-        
         data = self._get_sheet_data(sheet_name)
+        # Try 'id' first, then any key ending in '_id'
+        headers = self.get_headers(sheet_name)
+        id_col = "id"
+        if "id" not in headers:
+            for h in headers:
+                if h.endswith("_id"):
+                    id_col = h
+                    break
+
         for row in data:
             if str(row.get(id_col)) == str(id_value):
                 return dict(row)
@@ -88,13 +111,20 @@ class SheetsRepository:
         # Fallback: trigger a read to get headers
         self._get_sheet_data(sheet_name)
         with _CACHE_LOCK:
-            return list(_RAW_HEADERS.get(sheet_name, self.get_headers(sheet_name)))
+            return list(_RAW_HEADERS.get(sheet_name, []))
 
     def insert(self, sheet_name: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Inserts a new row, updates Sheets, and updates cache immediately."""
         headers = self.get_headers(sheet_name)
         raw_headers = self.get_raw_headers(sheet_name)
-        id_col = headers[0] if headers else "id"
+        
+        # Identify ID column
+        id_col = "id"
+        if "id" not in headers:
+            for h in headers:
+                if h.endswith("_id"):
+                    id_col = h
+                    break
         
         # Ensure default fields
         if id_col not in data or not data[id_col]:
@@ -108,18 +138,31 @@ class SheetsRepository:
         if "is_deleted" not in data:
             data["is_deleted"] = False
 
-        # 1. Update Sheets - use raw_headers for mapping
+        # 1. Update Sheets
         success = google_sheets.insert_row(sheet_name, data, raw_headers)
         
         if success:
-            # 2. Update Cache immediately
+            # 2. Update Cache immediately (add to end)
             with _CACHE_LOCK:
                 if sheet_name in _GLOBAL_CACHE:
-                    new_idx = len(_GLOBAL_CACHE[sheet_name]) + 2
+                    # Determine new row index
+                    max_idx = 1
+                    for r in _GLOBAL_CACHE[sheet_name]:
+                        if r.get("_row_idx", 0) > max_idx:
+                            max_idx = r["_row_idx"]
+                    
                     data_with_idx = dict(data)
-                    data_with_idx["_row_idx"] = new_idx
+                    data_with_idx["_row_idx"] = max_idx + 1
+                    # Add original headers mapping for consistency
+                    for h, rh in zip(headers, raw_headers):
+                        data_with_idx[f"_orig_{h}"] = rh
+                        
                     _GLOBAL_CACHE[sheet_name].append(data_with_idx)
                     print(f"✅ [SheetsRepo] Cache Updated (Insert): {sheet_name}")
+                else:
+                    # If cache was empty, might as well trigger a reload
+                    # to ensure everything is set up correctly
+                    self.clear_cache(sheet_name)
         
         return data
 
@@ -129,7 +172,13 @@ class SheetsRepository:
             
         headers = self.get_headers(sheet_name)
         raw_headers = self.get_raw_headers(sheet_name)
-        id_col = headers[0] if headers else "id"
+        
+        id_col = "id"
+        if "id" not in headers:
+            for h in headers:
+                if h.endswith("_id"):
+                    id_col = h
+                    break
         
         # Find the record in cache to get _row_idx
         cached_row = None
@@ -155,7 +204,7 @@ class SheetsRepository:
         if "updated_at" not in update_payload:
             update_payload["updated_at"] = get_current_time_ist().isoformat()
 
-        # 1. Update Sheets - use raw_headers for mapping
+        # 1. Update Sheets
         success = google_sheets.update_row_by_idx(sheet_name, row_idx, update_payload, raw_headers)
         
         if success:
@@ -167,6 +216,22 @@ class SheetsRepository:
                     print(f"✅ [SheetsRepo] Cache Updated (Update): {sheet_name} row {row_idx}")
         return success
 
+    def batch_append(self, sheet_name: str, rows: List[Dict[str, Any]]) -> bool:
+        """Updates multiple rows to Sheets and refreshes cache."""
+        raw_headers = self.get_raw_headers(sheet_name)
+        success = google_sheets.batch_append(sheet_name, rows, raw_headers)
+        if success:
+            self.clear_cache(sheet_name) # Easier to reload for batch
+        return success
+
+    def batch_update(self, sheet_name: str, updates: List[Dict[str, Any]]) -> bool:
+        """Updates multiple rows to Sheets and refreshes cache."""
+        raw_headers = self.get_raw_headers(sheet_name)
+        success = google_sheets.batch_update(sheet_name, updates, raw_headers)
+        if success:
+            self.clear_cache(sheet_name) # Reload for batch consistency
+        return success
+
     def soft_delete(self, sheet_name: str, id_value: Any) -> bool:
         """Sets is_deleted=True for a row."""
         return self.update(sheet_name, id_value, {"is_deleted": True})
@@ -176,7 +241,12 @@ class SheetsRepository:
         if not id_value: return False
             
         headers = self.get_headers(sheet_name)
-        id_col = headers[0] if headers else "id"
+        id_col = "id"
+        if "id" not in headers:
+            for h in headers:
+                if h.endswith("_id"):
+                    id_col = h
+                    break
         
         cached_idx_in_list = -1
         row_idx = -1

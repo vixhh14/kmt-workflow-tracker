@@ -70,7 +70,9 @@ MODEL_MAP = {
     "MachineRuntimeLog": "MachineRuntimeLog",
     "UserWorkLog": "UserWorkLog",
     "RescheduleRequest": "RescheduleRequests",
-    "PlanningTask": "PlanningTasks"
+    "PlanningTask": "PlanningTasks",
+    "Unit": "Units",
+    "MachineCategory": "MachineCategories"
 }
 
 from app.repositories.sheets_repository import sheets_repo
@@ -87,16 +89,20 @@ class SheetRow:
     def __getattr__(self, key):
         if key in self._data:
             value = self._data[key]
-            # Convert string boolean values to actual booleans
-            if key in ['is_deleted', 'active']:
+            # Coerce boolean strings
+            if key in ['is_deleted', 'active', 'approval_status']:
                 if isinstance(value, str):
-                    return value.upper() in ['TRUE', '1', 'YES']
-                return bool(value)
+                    if value.lower() in ['true', '1', 'yes']: return True
+                    if value.lower() in ['false', '0', 'no', '']: return False
             return value
+        # Special case for 'id' if 'project_id' or 'user_id' exists
+        if key == 'id':
+            for k in [f"{self._name[:-1].lower()}_id", f"{self._name.lower()}_id"]:
+                 if k in self._data: return self._data[k]
         return None
 
     def __getitem__(self, key):
-        return self._data.get(key)
+        return self.__getattr__(key)
     
     def __setitem__(self, key, value):
         self._data[key] = value
@@ -104,7 +110,7 @@ class SheetRow:
         if self._db: self._db._mark_dirty(self)
 
     def __setattr__(self, key, value):
-        if key.startswith("_"):
+        if key.startswith("_") or key == "__tablename__":
             super().__setattr__(key, value)
         else:
             self._data[key] = value
@@ -112,7 +118,11 @@ class SheetRow:
             if self._db: self._db._mark_dirty(self)
 
     def dict(self):
-        return self._data
+        d = dict(self._data)
+        # Ensure 'id' is present for frontend compatibility
+        if 'id' not in d:
+            d['id'] = self.__getattr__('id')
+        return d
 
 class QueryWrapper:
     def __init__(self, data: List[SheetRow], table_name: str):
@@ -122,17 +132,14 @@ class QueryWrapper:
     def filter(self, *args, **kwargs):
         filtered = list(self._data)
         
-        # 1. Handle Keyword Filters (e.g., id=val, task_id=val)
+        # 1. Handle Keyword Filters
         for key, value in kwargs.items():
             def match_kw(row, k, filter_val):
-                # Use getattr to get coerced values (especially for booleans)
                 row_val = getattr(row, k, None)
                 
                 if filter_val is None or str(filter_val).upper() in ["NONE", "NULL", ""]:
-                    if k in ['is_deleted', 'active'] and not row_val: return True
                     return row_val is None or str(row_val).upper() in ["NONE", "NULL", ""]
                 
-                # Special boolean comparison
                 if isinstance(filter_val, bool):
                     return bool(row_val) == filter_val
                 
@@ -140,40 +147,24 @@ class QueryWrapper:
             
             filtered = [row for row in filtered if match_kw(row, key, value)]
         
-        # 2. Handle Positional Expression Filters (e.g., Task.id == val)
+        # 2. Handle Positional Expression Filters
         for arg in args:
             arg_str = str(arg)
             if " == " in arg_str:
                 parts = arg_str.split(" == ")
                 left = parts[0].strip().split(".")[-1] 
                 right = parts[1].strip().strip("'\"")
-                
-                def match_eq(row, l, r):
-                    rv = getattr(row, l, None)
-                    if r.lower() in ["none", "null", "false", "0"] and not rv: return True
-                    if r.lower() == "true" and rv: return True
-                    return str(rv) == str(r)
-                filtered = [row for row in filtered if match_eq(row, left, right)]
-            
+                filtered = [row for row in filtered if str(getattr(row, left, None)) == str(right)]
             elif " != " in arg_str:
                 parts = arg_str.split(" != ")
                 left = parts[0].strip().split(".")[-1]
                 right = parts[1].strip().strip("'\"")
-                def match_neq(row, l, r):
-                    rv = getattr(row, l, None)
-                    if r.lower() in ["none", "null", "false", "0"] and rv: return True
-                    return str(rv) != str(r)
-                filtered = [row for row in filtered if match_neq(row, left, right)]
-
+                filtered = [row for row in filtered if str(getattr(row, left, None)) != str(right)]
             elif "is_deleted" in arg_str.lower():
-                is_false = "false" in arg_str.lower() or "none" in arg_str.lower() or "0" in arg_str.lower()
+                is_false = "false" in arg_str.lower()
                 filtered = [row for row in filtered if bool(getattr(row, "is_deleted", False)) != is_false]
 
         return QueryWrapper(filtered, self._table_name)
-
-    def order_by(self, *args):
-        # Implementation could sort rows here if needed
-        return self
 
     def first(self) -> Optional[SheetRow]:
         return self._data[0] if self._data else None
@@ -202,7 +193,6 @@ class SheetsDB:
 
     def query(self, model) -> QueryWrapper:
         sheet_name = self._get_sheet_name(model)
-        # Use repository for cached data
         raw_data = sheets_repo.get_all(sheet_name, include_deleted=True)
         rows = [SheetRow(row, sheet_name, self) for row in raw_data]
         return QueryWrapper(rows, sheet_name)
@@ -210,31 +200,57 @@ class SheetsDB:
     def add(self, obj):
         sheet_name = self._get_sheet_name(obj)
         data = obj.dict() if hasattr(obj, "dict") else obj
-        if "__tablename__" in data:
-            del data["__tablename__"]
-        
-        # Repository handles insertion and cache invalidation
+        if "__tablename__" in data: del data["__tablename__"]
         sheets_repo.insert(sheet_name, data)
 
     def commit(self):
-        """Saves all dirty tracked rows."""
+        """Batch-updates all dirty tracked rows to minimize API calls."""
+        if not self._dirty_rows: return
+        
+        # Group by sheet
+        by_sheet = {}
         for row in self._dirty_rows:
-            sheet_name = row._name
-            headers = SHEETS_SCHEMA.get(sheet_name, [])
-            id_col = headers[0] if headers else "id"
-            id_val = getattr(row, id_col)
+            if row._name not in by_sheet: by_sheet[row._name] = []
+            by_sheet[row._name].append(row)
+        
+        for sheet_name, rows in by_sheet.items():
+            if not rows: continue
             
-            update_data = {f: getattr(row, f) for f in row._dirty_fields if f in headers}
-            if update_data:
-                # Repository handles update and cache invalidation
-                sheets_repo.update(sheet_name, id_val, update_data)
+            headers = sheets_repo.get_headers(sheet_name)
+            id_col = "id"
+            if "id" not in headers:
+                for h in headers:
+                    if h.endswith("_id"):
+                        id_col = h
+                        break
+            
+            updates = []
+            for row in rows:
+                id_val = getattr(row, id_col)
+                # Build update dict with internal row index
+                update_entry = {"_row_idx": row.get("_row_idx")}
+                for f in row._dirty_fields:
+                    if f in headers or f == id_col:
+                        update_entry[f] = getattr(row, f)
+                
+                # Always sync updated_at
+                update_entry["updated_at"] = get_current_time_ist().isoformat()
+                updates.append(update_entry)
+            
+            if updates:
+                sheets_repo.batch_update(sheet_name, updates)
         
         self._dirty_rows = []
 
     def delete(self, obj, soft=True):
         sheet_name = self._get_sheet_name(obj)
-        headers = SHEETS_SCHEMA.get(sheet_name, [])
-        id_col = headers[0] if headers else "id"
+        headers = sheets_repo.get_headers(sheet_name)
+        id_col = "id"
+        if "id" not in headers:
+            for h in headers:
+                if h.endswith("_id"):
+                    id_col = h
+                    break
         id_val = getattr(obj, id_col) if hasattr(obj, id_col) else obj.get(id_col)
         
         if soft:

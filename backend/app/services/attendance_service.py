@@ -17,11 +17,13 @@ def mark_present(db: SheetsDB, user_id: str, ip_address: Optional[str] = None) -
         # Check if attendance record already exists for this user today
         all_att = db.query(Attendance).all()
         # Find local record for today - safe date comparison
-        existing_attendance = next((
-            a for a in all_att 
-            if str(getattr(a, 'user_id', '')) == str(user_id) 
-            and str(getattr(a, 'date', '')).split('T')[0] == today_str
-        ), None)
+        existing_attendance = None
+        for a in all_att:
+            if str(getattr(a, 'user_id', '')) == str(user_id):
+                att_date = str(getattr(a, 'date', '')).split('T')[0]
+                if att_date == today_str:
+                    existing_attendance = a
+                    break
         
         if existing_attendance:
             # If already logged in today, just update login_time but keep original check_in
@@ -69,11 +71,13 @@ def mark_checkout(db: SheetsDB, user_id: str) -> dict:
         
         all_att = db.query(Attendance).all()
         # Find record for today
-        attendance = next((
-            a for a in all_att 
-            if str(getattr(a, 'user_id', '')) == str(user_id) 
-            and str(getattr(a, 'date', '')).split('T')[0] == today_str
-        ), None)
+        attendance = None
+        for a in all_att:
+            if str(getattr(a, 'user_id', '')) == str(user_id):
+                att_date = str(getattr(a, 'date', '')).split('T')[0]
+                if att_date == today_str:
+                    attendance = a
+                    break
 
         if not attendance:
             return {"status": "error", "message": "No check-in record found for today"}
@@ -109,21 +113,28 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         # Get all users and filter by tracked roles
         tracked_roles = ['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master']
         all_users = db.query(User).all()
-        active_users = [
-            u for u in all_users 
-            if not getattr(u, 'is_deleted', False) 
-            and str(getattr(u, 'approval_status', '')).lower() == 'approved'
-            and str(getattr(u, 'role', '')).lower() in tracked_roles
-        ]
+        active_users = []
+        for u in all_users:
+            if getattr(u, 'is_deleted', False): continue
+            
+            approval_status = str(getattr(u, 'approval_status', '')).lower()
+            role = str(getattr(u, 'role', '')).lower()
+            
+            # Simple check for active/approved
+            if approval_status == 'approved' and role in tracked_roles:
+                active_users.append(u)
         
         # Get all attendance
         all_att = db.query(Attendance).all()
         
         attendance_map = {}
         for a in all_att:
+            if getattr(a, 'is_deleted', False): continue
             att_date = str(getattr(a, 'date', '')).split('T')[0].split(' ')[0]
             if att_date == target_date_compare:
-                attendance_map[str(getattr(a, 'user_id', ''))] = a
+                uid = str(getattr(a, 'user_id', ''))
+                # Keep the latest record if multiple exist
+                attendance_map[uid] = a
         
         present_users = []
         absent_users = []
@@ -166,13 +177,13 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
             "success": True,
             "date": target_date_compare,
             "total_tracked": len(active_users),
-            "present": len(present_users), # For admin dashboard consistency
-            "absent": len(absent_users),   # For admin dashboard consistency
+            "present": len(present_users), 
+            "absent": len(absent_users),   
             "present_count": len(present_users),
             "absent_count": len(absent_users),
             "present_users": present_users,
             "absent_users": absent_users,
-            "records": records,            # For admin dashboard consistency
+            "records": records,            
             "all_records": records
         }
     except Exception as e:
@@ -189,12 +200,37 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         }
 
 def get_all_attendance(db: SheetsDB, target_date_str: Optional[str] = None):
-    """Fetch all attendance records for a given date or for all time."""
+    """Implementation of mandatory task: Fetch all attendance records."""
     try:
-        results = get_attendance_summary(db, target_date_str)
-        if results.get("success"):
-            return results.get("all_records", [])
-        return []
+        # If date is provided, return for that date
+        if target_date_str:
+             results = get_attendance_summary(db, target_date_str)
+             if results.get("success"):
+                 return results.get("all_records", [])
+             return []
+        
+        # If no date, return ALL attendance records from cache
+        all_att = db.query(Attendance).all()
+        all_users = db.query(User).all()
+        user_map = {str(getattr(u, 'id', '')): u for u in all_users}
+        
+        results = []
+        for a in all_att:
+            if getattr(a, 'is_deleted', False): continue
+            uid = str(getattr(a, 'user_id', ''))
+            user = user_map.get(uid)
+            results.append({
+                "id": str(getattr(a, 'id', '')),
+                "user_id": uid,
+                "user": getattr(user, 'full_name', '') or getattr(user, 'username', 'Unknown'),
+                "username": getattr(user, 'username', 'Unknown'),
+                "status": getattr(a, 'status', ''),
+                "date": str(getattr(a, 'date', '')).split('T')[0],
+                "check_in": str(getattr(a, 'check_in', '') or ""),
+                "check_out": str(getattr(a, 'check_out', '') or ""),
+                "login_time": str(getattr(a, 'login_time', '') or "")
+            })
+        return results
     except Exception as e:
         print(f"❌ Error in get_all_attendance: {e}")
         return []

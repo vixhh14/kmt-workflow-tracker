@@ -25,7 +25,8 @@ def get_operations_overview(db: SheetsDB) -> Dict[str, Any]:
         # 1. Projects
         all_projects = [p for p in db.query(Project).all() if not getattr(p, 'is_deleted', False)]
         stats["projects"]["total"] = len(all_projects)
-        project_ids = {str(p.project_id) for p in all_projects}
+        # Use getattr(p, 'id') which is aliased in SheetRow
+        project_ids = {str(getattr(p, 'id', '')) for p in all_projects}
         
         # 2. Tasks Aggregation (Main Tasks Sheet)
         all_tasks = [t for t in db.query(Task).all() if not getattr(t, 'is_deleted', False)]
@@ -44,11 +45,7 @@ def get_operations_overview(db: SheetsDB) -> Dict[str, Any]:
         for t in all_tasks:
             # Check if task belongs to a valid project (non-deleted)
             pid = str(getattr(t, 'project_id', ''))
-            if pid not in project_ids and pid != "":
-                # If project_id is missing but it's a valid task, we might still count it depending on policy
-                # For now, let's count all non-deleted tasks
-                pass
-                
+            
             stats["tasks"]["total"] += 1
             status = str(getattr(t, 'status', 'pending')).lower().strip()
             
@@ -70,7 +67,8 @@ def get_operations_overview(db: SheetsDB) -> Dict[str, Any]:
     try:
         all_machines = [m for m in db.query(Machine).all() if not getattr(m, 'is_deleted', False)]
         stats["machines"]["total"] = len(all_machines)
-        stats["machines"]["active"] = len([m for m in all_machines if str(getattr(m, 'status', '')).lower() == 'active'])
+        # Check both 'status' field and in-memory busy status from tasks if needed
+        stats["machines"]["active"] = len([m for m in all_machines if str(getattr(m, 'status', '')).lower() in ('active', 'running')])
     except Exception as e:
         print(f"❌ Error aggregating dashboard machines: {e}")
 
