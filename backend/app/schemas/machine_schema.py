@@ -39,7 +39,7 @@ class MachineOut(MachineBase):
     )
 
     @field_serializer('created_at', 'updated_at')
-    def serialize_dt(self, dt: Optional[datetime], _info):
+    def serialize_dt(self, dt: Optional[Union[datetime, str]], _info):
         if dt is None:
             return None
         if isinstance(dt, str):

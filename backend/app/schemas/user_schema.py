@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_serializer, ConfigDict
-from typing import Optional
+from typing import Optional, Union
 from datetime import datetime
 
 class UserBase(BaseModel):

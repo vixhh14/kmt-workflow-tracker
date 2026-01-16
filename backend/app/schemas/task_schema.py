@@ -119,7 +119,7 @@ class TaskOut(TaskBase):
     model_config = ConfigDict(from_attributes=True)
 
     @field_serializer('created_at', 'started_at', 'completed_at', 'actual_start_time', 'actual_end_time', 'due_date')
-    def serialize_dt(self, dt: Optional[datetime], _info):
+    def serialize_dt(self, dt: Optional[Union[datetime, str]], _info):
         if dt is None:
             return None
         if isinstance(dt, str):
@@ -254,7 +254,7 @@ class OperationalTaskOut(OperationalTaskBase):
     model_config = ConfigDict(from_attributes=True)
 
     @field_serializer('created_at', 'updated_at', 'started_at', 'on_hold_at', 'resumed_at', 'completed_at', 'due_date')
-    def serialize_dt(self, dt: Optional[datetime], _info):
+    def serialize_dt(self, dt: Optional[Union[datetime, str]], _info):
         if dt is None:
             return None
         if isinstance(dt, str):
