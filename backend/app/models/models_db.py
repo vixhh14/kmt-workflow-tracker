@@ -114,11 +114,9 @@ class Machine(SheetsModel):
         if not m_id: m_id = str(uuid.uuid4())
         kwargs["id"] = m_id
         kwargs["machine_id"] = m_id
-        # Ensure active is set
-        if "active" not in kwargs and "is_active" in kwargs:
-            kwargs["active"] = kwargs["is_active"]
-        if "active" not in kwargs:
-            kwargs["active"] = True
+        # Canonical status
+        if "status" not in kwargs:
+            kwargs["status"] = "active"
         super().__init__(**kwargs)
 
 class Unit(SheetsModel):

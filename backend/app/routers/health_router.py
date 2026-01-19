@@ -43,3 +43,36 @@ async def health_check_sheets(db: Any = Depends(get_db)) -> Dict[str, Any]:
             "database": "Google Sheets",
             "error": str(e)
         }
+@router.get("/schema")
+async def health_check_schema() -> Dict[str, Any]:
+    """
+    Returns schema health status for critical sheets.
+    If mismatch detected, frontend should refuse to operate.
+    """
+    from app.core.sheets_config import SHEETS_SCHEMA
+    from app.services.google_sheets import google_sheets
+    
+    results = {}
+    try:
+        for sheet_name, expected_headers in SHEETS_SCHEMA.items():
+            try:
+                worksheet = google_sheets.get_worksheet(sheet_name)
+                all_vals = worksheet.get_all_values()
+                actual_headers = all_vals[0] if all_vals else []
+                
+                match = True
+                if len(actual_headers) < len(expected_headers):
+                    match = False
+                else:
+                    for i, h in enumerate(expected_headers):
+                        if actual_headers[i].strip().lower() != h.strip().lower():
+                            match = False
+                            break
+                
+                results[sheet_name] = "OK" if match else "ERROR: Header Mismatch"
+            except:
+                results[sheet_name] = "ERROR: Missing Worksheet"
+        
+        return results
+    except Exception as e:
+        return {"error": str(e)}

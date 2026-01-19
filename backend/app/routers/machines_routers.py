@@ -9,105 +9,122 @@ from app.core.time_utils import get_current_time_ist
 
 router = APIRouter(prefix="/machines", tags=["Machines"])
 
+def normalize_machine_data(data: dict) -> dict:
+    """Canonical normalization as per mandatory user rules."""
+    # 1. Normalize Unit
+    u = str(data.get("unit", "")).strip().lower()
+    if u in ["1", "unit1", "unit 1"]:
+        data["unit"] = "Unit 1"
+    elif u in ["2", "unit2", "unit 2"]:
+        data["unit"] = "Unit 2"
+    
+    # 2. Normalize Category
+    cat = str(data.get("category", "")).strip()
+    data["category"] = cat.title()
+    
+    # 3. Status
+    status = str(data.get("status", "active")).strip().lower()
+    data["status"] = "active" if status in ["active", "1", "true"] else "inactive"
+    
+    # 4. is_deleted must be boolean
+    is_del = data.get("is_deleted", False)
+    if isinstance(is_del, str):
+        data["is_deleted"] = is_del.lower() in ["true", "1", "yes"]
+    else:
+        data["is_deleted"] = bool(is_del)
+        
+    return data
+
 @router.get("", response_model=List[MachineOut])
 async def read_machines(db: Any = Depends(get_db)):
-    """Get all active machines."""
+    """Get all active machines with post-fetch normalization."""
     all_ms = db.query(Machine).all()
-    # Filter by both is_deleted and is_active for robustness
-    machines = [m for m in all_ms if not getattr(m, 'is_deleted', False) and getattr(m, 'is_active', True)]
-    
-    # Resolve names using cached data
-    units = db.query(Unit).all()
-    cats = db.query(MachineCategory).all()
-    
-    u_map = {str(getattr(u, 'id', '')): str(getattr(u, 'name', '')) for u in units}
-    c_map = {str(getattr(c, 'id', '')): str(getattr(c, 'name', '')) for c in cats}
     
     results = []
-    for m in machines:
-        data = m.dict()
-        data['unit_name'] = u_map.get(str(data.get('unit_id')), "Unknown")
-        data['category_name'] = c_map.get(str(data.get('category_id')), "Unknown")
-        results.append(data)
+    for m in all_ms:
+        m_dict = m.dict()
+        # Normalization ensures UI consistency even if sheet has mixed case/styles
+        norm_m = normalize_machine_data(m_dict)
         
+        # Exclude only if explicitly deleted
+        if not norm_m.get("is_deleted", False):
+            results.append(norm_m)
+            
     return results
 
 @router.post("", response_model=MachineOut, status_code=201)
 async def create_machine(machine: MachineCreate, db: Any = Depends(get_db)):
-    """Creates a machine using plain dictionary (Sheets-native)."""
-    # 1. Mandatory Uniqueness Check
-    new_name = machine.machine_name.strip()
-    existing = db.query(Machine).all()
-    if any(str(getattr(m, 'machine_name', '')).strip().lower() == new_name.lower() and not getattr(m, 'is_deleted', False) for m in existing):
-        raise HTTPException(status_code=400, detail=f"Machine with name '{new_name}' already exists")
+    """Creates a machine using STRICT APPEND logic."""
+    from app.repositories.sheets_repository import sheets_repo
+    
+    # 1. Normalize Input (handling legacy unit_id/category_id)
+    payload = machine.dict(exclude_none=True)
+    if "unit_id" in payload and not payload.get("unit"):
+        payload["unit"] = str(payload["unit_id"])
+    if "category_id" in payload and not payload.get("category"):
+        payload["category"] = str(payload["category_id"])
+        
+    payload = normalize_machine_data(payload)
+    
+    # 2. Uniqueness Check (Case Insensitive)
+    new_name = payload.get("machine_name", "").strip().lower()
+    all_current = sheets_repo.get_all("machines", include_deleted=True)
+    if any(str(m.get('machine_name', '')).strip().lower() == new_name and not bool(m.get('is_deleted')) for m in all_current):
+         raise HTTPException(status_code=400, detail=f"Machine '{payload['machine_name']}' already exists")
 
-    # 2. Build Plain Dictionary (Avoids model constructor conflicts)
+    # 3. Build canonical row
     m_id = str(uuid.uuid4())
     now = get_current_time_ist().isoformat()
     
-    # Extract data from Pydantic model
-    payload = machine.dict()
-    
-    # Build canonical row data
     new_m_data = {
-        **payload,
-        "id": m_id,
         "machine_id": m_id,
+        "machine_name": payload.get("machine_name"),
+        "category": payload.get("category"),
+        "unit": payload.get("unit"),
+        "status": payload.get("status", "active"),
         "created_at": now,
         "updated_at": now,
-        "status": payload.get("status", "active"), # Explicitly handle status
-        "is_active": True,
         "is_deleted": False
     }
     
-    # 3. Insert directly via repository
-    # db.add(new_m) would normally work with SheetsDB if we used models,
-    # but the user requested avoiding models to stop keyword conflicts.
-    # SheetsDB.add accepts instances. Let's use db.repository.insert for raw dict.
-    from app.repositories.sheets_repository import sheets_repo
     try:
+        # Mandatory: Use repository insert (which uses append_row)
         inserted = sheets_repo.insert("machines", new_m_data)
         return inserted
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to write to Google Sheets: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to append machine: {e}")
 
 @router.put("/{machine_id}", response_model=MachineOut)
 async def update_machine(machine_id: str, machine_update: MachineUpdate, db: Any = Depends(get_db)):
-    """Updates a machine using plain dict updates."""
-    m = db.query(Machine).filter(id=machine_id).first()
+    """Updates a machine using machine_id only."""
+    from app.repositories.sheets_repository import sheets_repo
+    
+    m = db.query(Machine).filter(machine_id=machine_id).first()
     if not m: raise HTTPException(status_code=404, detail="Machine not found")
     
     data = machine_update.dict(exclude_unset=True)
-    
-    # Check uniqueness if name changes
-    if "machine_name" in data:
-        new_name = data["machine_name"].strip()
-        if new_name.lower() != str(getattr(m, 'machine_name', '')).strip().lower():
-            existing = db.query(Machine).all()
-            if any(str(getattr(ex, 'machine_name', '')).strip().lower() == new_name.lower() and str(getattr(ex, 'id', '')) != machine_id and not getattr(ex, 'is_deleted', False) for ex in existing):
-                raise HTTPException(status_code=400, detail=f"Machine name '{new_name}' taken")
+    if "unit" in data or "category" in data or "status" in data:
+        # Re-normalize if critical fields change
+        temp_data = {**m.dict(), **data}
+        data = normalize_machine_data(temp_data)
+        # We only want the updated fields for the repo.update call
+        data = {k: data[k] for k in machine_update.dict(exclude_unset=True).keys()}
 
-    # Update row data
-    from app.repositories.sheets_repository import sheets_repo
     data["updated_at"] = get_current_time_ist().isoformat()
     
     success = sheets_repo.update("machines", machine_id, data)
     if not success:
-        raise HTTPException(status_code=500, detail="Failed to update Google Sheets")
+        raise HTTPException(status_code=500, detail="Failed to update machine")
     
-    # Return updated object
     return {**m.dict(), **data}
 
 @router.delete("/{machine_id}")
 async def delete_machine(machine_id: str, db: Any = Depends(get_db)):
-    """Soft delete machine."""
     from app.repositories.sheets_repository import sheets_repo
     success = sheets_repo.update("machines", machine_id, {
-        "is_active": False,
         "is_deleted": True,
+        "status": "inactive",
         "updated_at": get_current_time_ist().isoformat()
     })
-    if not success:
-         raise HTTPException(status_code=500, detail="Failed to delete from Google Sheets")
     return {"message": "Success"}
 

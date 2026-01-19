@@ -5,6 +5,7 @@ import threading
 from typing import List, Dict, Any, Optional
 from app.services.google_sheets import google_sheets
 from app.core.time_utils import get_current_time_ist
+from app.core.sheets_config import normalize_row
 
 # Global cache to persist across requests but within process
 # Thread-safe dictionary-based cache
@@ -151,6 +152,9 @@ class SheetsRepository:
         if "is_deleted" not in data:
             data["is_deleted"] = False
 
+        # MANDATORY: Schema Normalization before write
+        data = normalize_row(sheet_name, data)
+
         # 1. Update Sheets
         success = google_sheets.insert_row(sheet_name, data, raw_headers)
         
@@ -218,6 +222,9 @@ class SheetsRepository:
         if "updated_at" not in update_payload:
             update_payload["updated_at"] = get_current_time_ist().isoformat()
 
+        # MANDATORY: Schema Normalization before write
+        update_payload = normalize_row(sheet_name, update_payload)
+
         # 1. Update Sheets
         success = google_sheets.update_row_by_idx(sheet_name, row_idx, update_payload, raw_headers)
         
@@ -237,6 +244,9 @@ class SheetsRepository:
         """Updates multiple rows to Sheets and refreshes cache immediately."""
         raw_headers = self.get_raw_headers(sheet_name)
         headers = self.get_headers(sheet_name)
+        
+        # MANDATORY: Schema Normalization
+        rows = [normalize_row(sheet_name, r) for r in rows]
         
         success = google_sheets.batch_append(sheet_name, rows, raw_headers)
         
@@ -270,6 +280,10 @@ class SheetsRepository:
     def batch_update(self, sheet_name: str, updates: List[Dict[str, Any]]) -> bool:
         """Updates multiple rows to Sheets and updates cache immediately."""
         raw_headers = self.get_raw_headers(sheet_name)
+        
+        # MANDATORY: Schema Normalization
+        updates = [normalize_row(sheet_name, u) for u in updates]
+        
         success = google_sheets.batch_update(sheet_name, updates, raw_headers)
         
         if not success:

@@ -36,14 +36,12 @@ async def login(credentials: LoginRequest, background_tasks: BackgroundTasks, db
         if not user:
             raise HTTPException(status_code=401, detail="Incorrect username or password")
         
-        # Approval check
-        user_role = str(getattr(user, 'role', 'operator') or "operator").lower().strip()
-        if user_role != 'admin':
-            status_val = str(getattr(user, 'approval_status', 'pending') or 'pending').lower().strip()
-            if status_val == 'pending':
-                raise HTTPException(status_code=403, detail="Account awaiting admin approval")
-            elif status_val == 'rejected':
-                raise HTTPException(status_code=403, detail="Account registration rejected")
+        # Status check
+        if not bool(getattr(user, 'active', True)):
+            raise HTTPException(status_code=403, detail="Account is inactive")
+        
+        # Approval check (Disabled as per lean schema without 'approval_status')
+        # All newly created users are 'active=True' by default as per mandatory rules.
         
         # Password verification
         u_hash = getattr(user, 'password_hash', None)
@@ -78,7 +76,7 @@ async def login(credentials: LoginRequest, background_tasks: BackgroundTasks, db
                 "username": str(getattr(user, 'username', '')),
                 "email": str(getattr(user, 'email', '') or ""),
                 "role": str(user_role),
-                "full_name": str(getattr(user, 'full_name', '') or getattr(user, 'username', ''))
+                "full_name": str(getattr(user, 'username', '')) # Fallback as full_name is removed from lean schema
             }
         )
     except HTTPException: raise
@@ -228,19 +226,12 @@ async def signup(user_data: dict, db: any = Depends(get_db)):
     
     new_user_dict = {
         "user_id": u_id,
-        "id": u_id,
         "username": user_data['username'],
-        "password": hash_password(user_data['password']), # Maps to 'password' column
-        "email": user_data['email'],
-        "full_name": user_data['full_name'],
         "role": 'operator',
-        "contact_number": user_data.get('contact_number', ''),
-        "address": user_data.get('address', ''),
-        "is_active": True,
-        "approval_status": 'pending',
-        "is_deleted": False,
+        "email": user_data['email'],
+        "active": True, # Always write active=TRUE as per mandatory rules
         "created_at": now,
-        "updated_at": now
+        "password_hash": hash_password(user_data['password'])
     }
     
     try:

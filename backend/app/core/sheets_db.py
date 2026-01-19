@@ -6,57 +6,7 @@ from typing import List, Dict, Any, Optional, Type
 from app.services.google_sheets import google_sheets
 from app.core.time_utils import get_current_time_ist
 
-# Worksheet names as specified by user - now strictly lowercase for consistency
-SHEETS_SCHEMA = {
-    "projects": [
-        "id", "project_name", "client_name", "project_code", 
-        "is_deleted", "created_at", "updated_at"
-    ],
-    "tasks": [
-        "id", "title", "project_id", "assigned_to", "assigned_by", "status", 
-        "priority", "due_datetime", "is_deleted", "created_at", "updated_at",
-        "description", "part_item", "nos_unit", "machine_id", "started_at", 
-        "completed_at", "total_duration_seconds", "hold_reason", "denial_reason", 
-        "actual_start_time", "actual_end_time", "total_held_seconds", 
-        "ended_by", "end_reason", "work_order_number", "expected_completion_time"
-    ],
-    "users": [
-        "user_id", "username", "password", "role", "active", "email", "created_at",
-        "full_name", "machine_types", "date_of_birth", "address", 
-        "contact_number", "unit_id", "approval_status", "security_question", 
-        "security_answer", "is_deleted", "updated_at"
-    ],
-    "attendance": [
-        "attendance_id", "user_id", "date", "login_time", "logout_time", "status", "is_deleted", "created_at", "updated_at"
-    ],
-    "fabricationtasks": [
-        "id", "project_id", "part_item", "quantity", "due_date", "priority", 
-        "assigned_to", "completed_quantity", "remarks", "status", "machine_id", 
-        "work_order_number", "assigned_by", "is_deleted", "started_at", 
-        "on_hold_at", "resumed_at", "completed_at", "total_active_duration", 
-        "created_at", "updated_at"
-    ],
-    "filingtasks": [
-        "id", "project_id", "part_item", "quantity", "due_date", "priority", 
-        "assigned_to", "completed_quantity", "remarks", "status", "machine_id", 
-        "work_order_number", "assigned_by", "is_deleted", "started_at", 
-        "on_hold_at", "resumed_at", "completed_at", "total_active_duration", 
-        "created_at", "updated_at"
-    ],
-    "machines": [
-        "machine_id", "machine_name", "status", "active", "is_deleted", "hourly_rate", 
-        "last_maintenance", "current_operator", "category_id", "unit_id", 
-        "created_at", "updated_at"
-    ],
-    "tasktimelog": ["id", "task_id", "action", "timestamp", "reason", "is_deleted", "created_at", "updated_at"],
-    "taskhold": ["id", "task_id", "user_id", "hold_reason", "hold_started_at", "hold_ended_at", "is_deleted", "created_at", "updated_at"],
-    "machineruntimelog": ["id", "machine_id", "task_id", "start_time", "end_time", "duration_seconds", "date", "is_deleted", "created_at", "updated_at"],
-    "userworklog": ["id", "user_id", "task_id", "machine_id", "start_time", "end_time", "duration_seconds", "date", "is_deleted", "created_at", "updated_at"],
-    "units": ["id", "name", "description", "created_at", "updated_at", "is_deleted"],
-    "machinecategories": ["id", "name", "description", "created_at", "updated_at", "is_deleted"],
-    "reschedulerequests": ["id", "task_id", "new_date", "reason", "status", "created_at", "is_deleted", "updated_at"],
-    "planningtasks": ["id", "title", "description", "status", "created_at", "is_deleted", "updated_at"]
-}
+from app.core.sheets_config import SHEETS_SCHEMA, normalize_row
 
 # Mapping of Model names to Worksheet names for convenience
 MODEL_MAP = {
@@ -306,20 +256,56 @@ def get_sheets_db():
 
 def verify_sheets_structure():
     """
-    Mandatory startup verification: Ensure all tables exist in Google Sheets.
-    Creates missing sheets automatically and pre-warms cache.
+    Mandatory startup verification: Perform strict header validation.
+    Refuses to start if schemas do not match.
     """
-    print("🔍 [Startup] Verifying Google Sheets structure...")
+    print("[Startup] Verifying Google Sheets structure (STRICT MODE)...")
     try:
-        # 1. First ensure all exist (individual calls are okay once at startup)
-        for sheet_name, headers in SHEETS_SCHEMA.items():
-            google_sheets.ensure_worksheet(sheet_name, headers)
-        
+        errs = []
+        for sheet_name, expected_headers in SHEETS_SCHEMA.items():
+            print(f"  Checking {sheet_name}...")
+            try:
+                # 1. Ensure sheet exists
+                worksheet = google_sheets.get_worksheet(sheet_name)
+                
+                # 2. Validate Headers
+                all_vals = worksheet.get_all_values()
+                actual_headers = all_vals[0] if all_vals else []
+                
+                # Compare only the count of columns requested at minimum
+                # OR do exact match of first N columns
+                match = True
+                if len(actual_headers) < len(expected_headers):
+                    match = False
+                else:
+                    for i, h in enumerate(expected_headers):
+                        if actual_headers[i].strip().lower() != h.strip().lower():
+                            match = False
+                            break
+                
+                if not match:
+                    err_msg = f"❌ Header mismatch for '{sheet_name}'. Expected: {expected_headers}, Found: {actual_headers[:len(expected_headers)]}"
+                    print(err_msg)
+                    errs.append(err_msg)
+            except Exception as e:
+                if "WorksheetNotFound" in str(e):
+                    # One-time auto-creation is allowed if missing completely
+                    print(f"  ⚡ Sheet {sheet_name} missing. Creating with canonical headers...")
+                    google_sheets.ensure_worksheet(sheet_name, expected_headers)
+                else:
+                    errs.append(f"Failed to verify {sheet_name}: {e}")
+
+        if errs:
+              print("\n🔴 CRITICAL SCHEMA ERRORS DETECTED. PREVENTING STARTUP.")
+              for e in errs: print(f" - {e}")
+              raise RuntimeError("Startup failed due to Google Sheets schema drift. Please repair headers manually.")
+
         # 2. Trigger a Bootstrap Batch Read to pre-warm the cache
-        print("🔥 [Startup] Pre-warming Cache via Bootstrap...")
+        print("[Startup] Pre-warming Cache via Bootstrap...")
         sheets_repo.get_all("machines", include_deleted=True) 
         
-        print("✅ [Startup] All required sheets verified, accessible, and cached.")
+        print("[Startup] All required sheets verified, accessible, and cached.")
+    except RuntimeError: raise
     except Exception as e:
         print(f"❌ [Startup] Critical Error verifying sheets: {e}")
         raise RuntimeError(f"Startup failed: Google Sheets structure is invalid or inaccessible: {e}")

@@ -31,15 +31,13 @@ async def create_user(user_data: UserCreate, db: any = Depends(get_db), current_
     
     # 1. Build canonical dict
     user_dict = {
-        **user_data.dict(exclude={'password'}),
         "user_id": u_id,
-        "id": u_id,
-        "password": hash_password(user_data.password), # Map to 'password' column
-        "approval_status": 'approved',
-        "is_active": True,
-        "is_deleted": False,
+        "username": user_data.username,
+        "role": user_data.role,
+        "email": user_data.email,
+        "active": True,
         "created_at": now,
-        "updated_at": now
+        "password_hash": hash_password(user_data.password)
     }
     
     try:
@@ -60,7 +58,7 @@ async def list_users(exclude_id: Optional[str] = None, db: any = Depends(get_db)
 async def search_users(q: str, db: any = Depends(get_db)):
     all_u = db.query(User).all()
     q = q.lower()
-    return [u for u in all_u if not getattr(u, 'is_deleted', False) and (q in str(getattr(u, 'username', '')).lower() or q in str(getattr(u, 'email', '') or "").lower() or q in str(getattr(u, 'full_name', '') or "").lower())]
+    return [u for u in all_u if q in str(getattr(u, 'username', '')).lower() or q in str(getattr(u, 'email', '') or "").lower()]
 
 @router.get("/{user_id}", response_model=UserOut)
 async def get_user_by_id(user_id: str, db: any = Depends(get_db)):
@@ -78,7 +76,6 @@ async def update_user(user_id: str, user_update: UserUpdate, db: any = Depends(g
     
     # 1. Prepare Update Dictionary (Plain Dict)
     data = user_update.dict(exclude_unset=True)
-    data["updated_at"] = get_current_time_ist().isoformat()
     
     try:
         # 2. Strict Sheet Write
@@ -101,9 +98,7 @@ async def delete_user(user_id: str, db: any = Depends(get_db), current_admin: Us
     try:
         # 1. Soft Delete via Mandatory Status Update
         success = sheets_repo.update("users", user_id, {
-            "is_deleted": True,
-            "is_active": False,
-            "updated_at": get_current_time_ist().isoformat()
+            "active": False
         })
         if not success: raise RuntimeError("Sheets update returned False")
         return {"message": "Deleted"}

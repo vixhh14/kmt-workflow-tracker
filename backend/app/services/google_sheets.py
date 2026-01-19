@@ -50,10 +50,10 @@ class GoogleSheetsService:
                 info = json.loads(google_json)
                 creds = Credentials.from_service_account_info(info, scopes=SCOPES)
                 self._client = gspread.authorize(creds)
-                print("✅ [GoogleSheets] Authenticated successfully using GOOGLE_SHEETS_JSON environment variable.")
+                print("[GoogleSheets] Authenticated successfully using GOOGLE_SHEETS_JSON environment variable.")
                 return self._client
             except Exception as e:
-                print(f"❌ [GoogleSheets] Failed to parse GOOGLE_SHEETS_JSON: {e}")
+                print(f"[GoogleSheets] Failed to parse GOOGLE_SHEETS_JSON: {e}")
                 # We don't raise here yet, we might try fallback if local, 
                 # but usually if JSON is set and fails, it's a configuration error.
         
@@ -63,10 +63,10 @@ class GoogleSheetsService:
             try:
                 creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_PATH, scopes=SCOPES)
                 self._client = gspread.authorize(creds)
-                print(f"✅ [GoogleSheets] Authenticated successfully using file: {SERVICE_ACCOUNT_PATH}")
+                print(f"[GoogleSheets] Authenticated successfully using file: {SERVICE_ACCOUNT_PATH}")
                 return self._client
             except Exception as e:
-                print(f"❌ [GoogleSheets] Failed to authorize with service account file: {e}")
+                print(f"[GoogleSheets] Failed to authorize with service account file: {e}")
                 raise
         
         # 3. TERMINAL FAILURE: No credentials found anywhere
@@ -79,7 +79,7 @@ class GoogleSheetsService:
             "  - LOCAL: Ensure 'service_account.json' exists at: " + SERVICE_ACCOUNT_PATH + "\n"
             "------------------------------------"
         )
-        print(f"❌ {error_msg}")
+        print(f"CRITICAL: {error_msg}")
         raise RuntimeError(error_msg)
 
     def _get_spreadsheet(self):
@@ -90,7 +90,7 @@ class GoogleSheetsService:
             try:
                 self._spreadsheet = client.open_by_key(SHEET_ID)
             except Exception as e:
-                print(f"❌ Failed to open spreadsheet with ID {SHEET_ID}: {e}")
+                print(f"Failed to open spreadsheet with ID {SHEET_ID}: {e}")
                 raise
         return self._spreadsheet
 
