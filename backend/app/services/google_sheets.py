@@ -38,43 +38,49 @@ class GoogleSheetsService:
             return cls._instance
 
     def _get_client(self):
-        if not self._client:
-            # 1. Try to load from environment variable (JSON string) - Best for Render/Cloud
-            google_json = os.getenv("GOOGLE_SHEETS_JSON")
+        if self._client:
+            return self._client
             
-            if google_json:
-                try:
-                    info = json.loads(google_json)
-                    creds = Credentials.from_service_account_info(info, scopes=SCOPES)
-                    self._client = gspread.authorize(creds)
-                    print("✅ Authenticated using GOOGLE_SHEETS_JSON environment variable")
-                except Exception as e:
-                    print(f"❌ Failed to parse GOOGLE_SHEETS_JSON: {e}")
-                    raise
-            
-            # 2. Fallback to service_account.json file - Best for Local
-            else:
-                if not os.path.exists(SERVICE_ACCOUNT_PATH):
-                    # Provide an informative error for Render/Prod
-                    error_msg = (
-                        f"Credentials not found! \n"
-                        f"LOCAL: Ensure '{CREDENTIALS_FILE}' exists in the backend/ directory.\n"
-                        f"PROD (Render): Set the 'GOOGLE_SHEETS_JSON' Environment Variable with your service account JSON content.\n"
-                        f"Path checked: {SERVICE_ACCOUNT_PATH}"
-                    )
-                    print(f"❌ {error_msg}")
-                    # If we don't have it, we can't continue
-                    raise FileNotFoundError(error_msg)
-                
-                try:
-                    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_PATH, scopes=SCOPES)
-                    self._client = gspread.authorize(creds)
-                    print(f"✅ Authenticated using credentials file: {SERVICE_ACCOUNT_PATH}")
-                except Exception as e:
-                    print(f"❌ Failed to authorize with service account file: {e}")
-                    raise
-                
-        return self._client
+        # 1. PRIMARY: Try to load from environment variable (Full JSON string)
+        # This is the ONLY reliable way for Render/Cloud without committing secrets
+        google_json = os.getenv("GOOGLE_SHEETS_JSON", "").strip()
+        
+        if google_json:
+            try:
+                info = json.loads(google_json)
+                creds = Credentials.from_service_account_info(info, scopes=SCOPES)
+                self._client = gspread.authorize(creds)
+                print("✅ [GoogleSheets] Authenticated successfully using GOOGLE_SHEETS_JSON environment variable.")
+                return self._client
+            except Exception as e:
+                print(f"❌ [GoogleSheets] Failed to parse GOOGLE_SHEETS_JSON: {e}")
+                # We don't raise here yet, we might try fallback if local, 
+                # but usually if JSON is set and fails, it's a configuration error.
+        
+        # 2. SECONDARY: Fallback to local service_account.json file
+        # ONLY used if GOOGLE_SHEETS_JSON is missing or invalid
+        if os.path.exists(SERVICE_ACCOUNT_PATH):
+            try:
+                creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_PATH, scopes=SCOPES)
+                self._client = gspread.authorize(creds)
+                print(f"✅ [GoogleSheets] Authenticated successfully using file: {SERVICE_ACCOUNT_PATH}")
+                return self._client
+            except Exception as e:
+                print(f"❌ [GoogleSheets] Failed to authorize with service account file: {e}")
+                raise
+        
+        # 3. TERMINAL FAILURE: No credentials found anywhere
+        error_msg = (
+            "GOOGLE SHEETS AUTHENTICATION FAILED!\n"
+            "------------------------------------\n"
+            "ROOT CAUSE: No valid service account credentials found.\n"
+            "ACTION REQUIRED:\n"
+            "  - PROD (Render): Set 'GOOGLE_SHEETS_JSON' environment variable to the content of your service_account.json.\n"
+            "  - LOCAL: Ensure 'service_account.json' exists at: " + SERVICE_ACCOUNT_PATH + "\n"
+            "------------------------------------"
+        )
+        print(f"❌ {error_msg}")
+        raise RuntimeError(error_msg)
 
     def _get_spreadsheet(self):
         if not self._spreadsheet:
