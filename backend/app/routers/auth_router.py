@@ -29,16 +29,17 @@ async def login(credentials: LoginRequest, background_tasks: BackgroundTasks, db
         # Load all users from Sheets (cached)
         all_users = db.query(User).all()
         
-        # Manual case-insensitive and is_deleted filter
-        user = next((u for u in all_users if str(getattr(u, 'username', '')).lower() == credentials.username.lower() and not getattr(u, 'is_deleted', False)), None)
+        # Mandatory: Trim whitespace and check is_active
+        u_name = credentials.username.strip().lower()
+        user = next((u for u in all_users if str(getattr(u, 'username', '')).strip().lower() == u_name and getattr(u, 'is_active', False) and not getattr(u, 'is_deleted', False)), None)
 
         if not user:
             raise HTTPException(status_code=401, detail="Incorrect username or password")
         
         # Approval check
-        user_role = (getattr(user, 'role', 'operator') or "operator").lower()
+        user_role = str(getattr(user, 'role', 'operator') or "operator").lower().strip()
         if user_role != 'admin':
-            status_val = str(getattr(user, 'approval_status', 'pending') or 'pending').lower()
+            status_val = str(getattr(user, 'approval_status', 'pending') or 'pending').lower().strip()
             if status_val == 'pending':
                 raise HTTPException(status_code=403, detail="Account awaiting admin approval")
             elif status_val == 'rejected':
@@ -54,7 +55,7 @@ async def login(credentials: LoginRequest, background_tasks: BackgroundTasks, db
         
         # JWT Token
         u_id = str(getattr(user, 'id', ''))
-        token_data = {"sub": str(getattr(user, 'username', '')), "id": u_id, "role": str(user_role)}
+        token_data = {"sub": str(getattr(user, 'username', '')), "id": u_id, "role": user_role}
         access_token = create_access_token(data=token_data)
         
         # Mark Attendance (IST) in background so login is NOT blocked by Sheets API

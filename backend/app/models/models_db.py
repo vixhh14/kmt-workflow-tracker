@@ -23,17 +23,22 @@ class SheetsModel:
         return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
 
 class User(SheetsModel):
-    __tablename__ = "Users"
+    __tablename__ = "users"
     def __init__(self, **kwargs):
-        # Sync id and user_id
-        u_id = kwargs.get("id") or kwargs.get("user_id")
+        # Sync id, user_id and others
+        u_id = kwargs.get("user_id") or kwargs.get("id")
         if not u_id: u_id = str(uuid.uuid4())
         kwargs["id"] = u_id
         kwargs["user_id"] = u_id
+        # Ensure is_active is set
+        if "is_active" not in kwargs and "active" in kwargs:
+            kwargs["is_active"] = kwargs["active"]
+        if "is_active" not in kwargs:
+            kwargs["is_active"] = True
         super().__init__(**kwargs)
 
 class Project(SheetsModel):
-    __tablename__ = "Projects"
+    __tablename__ = "projects"
     def __init__(self, **kwargs):
         # Sync id and project_id
         p_id = kwargs.get("id") or kwargs.get("project_id")
@@ -43,7 +48,7 @@ class Project(SheetsModel):
         super().__init__(**kwargs)
 
 class Task(SheetsModel):
-    __tablename__ = "Tasks"
+    __tablename__ = "tasks"
     def __init__(self, **kwargs):
         # Handle legacy task_id
         if "id" not in kwargs and "task_id" in kwargs:
@@ -53,88 +58,91 @@ class Task(SheetsModel):
         super().__init__(**kwargs)
 
 class Attendance(SheetsModel):
-    __tablename__ = "Attendance"
+    __tablename__ = "attendance"
     def __init__(self, **kwargs):
         if "id" not in kwargs or not kwargs["id"]:
             kwargs["id"] = f"att_{int(datetime.now().timestamp())}"
         super().__init__(**kwargs)
 
 class FabricationTask(SheetsModel):
-    __tablename__ = "FabricationTasks"
+    __tablename__ = "fabricationtasks"
     def __init__(self, **kwargs):
         if "id" not in kwargs or not kwargs["id"]:
             kwargs["id"] = str(uuid.uuid4())
         super().__init__(**kwargs)
 
 class FilingTask(SheetsModel):
-    __tablename__ = "FilingTasks"
+    __tablename__ = "filingtasks"
     def __init__(self, **kwargs):
         if "id" not in kwargs or not kwargs["id"]:
             kwargs["id"] = str(uuid.uuid4())
         super().__init__(**kwargs)
 
 class TaskTimeLog(SheetsModel):
-    __tablename__ = "TaskTimeLog"
+    __tablename__ = "tasktimelog"
     def __init__(self, **kwargs):
         if "id" not in kwargs or not kwargs["id"]:
             kwargs["id"] = str(uuid.uuid4())
         super().__init__(**kwargs)
 
 class TaskHold(SheetsModel):
-    __tablename__ = "TaskHold"
+    __tablename__ = "taskhold"
     def __init__(self, **kwargs):
         if "id" not in kwargs or not kwargs["id"]:
             kwargs["id"] = str(uuid.uuid4())
         super().__init__(**kwargs)
 
 class MachineRuntimeLog(SheetsModel):
-    __tablename__ = "MachineRuntimeLog"
+    __tablename__ = "machineruntimelog"
     def __init__(self, **kwargs):
         if "id" not in kwargs or not kwargs["id"]:
             kwargs["id"] = str(uuid.uuid4())
         super().__init__(**kwargs)
 
 class UserWorkLog(SheetsModel):
-    __tablename__ = "UserWorkLog"
+    __tablename__ = "userworklog"
     def __init__(self, **kwargs):
         if "id" not in kwargs or not kwargs["id"]:
             kwargs["id"] = str(uuid.uuid4())
         super().__init__(**kwargs)
 
 class Machine(SheetsModel):
-    __tablename__ = "Machines"
+    __tablename__ = "machines"
     def __init__(self, **kwargs):
         # Sync id and machine_id
-        m_id = kwargs.get("id") or kwargs.get("machine_id")
+        m_id = kwargs.get("machine_id") or kwargs.get("id")
         if not m_id: m_id = str(uuid.uuid4())
         kwargs["id"] = m_id
         kwargs["machine_id"] = m_id
+        # Ensure is_active is set
+        if "is_active" not in kwargs:
+            kwargs["is_active"] = True
         super().__init__(**kwargs)
 
 class Unit(SheetsModel):
-    __tablename__ = "Units"
+    __tablename__ = "units"
 
 class MachineCategory(SheetsModel):
-    __tablename__ = "MachineCategories"
+    __tablename__ = "machinecategories"
 
 class UserMachine(SheetsModel):
-    __tablename__ = "UserMachine"
+    __tablename__ = "usermachine"
 
 class Subtask(SheetsModel):
-    __tablename__ = "Subtasks"
+    __tablename__ = "subtasks"
 
 class OutsourceItem(SheetsModel):
-    __tablename__ = "OutsourceItems"
+    __tablename__ = "outsourceitems"
 
 class RescheduleRequest(SheetsModel):
-    __tablename__ = "RescheduleRequests"
+    __tablename__ = "reschedulerequests"
     def __init__(self, **kwargs):
         if "id" not in kwargs or not kwargs["id"]:
             kwargs["id"] = str(uuid.uuid4())
         super().__init__(**kwargs)
 
 class PlanningTask(SheetsModel):
-    __tablename__ = "PlanningTasks"
+    __tablename__ = "planningtasks"
     def __init__(self, **kwargs):
         if "id" not in kwargs or not kwargs["id"]:
             kwargs["id"] = str(uuid.uuid4())

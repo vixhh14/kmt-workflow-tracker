@@ -150,28 +150,29 @@ class SheetsRepository:
         # 1. Update Sheets
         success = google_sheets.insert_row(sheet_name, data, raw_headers)
         
-        if success:
-            # 2. Update Cache immediately (add to end)
-            with _CACHE_LOCK:
-                if sheet_name in _GLOBAL_CACHE:
-                    # Determine new row index
-                    max_idx = 1
-                    for r in _GLOBAL_CACHE[sheet_name]:
-                        if r.get("_row_idx", 0) > max_idx:
-                            max_idx = r["_row_idx"]
+        if not success:
+            print(f"❌ [SheetsRepo] Insert failed for {sheet_name}")
+            raise RuntimeError(f"Failed to insert record into Google Sheets ({sheet_name})")
+
+        # 2. Update Cache immediately (add to end)
+        with _CACHE_LOCK:
+            if sheet_name in _GLOBAL_CACHE:
+                # Determine new row index
+                max_idx = 1
+                for r in _GLOBAL_CACHE[sheet_name]:
+                    if r.get("_row_idx", 0) > max_idx:
+                        max_idx = r["_row_idx"]
+                
+                data_with_idx = dict(data)
+                data_with_idx["_row_idx"] = max_idx + 1
+                # Add original headers mapping for consistency
+                for h, rh in zip(headers, raw_headers):
+                    data_with_idx[f"_orig_{h}"] = rh
                     
-                    data_with_idx = dict(data)
-                    data_with_idx["_row_idx"] = max_idx + 1
-                    # Add original headers mapping for consistency
-                    for h, rh in zip(headers, raw_headers):
-                        data_with_idx[f"_orig_{h}"] = rh
-                        
-                    _GLOBAL_CACHE[sheet_name].append(data_with_idx)
-                    print(f"✅ [SheetsRepo] Cache Updated (Insert): {sheet_name}")
-                else:
-                    # If cache was empty, might as well trigger a reload
-                    # to ensure everything is set up correctly
-                    self.clear_cache(sheet_name)
+                _GLOBAL_CACHE[sheet_name].append(data_with_idx)
+                print(f"✅ [SheetsRepo] Cache Updated (Insert): {sheet_name}")
+            else:
+                self.clear_cache(sheet_name)
         
         return data
 
@@ -216,14 +217,17 @@ class SheetsRepository:
         # 1. Update Sheets
         success = google_sheets.update_row_by_idx(sheet_name, row_idx, update_payload, raw_headers)
         
-        if success:
-            # 2. Update Cache immediately
-            with _CACHE_LOCK:
-                if sheet_name in _GLOBAL_CACHE and cached_idx_in_list != -1:
-                    for k, v in update_payload.items():
-                        _GLOBAL_CACHE[sheet_name][cached_idx_in_list][k] = v
-                    print(f"✅ [SheetsRepo] Cache Updated (Update): {sheet_name} row {row_idx}")
-        return success
+        if not success:
+            print(f"❌ [SheetsRepo] Update failed for {sheet_name} row {row_idx}")
+            raise RuntimeError(f"Failed to update record in Google Sheets ({sheet_name})")
+
+        # 2. Update Cache immediately
+        with _CACHE_LOCK:
+            if sheet_name in _GLOBAL_CACHE and cached_idx_in_list != -1:
+                for k, v in update_payload.items():
+                    _GLOBAL_CACHE[sheet_name][cached_idx_in_list][k] = v
+                print(f"✅ [SheetsRepo] Cache Updated (Update): {sheet_name} row {row_idx}")
+        return True
 
     def batch_append(self, sheet_name: str, rows: List[Dict[str, Any]]) -> bool:
         """Updates multiple rows to Sheets and refreshes cache immediately."""
@@ -264,28 +268,28 @@ class SheetsRepository:
         raw_headers = self.get_raw_headers(sheet_name)
         success = google_sheets.batch_update(sheet_name, updates, raw_headers)
         
-        if success:
-            with _CACHE_LOCK:
-                if sheet_name in _GLOBAL_CACHE and _GLOBAL_CACHE[sheet_name]:
-                    # Map rows by _row_idx for O(1) lookup ?? No, cache is list.
-                    # We have to iterate or map.
-                    # updates is list of dicts with _row_idx
-                    
-                    # Create a map of updates by row_idx
-                    updates_map = {u["_row_idx"]: u for u in updates if "_row_idx" in u}
-                    
-                    for i, row in enumerate(_GLOBAL_CACHE[sheet_name]):
-                        r_idx = row.get("_row_idx")
-                        if r_idx in updates_map:
-                            # Update fields
-                            for k, v in updates_map[r_idx].items():
-                                if k != "_row_idx":
-                                    _GLOBAL_CACHE[sheet_name][i][k] = v
-                    
-                    print(f"✅ [SheetsRepo] Cache Updated (Batch Update): {sheet_name} ({len(updates)} rows)")
-                else:
-                    self.clear_cache(sheet_name)
-        return success
+        if not success:
+            print(f"❌ [SheetsRepo] Batch update failed for {sheet_name}")
+            raise RuntimeError(f"Failed to batch update records in Google Sheets ({sheet_name})")
+            
+        with _CACHE_LOCK:
+            if sheet_name in _GLOBAL_CACHE and _GLOBAL_CACHE[sheet_name]:
+                # Map rows by _row_idx for O(1) lookup
+                # Create a map of updates by row_idx
+                updates_map = {u["_row_idx"]: u for u in updates if "_row_idx" in u}
+                
+                for i, row in enumerate(_GLOBAL_CACHE[sheet_name]):
+                    r_idx = row.get("_row_idx")
+                    if r_idx in updates_map:
+                        # Update fields
+                        for k, v in updates_map[r_idx].items():
+                            if k != "_row_idx":
+                                _GLOBAL_CACHE[sheet_name][i][k] = v
+                
+                print(f"✅ [SheetsRepo] Cache Updated (Batch Update): {sheet_name} ({len(updates)} rows)")
+            else:
+                self.clear_cache(sheet_name)
+        return True
 
     def soft_delete(self, sheet_name: str, id_value: Any) -> bool:
         """Sets is_deleted=True for a row."""

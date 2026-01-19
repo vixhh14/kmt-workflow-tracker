@@ -6,13 +6,13 @@ from typing import List, Dict, Any, Optional, Type
 from app.services.google_sheets import google_sheets
 from app.core.time_utils import get_current_time_ist
 
-# Worksheet names as specified by user
+# Worksheet names as specified by user - now strictly lowercase for consistency
 SHEETS_SCHEMA = {
-    "Projects": [
+    "projects": [
         "id", "project_name", "client_name", "project_code", 
         "is_deleted", "created_at", "updated_at"
     ],
-    "Tasks": [
+    "tasks": [
         "id", "title", "project_id", "assigned_to", "assigned_by", "status", 
         "priority", "due_datetime", "is_deleted", "created_at", "updated_at",
         "description", "part_item", "nos_unit", "machine_id", "started_at", 
@@ -20,59 +20,61 @@ SHEETS_SCHEMA = {
         "actual_start_time", "actual_end_time", "total_held_seconds", 
         "ended_by", "end_reason", "work_order_number", "expected_completion_time"
     ],
-    "Users": [
-        "id", "username", "role", "email", "active", "created_at",
-        "password_hash", "full_name", "machine_types", "date_of_birth", "address", 
+    "users": [
+        "user_id", "username", "password", "role", "is_active", "email", "created_at",
+        "full_name", "machine_types", "date_of_birth", "address", 
         "contact_number", "unit_id", "approval_status", "security_question", 
         "security_answer", "is_deleted", "updated_at"
     ],
-    "Attendance": [
+    "attendance": [
         "id", "date", "user_id", "status", "check_in", "check_out", "login_time", "ip_address", "is_deleted", "created_at", "updated_at"
     ],
-    "FabricationTasks": [
+    "fabricationtasks": [
         "id", "project_id", "part_item", "quantity", "due_date", "priority", 
         "assigned_to", "completed_quantity", "remarks", "status", "machine_id", 
         "work_order_number", "assigned_by", "is_deleted", "started_at", 
         "on_hold_at", "resumed_at", "completed_at", "total_active_duration", 
         "created_at", "updated_at"
     ],
-    "FilingTasks": [
+    "filingtasks": [
         "id", "project_id", "part_item", "quantity", "due_date", "priority", 
         "assigned_to", "completed_quantity", "remarks", "status", "machine_id", 
         "work_order_number", "assigned_by", "is_deleted", "started_at", 
         "on_hold_at", "resumed_at", "completed_at", "total_active_duration", 
         "created_at", "updated_at"
     ],
-    "Machines": [
-        "id", "machine_name", "status", "is_deleted", "hourly_rate", 
+    "machines": [
+        "machine_id", "machine_name", "status", "is_active", "is_deleted", "hourly_rate", 
         "last_maintenance", "current_operator", "category_id", "unit_id", 
         "created_at", "updated_at"
     ],
-    "TaskTimeLog": ["id", "task_id", "action", "timestamp", "reason", "is_deleted", "created_at", "updated_at"],
-    "TaskHold": ["id", "task_id", "user_id", "hold_reason", "hold_started_at", "hold_ended_at", "is_deleted", "created_at", "updated_at"],
-    "MachineRuntimeLog": ["id", "machine_id", "task_id", "start_time", "end_time", "duration_seconds", "date", "is_deleted", "created_at", "updated_at"],
-    "UserWorkLog": ["id", "user_id", "task_id", "machine_id", "start_time", "end_time", "duration_seconds", "date", "is_deleted", "created_at", "updated_at"],
-    "RescheduleRequests": ["id", "task_id", "new_date", "reason", "status", "created_at", "is_deleted", "updated_at"],
-    "PlanningTasks": ["id", "title", "description", "status", "created_at", "is_deleted", "updated_at"]
+    "tasktimelog": ["id", "task_id", "action", "timestamp", "reason", "is_deleted", "created_at", "updated_at"],
+    "taskhold": ["id", "task_id", "user_id", "hold_reason", "hold_started_at", "hold_ended_at", "is_deleted", "created_at", "updated_at"],
+    "machineruntimelog": ["id", "machine_id", "task_id", "start_time", "end_time", "duration_seconds", "date", "is_deleted", "created_at", "updated_at"],
+    "userworklog": ["id", "user_id", "task_id", "machine_id", "start_time", "end_time", "duration_seconds", "date", "is_deleted", "created_at", "updated_at"],
+    "units": ["id", "name", "description", "created_at", "updated_at", "is_deleted"],
+    "machinecategories": ["id", "name", "description", "created_at", "updated_at", "is_deleted"],
+    "reschedulerequests": ["id", "task_id", "new_date", "reason", "status", "created_at", "is_deleted", "updated_at"],
+    "planningtasks": ["id", "title", "description", "status", "created_at", "is_deleted", "updated_at"]
 }
 
 # Mapping of Model names to Worksheet names for convenience
 MODEL_MAP = {
-    "Project": "Projects",
-    "Task": "Tasks",
-    "User": "Users",
-    "Attendance": "Attendance",
-    "FabricationTask": "FabricationTasks",
-    "FilingTask": "FilingTasks",
-    "Machine": "Machines",
-    "TaskTimeLog": "TaskTimeLog",
-    "TaskHold": "TaskHold",
-    "MachineRuntimeLog": "MachineRuntimeLog",
-    "UserWorkLog": "UserWorkLog",
-    "RescheduleRequest": "RescheduleRequests",
-    "PlanningTask": "PlanningTasks",
-    "Unit": "Units",
-    "MachineCategory": "MachineCategories"
+    "Project": "projects",
+    "Task": "tasks",
+    "User": "users",
+    "Attendance": "attendance",
+    "FabricationTask": "fabricationtasks",
+    "FilingTask": "filingtasks",
+    "Machine": "machines",
+    "TaskTimeLog": "tasktimelog",
+    "TaskHold": "taskhold",
+    "MachineRuntimeLog": "machineruntimelog",
+    "UserWorkLog": "userworklog",
+    "RescheduleRequest": "reschedulerequests",
+    "PlanningTask": "planningtasks",
+    "Unit": "units",
+    "MachineCategory": "machinecategories"
 }
 
 from app.repositories.sheets_repository import sheets_repo
@@ -81,21 +83,39 @@ class SheetRow:
     """A row proxy that tracks changes for later commit."""
     def __init__(self, data: Dict[str, Any], table_name: str, db=None):
         self._db = db
-        self._data = data
-        self._name = table_name
-        self.__tablename__ = table_name
+        # Trim all string values immediately on load
+        self._data = {k: (v.strip() if isinstance(v, str) else v) for k, v in data.items()}
+        self._name = table_name.lower()
+        self.__tablename__ = table_name.lower()
         self._dirty_fields = set()
 
     def __getattr__(self, key):
+        # 1. Exact match
         if key in self._data:
             value = self._data[key]
-            # Improved coercion for boolean-like strings
             if isinstance(value, str):
                 low_val = value.lower()
                 if low_val in ['true', '1', 'yes']: return True
                 if low_val in ['false', '0', 'no', '']: return False
             return value
-        # Special case for IDs: bidirectional aliasing between 'id' and legacy names
+        
+        # 2. Aliases for common keys
+        aliases = {
+            "id": ["user_id", "machine_id", "task_id", "project_id"],
+            "password_hash": ["password"],
+            "active": ["is_active"],
+            "is_active": ["active"]
+        }
+        
+        # Check if the requested key is a core key with potential aliases in data
+        for core, alt_list in aliases.items():
+            if key == core:
+                for alt in alt_list:
+                    if alt in self._data: return self.__getattr__(alt)
+            if key in alt_list:
+                if core in self._data: return self.__getattr__(core)
+
+        # 3. Special case for generic 'id' and legacy names
         prefix = self._name.lower()
         if prefix.endswith('s'): prefix = prefix[:-1]
         legacy_id_key = f"{prefix}_id"
@@ -106,6 +126,7 @@ class SheetRow:
             if 'id' in self._data: return self._data['id']
             
         return None
+
 
     def __getitem__(self, key):
         return self.__getattr__(key)
@@ -175,6 +196,9 @@ class QueryWrapper:
             elif "is_deleted" in arg_str.lower():
                 is_false = "false" in arg_str.lower()
                 filtered = [row for row in filtered if bool(getattr(row, "is_deleted", False)) != is_false]
+            elif "is_active" in arg_str.lower():
+                is_true = "true" in arg_str.lower()
+                filtered = [row for row in filtered if bool(getattr(row, "is_active", True)) == is_true]
 
         return QueryWrapper(filtered, self._table_name)
 

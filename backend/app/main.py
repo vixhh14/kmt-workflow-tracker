@@ -10,7 +10,8 @@ from app.routers import (
     planning_router, approvals_router, dropdowns_router,
     reports_router, analytics_router, operator_router,
     seed_router, subtasks_router, outsource_router,
-    machine_categories_router, units_router, user_skills_router
+    machine_categories_router, units_router, user_skills_router,
+    health_router
 )
 
 from fastapi import FastAPI, Request
@@ -77,6 +78,7 @@ app.include_router(outsource_router.router)
 app.include_router(machine_categories_router.router)
 app.include_router(units_router.router)
 app.include_router(user_skills_router.router)
+app.include_router(health_router.router)
 
 @app.get("/")
 async def root():
