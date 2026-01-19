@@ -30,11 +30,11 @@ class User(SheetsModel):
         if not u_id: u_id = str(uuid.uuid4())
         kwargs["id"] = u_id
         kwargs["user_id"] = u_id
-        # Ensure is_active is set
-        if "is_active" not in kwargs and "active" in kwargs:
-            kwargs["is_active"] = kwargs["active"]
-        if "is_active" not in kwargs:
-            kwargs["is_active"] = True
+        # Ensure active is set
+        if "active" not in kwargs and "is_active" in kwargs:
+            kwargs["active"] = kwargs["is_active"]
+        if "active" not in kwargs:
+            kwargs["active"] = True
         super().__init__(**kwargs)
 
 class Project(SheetsModel):
@@ -114,9 +114,11 @@ class Machine(SheetsModel):
         if not m_id: m_id = str(uuid.uuid4())
         kwargs["id"] = m_id
         kwargs["machine_id"] = m_id
-        # Ensure is_active is set
-        if "is_active" not in kwargs:
-            kwargs["is_active"] = True
+        # Ensure active is set
+        if "active" not in kwargs and "is_active" in kwargs:
+            kwargs["active"] = kwargs["is_active"]
+        if "active" not in kwargs:
+            kwargs["active"] = True
         super().__init__(**kwargs)
 
 class Unit(SheetsModel):

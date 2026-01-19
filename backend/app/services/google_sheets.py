@@ -109,22 +109,67 @@ class GoogleSheetsService:
             print(f"❌ Error getting worksheet {name}: {e}")
             raise
 
+    def batch_get_all(self, names: List[str]) -> Dict[str, List[Dict[str, Any]]]:
+        """Fetches multiple sheets in a single call using values_batch_get."""
+        spreadsheet = self._get_spreadsheet()
+        ranges = [f"'{name}'!A1:Z5000" for name in names]
+        try:
+            batch_results = spreadsheet.values_batch_get(ranges)
+            value_ranges = batch_results.get('valueRanges', [])
+            
+            results = {}
+            for name, v_range in zip(names, value_ranges):
+                values = v_range.get('values', [])
+                results[name] = self._process_values_to_records(values)
+            return results
+        except Exception as e:
+            print(f"❌ Error in batch_get_all: {e}")
+            raise
+
+    def _process_values_to_records(self, all_values: List[List[Any]]) -> List[Dict[str, Any]]:
+        """Helper to convert raw grid values to normalized record dicts."""
+        if not all_values:
+            return []
+        
+        raw_headers = all_values[0]
+        normalized_headers = [self._normalize_header(h) for h in raw_headers]
+        
+        # Ensure at least one 'id' key for the primary column
+        if "id" not in normalized_headers and len(normalized_headers) > 0:
+            if normalized_headers[0].endswith("_id"):
+                normalized_headers[0] = "id"
+        
+        records = []
+        for i, values in enumerate(all_values[1:]):
+            padded_values = values + [""] * (len(raw_headers) - len(values))
+            record = {}
+            for rh, nh, val in zip(raw_headers, normalized_headers, padded_values):
+                record[nh] = val
+                record[f"_orig_{nh}"] = rh
+            
+            record["_row_idx"] = i + 2
+            records.append(record)
+        return records
+
     def ensure_worksheet(self, name: str, expected_headers: List[str]):
         """Verifies worksheet exists; creates it with headers if missing."""
         try:
             # First, check if it exists (case-insensitive)
             try:
                 ws = self.get_worksheet(name)
+                # Verify headers if empty
+                if ws.row_count < 1:
+                     ws.append_row(expected_headers)
                 print(f"✅ Worksheet verified: {ws.title}")
                 return ws
             except gspread.WorksheetNotFound:
                 # Create it
                 print(f"✨ Creating missing worksheet: {name}")
                 spreadsheet = self._get_spreadsheet()
-                ws = spreadsheet.add_worksheet(title=name, rows="100", cols=str(len(expected_headers)))
+                ws = spreadsheet.add_worksheet(title=name, rows="5000", cols=str(len(expected_headers)))
                 # Add headers immediately
                 ws.append_row(expected_headers)
-                print(f"🚀 Worksheet '{name}' created with {len(expected_headers)} headers.")
+                print(f"🚀 Worksheet '{name}' created.")
                 return ws
         except Exception as e:
             print(f"❌ Critical error ensuring worksheet {name}: {e}")
@@ -139,36 +184,13 @@ class GoogleSheetsService:
         return s.strip('_')
 
     def read_all_bulk(self, name: str) -> List[Dict[str, Any]]:
-        """Reads all records in one call and returns as list of dicts with normalized keys."""
+        """Reads all records in one call and returns as list of dicts."""
         worksheet = self.get_worksheet(name)
         try:
             all_values = worksheet.get_all_values()
-            if not all_values:
-                return []
-            
-            raw_headers = all_values[0]
-            normalized_headers = [self._normalize_header(h) for h in raw_headers]
-            
-            # Ensure at least one 'id' key for the primary column
-            if "id" not in normalized_headers and len(normalized_headers) > 0:
-                # If first column looks like an ID, alias it
-                if normalized_headers[0].endswith("_id"):
-                    normalized_headers[0] = "id"
-            
-            records = []
-            for i, values in enumerate(all_values[1:]):
-                # Pad values to match header length
-                padded_values = values + [""] * (len(raw_headers) - len(values))
-                record = {}
-                for rh, nh, val in zip(raw_headers, normalized_headers, padded_values):
-                    record[nh] = val
-                    record[f"_orig_{nh}"] = rh
-                
-                record["_row_idx"] = i + 2
-                records.append(record)
-            return records
+            return self._process_values_to_records(all_values)
         except Exception as e:
-            print(f"❌ Error reading all values from {name}: {e}")
+            print(f"❌ [GS] Error reading all values from {name}: {e}")
             raise
 
     def insert_row(self, name: str, data: Dict[str, Any], raw_headers: Optional[List[str]] = None):

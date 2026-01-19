@@ -22,52 +22,57 @@ class SheetsRepository:
     def _get_sheet_data(self, sheet_name: str, force_refresh: bool = False) -> List[Dict[str, Any]]:
         now = time.time()
         
-        # Check if we have valid cache
+        # 1. Check if we have valid cache
         if not force_refresh:
             with _CACHE_LOCK:
                 if sheet_name in _GLOBAL_CACHE and now < _CACHE_EXPIRY.get(sheet_name, 0):
                     return _GLOBAL_CACHE[sheet_name]
 
-        # Cache expired or missing, refresh it
+        # 2. Cache expired or missing, refresh it
         try:
-            # One bulk read per sheet
-            try:
-                data = google_sheets.read_all_bulk(sheet_name)
-            except gspread.exceptions.WorksheetNotFound:
-                # If worksheet is missing, we DONOR cache a failure. 
-                # Instead, we return empty and let the caller/startup handle creation or error.
-                print(f"⚠️ [SheetsRepo] Worksheet '{sheet_name}' not found.")
-                return []
+            # OPTIMIZATION: If we're hitting 'machines', 'users', 'projects', or 'units' 
+            # and they are ALL expired, consider a batch bootstrap read
+            sheets_to_bootstrap = ["machines", "users", "projects", "units", "tasks", "attendance", "fabricationtasks", "filingtasks"]
             
-            # Extract raw headers for mapping
-            raw_headers = []
-            if data:
-                first = data[0]
-                # Filter out internal keys like _row_idx, etc.
-                raw_headers = [v for k, v in first.items() if k.startswith("_orig_")]
+            # Check if current sheet is one of these and others are also expired
+            should_bootstrap = False
+            if sheet_name in sheets_to_bootstrap:
+                expired_count = sum(1 for s in sheets_to_bootstrap if s not in _GLOBAL_CACHE or now >= _CACHE_EXPIRY.get(s, 0))
+                if expired_count >= 3: # If 3 or more are stale, do a bulk load
+                    should_bootstrap = True
+            
+            if should_bootstrap:
+                print(f"🚀 [SheetsRepo] TRIGGERING BOOTSTRAP BATCH READ for {len(sheets_to_bootstrap)} sheets")
+                batch_data = google_sheets.batch_get_all(sheets_to_bootstrap)
+                with _CACHE_LOCK:
+                    for s_name, s_data in batch_data.items():
+                        _GLOBAL_CACHE[s_name] = s_data
+                        _CACHE_EXPIRY[s_name] = now + CACHE_TTL
+                        self._extract_headers(s_name, s_data)
+                return _GLOBAL_CACHE.get(sheet_name, [])
+
+            # Single Bulk Read
+            data = google_sheets.read_all_bulk(sheet_name)
             
             with _CACHE_LOCK:
                 _GLOBAL_CACHE[sheet_name] = data
                 _CACHE_EXPIRY[sheet_name] = now + CACHE_TTL
-                
-                if raw_headers:
-                    _RAW_HEADERS[sheet_name] = raw_headers
-                else:
-                    # Fallback if sheet is empty but we need headers
-                    try:
-                        worksheet = google_sheets.get_worksheet(sheet_name)
-                        _RAW_HEADERS[sheet_name] = worksheet.row_values(1)
-                    except:
-                        pass
+                self._extract_headers(sheet_name, data)
                 print(f"🔄 [SheetsRepo] Cache Refreshed: {sheet_name} ({len(data)} rows)")
             return data
         except Exception as e:
             print(f"❌ [SheetsRepo] Failed to fetch {sheet_name}: {e}")
             with _CACHE_LOCK:
-                # Fallback to expired cache if available, but never cache long-term failure
                 if sheet_name in _GLOBAL_CACHE:
                     return _GLOBAL_CACHE[sheet_name]
                 return []
+
+    def _extract_headers(self, sheet_name: str, data: List[Dict[str, Any]]):
+        """Helper to sync headers from data."""
+        if not data: return
+        raw_headers = [v for k, v in data[0].items() if k.startswith("_orig_")]
+        if raw_headers:
+            _RAW_HEADERS[sheet_name] = raw_headers
 
     def get_cached_records(self, sheet_name: str) -> List[Dict[str, Any]]:
         """Implementation of mandatory task: Reads entire worksheet from cache."""

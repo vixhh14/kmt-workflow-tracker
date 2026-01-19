@@ -4,6 +4,7 @@ from app.core.database import get_db
 from app.models.models_db import Project, Machine, User
 from app.core.dependencies import get_current_user
 from pydantic import BaseModel
+from app.core.time_utils import get_current_time_ist
 
 router = APIRouter(prefix="/dropdowns", tags=["Dropdowns"])
 
@@ -62,3 +63,38 @@ async def get_assignable_users(
     except Exception as e:
         print(f"❌ Error in users dropdown: {e}")
         return []
+
+@router.get("/bootstrap")
+async def bootstrap_data(
+    db: any = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Consolidated endpoint to fetch all common dropdown/static data in ONE call.
+    Target: 1 API call instead of 5+ during page load.
+    """
+    try:
+        from app.models.models_db import Unit, MachineCategory
+        
+        projects = [{"id": str(getattr(p, 'id', '')), "name": str(getattr(p, 'project_name', ''))} 
+                   for p in db.query(Project).all() if not getattr(p, 'is_deleted', False)]
+                   
+        machines = [{"id": str(getattr(m, 'id', '')), "name": str(getattr(m, 'machine_name', ''))} 
+                   for m in db.query(Machine).all() if not getattr(m, 'is_deleted', False)]
+                   
+        units = [{"id": str(getattr(u, 'id', '')), "name": str(getattr(u, 'name', ''))} 
+                for u in db.query(Unit).all() if not getattr(u, 'is_deleted', False)]
+                
+        categories = [{"id": str(getattr(c, 'id', '')), "name": str(getattr(c, 'name', ''))} 
+                      for c in db.query(MachineCategory).all() if not getattr(c, 'is_deleted', False)]
+        
+        return {
+            "projects": projects,
+            "machines": machines,
+            "units": units,
+            "categories": categories,
+            "server_time": get_current_time_ist().isoformat()
+        }
+    except Exception as e:
+        print(f"❌ Error in bootstrap: {e}")
+        return {"error": str(e)}

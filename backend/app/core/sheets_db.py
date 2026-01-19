@@ -21,13 +21,13 @@ SHEETS_SCHEMA = {
         "ended_by", "end_reason", "work_order_number", "expected_completion_time"
     ],
     "users": [
-        "user_id", "username", "password", "role", "is_active", "email", "created_at",
+        "user_id", "username", "password", "role", "active", "email", "created_at",
         "full_name", "machine_types", "date_of_birth", "address", 
         "contact_number", "unit_id", "approval_status", "security_question", 
         "security_answer", "is_deleted", "updated_at"
     ],
     "attendance": [
-        "id", "date", "user_id", "status", "check_in", "check_out", "login_time", "ip_address", "is_deleted", "created_at", "updated_at"
+        "attendance_id", "user_id", "date", "login_time", "logout_time", "status", "is_deleted", "created_at", "updated_at"
     ],
     "fabricationtasks": [
         "id", "project_id", "part_item", "quantity", "due_date", "priority", 
@@ -44,7 +44,7 @@ SHEETS_SCHEMA = {
         "created_at", "updated_at"
     ],
     "machines": [
-        "machine_id", "machine_name", "status", "is_active", "is_deleted", "hourly_rate", 
+        "machine_id", "machine_name", "status", "active", "is_deleted", "hourly_rate", 
         "last_maintenance", "current_operator", "category_id", "unit_id", 
         "created_at", "updated_at"
     ],
@@ -196,9 +196,10 @@ class QueryWrapper:
             elif "is_deleted" in arg_str.lower():
                 is_false = "false" in arg_str.lower()
                 filtered = [row for row in filtered if bool(getattr(row, "is_deleted", False)) != is_false]
-            elif "is_active" in arg_str.lower():
+            elif "is_active" in arg_str.lower() or "active" in arg_str.lower():
                 is_true = "true" in arg_str.lower()
-                filtered = [row for row in filtered if bool(getattr(row, "is_active", True)) == is_true]
+                # Check both aliases
+                filtered = [row for row in filtered if bool(getattr(row, "active", True)) == is_true]
 
         return QueryWrapper(filtered, self._table_name)
 
@@ -306,16 +307,20 @@ def get_sheets_db():
 def verify_sheets_structure():
     """
     Mandatory startup verification: Ensure all tables exist in Google Sheets.
-    Creates missing sheets automatically.
+    Creates missing sheets automatically and pre-warms cache.
     """
     print("🔍 [Startup] Verifying Google Sheets structure...")
     try:
+        # 1. First ensure all exist (individual calls are okay once at startup)
         for sheet_name, headers in SHEETS_SCHEMA.items():
-            # Trigger creation/verification
             google_sheets.ensure_worksheet(sheet_name, headers)
-        print("✅ [Startup] All required sheets verified and accessible.")
+        
+        # 2. Trigger a Bootstrap Batch Read to pre-warm the cache
+        print("🔥 [Startup] Pre-warming Cache via Bootstrap...")
+        sheets_repo.get_all("machines", include_deleted=True) 
+        
+        print("✅ [Startup] All required sheets verified, accessible, and cached.")
     except Exception as e:
         print(f"❌ [Startup] Critical Error verifying sheets: {e}")
-        # In production, we should probably fail fast if we can't reach sheets
         raise RuntimeError(f"Startup failed: Google Sheets structure is invalid or inaccessible: {e}")
 

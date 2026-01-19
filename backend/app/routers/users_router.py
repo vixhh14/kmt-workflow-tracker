@@ -51,7 +51,7 @@ async def create_user(user_data: UserCreate, db: any = Depends(get_db), current_
 @router.get("/", response_model=List[UserOut])
 async def list_users(exclude_id: Optional[str] = None, db: any = Depends(get_db)):
     """List all active users from cache."""
-    res = db.query(User).filter(is_deleted=False).all()
+    res = db.query(User).filter(is_deleted=False, active=True).all()
     if exclude_id:
         res = [u for u in res if str(getattr(u, 'id', '')) != str(exclude_id)]
     return res

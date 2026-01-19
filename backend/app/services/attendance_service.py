@@ -8,78 +8,45 @@ from app.core.sheets_db import SheetsDB
 def mark_present(db: SheetsDB, user_id: str, ip_address: Optional[str] = None) -> dict:
     """
     Mark user as present for today (IST). Idempotent.
+    Canonical columns: [attendance_id, user_id, date, login_time, logout_time, status]
     """
     try:
-        today = get_today_date_ist()
-        now_ist = get_current_time_ist()
-        today_str = today.isoformat()
+        from app.repositories.sheets_repository import sheets_repo
+        today_str = get_today_date_ist().isoformat()
+        now_ist = get_current_time_ist().isoformat()
         
-        # Helper for robust date matching
-        def dates_match(row_date, target_date):
-            if not row_date: return False
-            r_str = str(row_date).strip().split('T')[0].split(' ')[0]
-            if r_str == target_date: return True
-            try:
-                if '/' in r_str:
-                    parts = r_str.split('/')
-                    if len(parts) == 3:
-                        d, m, y = parts
-                        norm_r = f"{y}-{m.zfill(2)}-{d.zfill(2)}"
-                        if norm_r == target_date: return True
-            except: pass
-            return False
-
-        # Check if attendance record already exists for this user today
-        all_att = db.query(Attendance).all()
-        # Find local record for today - safe date comparison
-        existing_attendance = None
-        for a in all_att:
-            if str(getattr(a, 'user_id', '')) == str(user_id):
-                if dates_match(getattr(a, 'date', ''), today_str):
-                    existing_attendance = a
-                    break
+        # 1. Fetch all attendance for today (cached)
+        all_att = sheets_repo.get_all("attendance")
         
-        if existing_attendance:
-            # If already logged in today, just update login_time but keep original check_in
-            upd_data = {}
-            if not getattr(existing_attendance, 'login_time', None):
-                upd_data["login_time"] = now_ist.isoformat()
-            if ip_address:
-                upd_data["ip_address"] = ip_address
-            
-            if upd_data:
-                from app.repositories.sheets_repository import sheets_repo
-                sheets_repo.update("attendance", existing_attendance.id, upd_data)
-            
-            return {"status": "success", "message": "Attendance already marked", "data": existing_attendance.dict()}
-        else:
-            # Create new attendance record using plain DICT
-            import uuid
-            att_id = f"att_{int(now_ist.timestamp())}"
-            new_attendance = {
-                "id": att_id,
-                "date": today_str,
-                "user_id": str(user_id),
-                "status": "Present",
-                "check_in": now_ist.isoformat(),
-                "login_time": now_ist.isoformat(),
-                "ip_address": ip_address or "unknown",
-                "created_at": now_ist.isoformat(),
-                "updated_at": now_ist.isoformat(),
-                "is_deleted": False
-            }
-            
-            from app.repositories.sheets_repository import sheets_repo
-            inserted = sheets_repo.insert("attendance", new_attendance)
-            return {"status": "success", "message": "Checked in successfully", "data": inserted}
+        existing = next((a for a in all_att if str(a.get("user_id")) == str(user_id) and str(a.get("date")) == today_str), None)
+        
+        if existing:
+            # Already has a record for today, ensure login_time is set
+            if not existing.get("login_time"):
+                sheets_repo.update("attendance", existing["attendance_id"], {"login_time": now_ist})
+            return {"status": "success", "message": "Attendance already marked", "data": existing}
+        
+        # 2. Create new record
+        att_id = f"att_{user_id}_{today_str.replace('-', '')}"
+        record = {
+            "attendance_id": att_id,
+            "id": att_id,
+            "user_id": str(user_id),
+            "date": today_str,
+            "login_time": now_ist,
+            "logout_time": "",
+            "status": "Present",
+            "is_deleted": False,
+            "created_at": now_ist,
+            "updated_at": now_ist
+        }
+        
+        inserted = sheets_repo.insert("attendance", record)
+        return {"status": "success", "message": "Checked in successfully", "data": inserted}
     
     except Exception as e:
         print(f"❌ Error in mark_present: {e}")
-        return {
-            "success": False,
-            "message": f"Failed to mark attendance: {str(e)}",
-            "error": str(e)
-        }
+        return {"success": False, "message": str(e)}
 
 
 def mark_checkout(db: SheetsDB, user_id: str) -> dict:
@@ -87,57 +54,29 @@ def mark_checkout(db: SheetsDB, user_id: str) -> dict:
     Mark user as checked out for today (IST).
     """
     try:
-        today = get_today_date_ist()
-        now_ist = get_current_time_ist()
-        today_str = today.isoformat()
+        from app.repositories.sheets_repository import sheets_repo
+        today_str = get_today_date_ist().isoformat()
+        now_ist = get_current_time_ist().isoformat()
         
-        # Helper for robust date matching
-        def dates_match(row_date, target_date):
-            if not row_date: return False
-            r_str = str(row_date).strip().split('T')[0].split(' ')[0]
-            if r_str == target_date: return True
-            try:
-                if '/' in r_str:
-                    parts = r_str.split('/')
-                    if len(parts) == 3:
-                        d, m, y = parts
-                        norm_r = f"{y}-{m.zfill(2)}-{d.zfill(2)}"
-                        if norm_r == target_date: return True
-            except: pass
-            return False
+        all_att = sheets_repo.get_all("attendance")
+        existing = next((a for a in all_att if str(a.get("user_id")) == str(user_id) and str(a.get("date")) == today_str), None)
 
-        all_att = db.query(Attendance).all()
-        # Find record for today
-        attendance = None
-        for a in all_att:
-            if str(getattr(a, 'user_id', '')) == str(user_id):
-                if dates_match(getattr(a, 'date', ''), today_str):
-                    attendance = a
-                    break
-
-        if not attendance:
+        if not existing:
             return {"status": "error", "message": "No check-in record found for today"}
 
-        if getattr(attendance, 'check_out', None) and str(getattr(attendance, 'check_out', '')).strip():
-            return {"status": "success", "message": "Already checked out", "data": attendance.dict()}
+        if existing.get("logout_time"):
+            return {"status": "success", "message": "Already checked out", "data": existing}
 
-        from app.repositories.sheets_repository import sheets_repo
-        data = {
-            "check_out": now_ist.isoformat(),
-            "updated_at": now_ist.isoformat()
-        }
-        success = sheets_repo.update("attendance", attendance.id, data)
-        if not success: raise RuntimeError("Sheets update returned False")
+        sheets_repo.update("attendance", existing["attendance_id"], {
+            "logout_time": now_ist,
+            "updated_at": now_ist
+        })
         
-        return {"status": "success", "message": "Checked out successfully", "data": {**attendance.dict(), **data}}
+        return {"status": "success", "message": "Checked out successfully"}
     
     except Exception as e:
         print(f"❌ Error in mark_checkout: {e}")
-        return {
-            "success": False,
-            "message": f"Failed to record check-out: {str(e)}",
-            "error": str(e)
-        }
+        return {"success": False, "message": str(e)}
 
 
 def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):

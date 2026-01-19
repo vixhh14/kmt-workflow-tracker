@@ -28,7 +28,7 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    user = db.query(User).filter(username=username, is_deleted=False, is_active=True).first()
+    user = db.query(User).filter(username=username, is_deleted=False, active=True).first()
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

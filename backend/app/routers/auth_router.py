@@ -29,9 +29,9 @@ async def login(credentials: LoginRequest, background_tasks: BackgroundTasks, db
         # Load all users from Sheets (cached)
         all_users = db.query(User).all()
         
-        # Mandatory: Trim whitespace and check is_active
+        # Mandatory: Trim whitespace and check active
         u_name = credentials.username.strip().lower()
-        user = next((u for u in all_users if str(getattr(u, 'username', '')).strip().lower() == u_name and getattr(u, 'is_active', False) and not getattr(u, 'is_deleted', False)), None)
+        user = next((u for u in all_users if str(getattr(u, 'username', '')).strip().lower() == u_name and getattr(u, 'active', False) and not getattr(u, 'is_deleted', False)), None)
 
         if not user:
             raise HTTPException(status_code=401, detail="Incorrect username or password")
@@ -200,41 +200,54 @@ async def signup(user_data: dict, db: any = Depends(get_db)):
     Register new user.
     User will be in 'pending' status until admin approves.
     """
-    # Basic Validation
-    for field in ['username', 'password', 'email', 'full_name']:
+    from app.repositories.sheets_repository import sheets_repo
+    from app.core.time_utils import get_current_time_ist
+    import uuid
+
+    # 1. Basic Validation
+    required = ['username', 'password', 'email', 'full_name']
+    for field in required:
         if not user_data.get(field):
             raise HTTPException(status_code=400, detail=f"{field} is required")
 
-    all_users = db.query(User).all()
-    if any(str(getattr(u, 'username', '')).lower() == str(user_data['username']).lower() for u in all_users):
+    # 2. Uniqueness Check (Cached)
+    all_users = sheets_repo.get_all("users", include_deleted=True)
+    if any(str(u.get('username', '')).lower() == str(user_data['username']).lower() for u in all_users):
         raise HTTPException(status_code=400, detail="Username exists")
     
-    # Check if email already exists
-    if user_data.get('email'):
-        if any(str(getattr(u, 'email', '')).lower() == str(user_data['email']).lower() for u in all_users):
-            raise HTTPException(status_code=400, detail="Email already exists")
+    if any(str(u.get('email', '')).lower() == str(user_data['email']).lower() for u in all_users):
+        raise HTTPException(status_code=400, detail="Email exists")
     
     is_valid, errors = validate_password_strength(user_data['password'])
     if not is_valid:
         raise HTTPException(status_code=400, detail=errors[0])
     
+    # 3. Create canonical dictionary
+    u_id = str(uuid.uuid4())
     now = get_current_time_ist().isoformat()
-    new_user = User(
-        username=user_data['username'],
-        password_hash=hash_password(user_data['password']),
-        email=user_data.get('email'),
-        full_name=user_data.get('full_name'),
-        role='operator',
-        contact_number=user_data.get('contact_number'),
-        address=user_data.get('address'), 
-        approval_status='pending',
-        created_at=now,
-        updated_at=now,
-        is_deleted=False
-    )
     
-    db.add(new_user)
-    return {"message": "Registered. Awaiting approval.", "username": new_user.username}
+    new_user_dict = {
+        "user_id": u_id,
+        "id": u_id,
+        "username": user_data['username'],
+        "password": hash_password(user_data['password']), # Maps to 'password' column
+        "email": user_data['email'],
+        "full_name": user_data['full_name'],
+        "role": 'operator',
+        "contact_number": user_data.get('contact_number', ''),
+        "address": user_data.get('address', ''),
+        "is_active": True,
+        "approval_status": 'pending',
+        "is_deleted": False,
+        "created_at": now,
+        "updated_at": now
+    }
+    
+    try:
+        inserted = sheets_repo.insert("users", new_user_dict)
+        return {"message": "Registered. Awaiting approval.", "username": inserted.get('username')}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Signup failed: {e}")
 
 @router.post("/logout")
 async def logout(current_user: User = Depends(get_current_active_user), db: any = Depends(get_db)):
