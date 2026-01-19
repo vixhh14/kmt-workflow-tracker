@@ -24,8 +24,10 @@ async def get_projects_dropdown(
     current_user: User = Depends(get_current_user)
 ):
     try:
-        projects = [p for p in db.query(Project).all() if not getattr(p, 'is_deleted', False)]
-        return [{"id": str(getattr(p, 'id', '')), "name": str(getattr(p, 'project_name', ''))} for p in projects]
+        from app.models.models_db import Project
+        all_p = db.query(Project).all()
+        return [{"id": str(getattr(p, 'id', '')), "name": str(getattr(p, 'project_name', ''))} 
+                for p in all_p if not getattr(p, 'is_deleted', False)]
     except Exception as e:
         print(f"❌ Error in projects dropdown: {e}")
         return []
@@ -36,8 +38,10 @@ async def get_machines_dropdown(
     current_user: User = Depends(get_current_user)
 ):
     try:
-        machines = [m for m in db.query(Machine).all() if not getattr(m, 'is_deleted', False)]
-        return [{"id": str(getattr(m, 'id', '')), "name": str(getattr(m, 'machine_name', ''))} for m in machines]
+        from app.models.models_db import Machine
+        all_m = db.query(Machine).all()
+        return [{"id": str(getattr(m, 'id', '')), "name": str(getattr(m, 'machine_name', ''))} 
+                for m in all_m if not getattr(m, 'is_deleted', False)]
     except Exception as e:
         print(f"❌ Error in machines dropdown: {e}")
         return []
@@ -49,17 +53,22 @@ async def get_assignable_users(
 ):
     try:
         assignable_roles = ['admin', 'supervisor', 'planning', 'operator', 'fab_master', 'file_master']
-        all_users = db.query(User).all()
-        users = [u for u in all_users if not getattr(u, 'is_deleted', False) and str(getattr(u, 'role', '')).lower() in assignable_roles]
+        all_u = db.query(User).all()
         
-        return [
-            {
-                "id": str(getattr(u, 'id', '')),
-                "username": str(getattr(u, 'username', '')),
-                "full_name": str(getattr(u, 'full_name', '') or getattr(u, 'username', '')),
-                "role": str(getattr(u, 'role', ''))
-            } for u in users
-        ]
+        results = []
+        for u in all_u:
+            if getattr(u, 'is_deleted', False) or not bool(getattr(u, 'active', True)):
+                continue
+            
+            u_role = str(getattr(u, 'role', '')).lower()
+            if u_role in assignable_roles:
+                results.append({
+                    "id": str(getattr(u, 'user_id', getattr(u, 'id', ''))),
+                    "username": str(getattr(u, 'username', '')),
+                    "full_name": str(getattr(u, 'username', '')),
+                    "role": u_role
+                })
+        return results
     except Exception as e:
         print(f"❌ Error in users dropdown: {e}")
         return []
@@ -69,32 +78,29 @@ async def bootstrap_data(
     db: any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Consolidated endpoint to fetch all common dropdown/static data in ONE call.
-    Target: 1 API call instead of 5+ during page load.
-    """
+    """Consolidated endpoint to fetch all common dropdown data."""
     try:
-        from app.models.models_db import Unit, MachineCategory
+        from app.models.models_db import Unit, MachineCategory, Project, Machine
         
-        projects = [{"id": str(getattr(p, 'id', '')), "name": str(getattr(p, 'project_name', ''))} 
-                   for p in db.query(Project).all() if not getattr(p, 'is_deleted', False)]
+        p = [{"id": str(getattr(p, 'id', '')), "name": str(getattr(p, 'project_name', ''))} 
+             for p in db.query(Project).all() if not getattr(p, 'is_deleted', False)]
                    
-        machines = [{"id": str(getattr(m, 'id', '')), "name": str(getattr(m, 'machine_name', ''))} 
-                   for m in db.query(Machine).all() if not getattr(m, 'is_deleted', False)]
+        m = [{"id": str(getattr(m, 'id', '')), "name": str(getattr(m, 'machine_name', ''))} 
+             for m in db.query(Machine).all() if not getattr(m, 'is_deleted', False)]
                    
-        units = [{"id": str(getattr(u, 'id', '')), "name": str(getattr(u, 'name', ''))} 
-                for u in db.query(Unit).all() if not getattr(u, 'is_deleted', False)]
+        u = [{"id": str(getattr(u, 'id', '')), "name": str(getattr(u, 'name', ''))} 
+             for u in db.query(Unit).all() if not getattr(u, 'is_deleted', False)]
                 
-        categories = [{"id": str(getattr(c, 'id', '')), "name": str(getattr(c, 'name', ''))} 
-                      for c in db.query(MachineCategory).all() if not getattr(c, 'is_deleted', False)]
+        c = [{"id": str(getattr(c, 'id', '')), "name": str(getattr(c, 'name', ''))} 
+             for c in db.query(MachineCategory).all() if not getattr(c, 'is_deleted', False)]
         
         return {
-            "projects": projects,
-            "machines": machines,
-            "units": units,
-            "categories": categories,
+            "projects": p,
+            "machines": m,
+            "units": u,
+            "categories": c,
             "server_time": get_current_time_ist().isoformat()
         }
     except Exception as e:
         print(f"❌ Error in bootstrap: {e}")
-        return {"error": str(e)}
+        return {"error": str(e), "projects": [], "machines": [], "units": [], "categories": []}

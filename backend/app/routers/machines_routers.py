@@ -37,18 +37,31 @@ def normalize_machine_data(data: dict) -> dict:
 
 @router.get("", response_model=List[MachineOut])
 async def read_machines(db: Any = Depends(get_db)):
-    """Get all active machines with post-fetch normalization."""
+    """Get all active machines with post-fetch normalization and safety guard."""
     all_ms = db.query(Machine).all()
     
     results = []
     for m in all_ms:
-        m_dict = m.dict()
-        # Normalization ensures UI consistency even if sheet has mixed case/styles
-        norm_m = normalize_machine_data(m_dict)
-        
-        # Exclude only if explicitly deleted
-        if not norm_m.get("is_deleted", False):
-            results.append(norm_m)
+        try:
+            m_dict = m.dict()
+            # 1. Post-Fetch Normalization
+            norm_data = normalize_machine_data(m_dict)
+            
+            # 2. Skip if deleted
+            if norm_data.get("is_deleted", False):
+                continue
+
+            # 3. Defensive Check: Ensure required ID fields are populated
+            if not norm_data.get("id") or not norm_data.get("machine_id"):
+                print(f"⚠️ [Machines] Skipping row with missing ID: {norm_data.get('machine_name', 'Unnamed')}")
+                continue
+
+            # 4. Final Validation against Pydantic schema
+            valid_m = MachineOut(**norm_data)
+            results.append(valid_m)
+        except Exception as e:
+            msg = getattr(m, 'machine_name', 'Unknown')
+            print(f"❌ [Machines] Invalid row '{msg}' skipped: {e}")
             
     return results
 

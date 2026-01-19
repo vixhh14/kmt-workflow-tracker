@@ -48,17 +48,48 @@ async def create_user(user_data: UserCreate, db: any = Depends(get_db), current_
 
 @router.get("/", response_model=List[UserOut])
 async def list_users(exclude_id: Optional[str] = None, db: any = Depends(get_db)):
-    """List all active users from cache."""
-    res = db.query(User).filter(is_deleted=False, active=True).all()
-    if exclude_id:
-        res = [u for u in res if str(getattr(u, 'id', '')) != str(exclude_id)]
-    return res
+    """List all active users with safety guard."""
+    all_u = db.query(User).all()
+    
+    results = []
+    for u in all_u:
+        try:
+            # 1. Skip if deleted or inactive
+            if not bool(getattr(u, 'active', True)) or bool(getattr(u, 'is_deleted', False)):
+                continue
+                
+            # 2. Skip excluded user (usually self)
+            u_id = str(getattr(u, 'user_id', getattr(u, 'id', '')))
+            if exclude_id and u_id == str(exclude_id):
+                continue
+            
+            # 3. Final Validation
+            results.append(UserOut(**u.dict()))
+        except Exception as e:
+            msg = getattr(u, 'username', 'Unknown')
+            print(f"❌ [Users] Invalid row '{msg}' skipped: {e}")
+            
+    return results
 
 @router.get("/search", response_model=List[UserOut])
 async def search_users(q: str, db: any = Depends(get_db)):
+    """Search users with safety guard."""
     all_u = db.query(User).all()
-    q = q.lower()
-    return [u for u in all_u if q in str(getattr(u, 'username', '')).lower() or q in str(getattr(u, 'email', '') or "").lower()]
+    q = q.lower().strip()
+    
+    results = []
+    for u in all_u:
+        try:
+            u_name = str(getattr(u, 'username', '')).lower()
+            u_email = str(getattr(u, 'email', '') or "").lower()
+            
+            if q in u_name or q in u_email:
+                results.append(UserOut(**u.dict()))
+        except Exception as e:
+            msg = getattr(u, 'username', 'Unknown')
+            print(f"❌ [Users Search] Invalid row '{msg}' skipped: {e}")
+            
+    return results
 
 @router.get("/{user_id}", response_model=UserOut)
 async def get_user_by_id(user_id: str, db: any = Depends(get_db)):

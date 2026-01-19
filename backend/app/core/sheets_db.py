@@ -40,24 +40,27 @@ class SheetRow:
         self._dirty_fields = set()
 
     def __getattr__(self, key):
-        # 1. Exact match
+        # 1. Exact match in data
         if key in self._data:
             value = self._data[key]
-            if isinstance(value, str):
-                low_val = value.lower()
-                if low_val in ['true', '1', 'yes']: return True
-                if low_val in ['false', '0', 'no', '']: return False
+            # Standardize common boolean strings to bool
+            if key in ["active", "is_active", "is_deleted", "status"]:
+                if isinstance(value, str):
+                    low = value.lower().strip()
+                    if low in ["true", "1", "yes", "active"]: return True
+                    if low in ["false", "0", "no", "inactive", ""]: return False
+                return bool(value)
             return value
         
-        # 2. Aliases for common keys
+        # 2. Key Aliases
         aliases = {
-            "id": ["user_id", "machine_id", "task_id", "project_id"],
+            "id": ["user_id", "machine_id", "task_id", "project_id", "attendance_id"],
             "password_hash": ["password"],
             "active": ["is_active"],
             "is_active": ["active"]
         }
         
-        # Check if the requested key is a core key with potential aliases in data
+        # Resolve through aliases recursively
         for core, alt_list in aliases.items():
             if key == core:
                 for alt in alt_list:
@@ -65,17 +68,22 @@ class SheetRow:
             if key in alt_list:
                 if core in self._data: return self.__getattr__(core)
 
-        # 3. Special case for generic 'id' and legacy names
+        # 3. Sheet-prefixed ID aliasing (e.g. user_id -> id)
         prefix = self._name.lower()
         if prefix.endswith('s'): prefix = prefix[:-1]
-        legacy_id_key = f"{prefix}_id"
+        prefixed_id = f"{prefix}_id"
         
-        if key == 'id':
-            if legacy_id_key in self._data: return self._data[legacy_id_key]
-        if key == legacy_id_key:
-            if 'id' in self._data: return self._data['id']
+        if key == 'id' and prefixed_id in self._data:
+             return self.__getattr__(prefixed_id)
+        if key == prefixed_id and 'id' in self._data:
+             return self.__getattr__('id')
             
-        return None
+        # 4. Mandatory Safe Defaults (Prevents ResponseValidationError)
+        if key in ["active", "is_active"]: return True
+        if key == "is_deleted": return False
+        if key in ["role", "status"]: return "operator" if key == "role" else "active"
+        
+        return "" # Default to empty string instead of None for Pydantic str fields
 
 
     def __getitem__(self, key):
@@ -95,10 +103,26 @@ class SheetRow:
             if self._db: self._db._mark_dirty(self)
 
     def dict(self):
-        d = dict(self._data)
-        # Ensure 'id' is present for frontend compatibility
+        """Returns clean dictionary with resolved aliases and removed internals."""
+        # 1. Start with canonical headers defined in schema
+        canonical = SHEETS_SCHEMA.get(self._name, list(self._data.keys()))
+        
+        # 2. Populate data ensuring types are correct
+        d = {}
+        for h in canonical:
+            d[h] = self.__getattr__(h)
+        
+        # 3. Ensure 'id' alias is present for frontend (CRITICAL)
         if 'id' not in d:
             d['id'] = self.__getattr__('id')
+            
+        # 4. Ensure specific ID field is present if frontend expects it (e.g. machine_id)
+        prefix = self._name.lower()
+        if prefix.endswith('s'): prefix = prefix[:-1]
+        prefixed_id = f"{prefix}_id"
+        if prefixed_id not in d and prefixed_id in SHEETS_SCHEMA.get(self._name, []):
+            d[prefixed_id] = d.get('id')
+            
         return d
 
 class QueryWrapper:
