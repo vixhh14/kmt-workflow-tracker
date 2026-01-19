@@ -39,6 +39,11 @@ Thumbs.db
 # Service account (sensitive)
 service_account.json
 
+# Environment variables
+.env
+.env.*
+*.env
+
 # Build artifacts
 dist/
 build/
