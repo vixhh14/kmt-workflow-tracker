@@ -36,12 +36,12 @@ async def login(credentials: LoginRequest, background_tasks: BackgroundTasks, db
         if not user:
             raise HTTPException(status_code=401, detail="Incorrect username or password")
         
+        # Define user_role before use
+        user_role = str(getattr(user, 'role', 'operator') or "operator").lower().strip()
+
         # Status check
         if not bool(getattr(user, 'active', True)):
             raise HTTPException(status_code=403, detail="Account is inactive")
-        
-        # Approval check (Disabled as per lean schema without 'approval_status')
-        # All newly created users are 'active=True' by default as per mandatory rules.
         
         # Password verification
         u_hash = getattr(user, 'password_hash', None)
@@ -52,11 +52,11 @@ async def login(credentials: LoginRequest, background_tasks: BackgroundTasks, db
             raise HTTPException(status_code=401, detail="Incorrect username or password")
         
         # JWT Token
-        u_id = str(getattr(user, 'id', ''))
+        u_id = str(getattr(user, 'user_id', getattr(user, 'id', '')))
         token_data = {"sub": str(getattr(user, 'username', '')), "id": u_id, "role": user_role}
         access_token = create_access_token(data=token_data)
         
-        # Mark Attendance (IST) in background so login is NOT blocked by Sheets API
+        # Mark Attendance (IST) in background
         def mark_attendance_bg(uid):
              try:
                  from app.services import attendance_service
@@ -64,7 +64,7 @@ async def login(credentials: LoginRequest, background_tasks: BackgroundTasks, db
                  new_db = get_sheets_db()
                  attendance_service.mark_present(db=new_db, user_id=uid)
              except Exception as e:
-                 print(f"⚠️ Background Attendance mark failed: {e}")
+                 print(f"Background Attendance mark failed: {e}")
 
         background_tasks.add_task(mark_attendance_bg, u_id)
  
@@ -243,13 +243,13 @@ async def signup(user_data: dict, db: any = Depends(get_db)):
 @router.post("/logout")
 async def logout(current_user: User = Depends(get_current_active_user), db: any = Depends(get_db)):
     """
-    Handle user logout.
-    This is ONLY called when user clicks the LOGOUT button.
-    Records check-out time in attendance.
+    Handle user logout and update attendance.
     """
     try:
         from app.services import attendance_service
-        res = attendance_service.mark_checkout(db=db, user_id=getattr(current_user, 'id', ''))
+        u_id = str(getattr(current_user, 'user_id', getattr(current_user, 'id', '')))
+        res = attendance_service.mark_checkout(db=db, user_id=u_id)
         return {"message": "Logged out", "checkout": res}
     except Exception as e:
+        print(f"Logout error: {e}")
         return {"message": "Logged out", "error": str(e)}

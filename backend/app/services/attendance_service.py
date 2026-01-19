@@ -21,24 +21,26 @@ def mark_present(db: SheetsDB, user_id: str, ip_address: Optional[str] = None) -
         existing = next((a for a in all_att if str(a.get("user_id")) == str(user_id) and str(a.get("date")) == today_str), None)
         
         if existing:
-            # Already has a record for today, ensure login_time is set
+            # Update missing login_time or status
+            updates = {}
             if not existing.get("login_time"):
-                sheets_repo.update("attendance", existing["attendance_id"], {"login_time": now_ist})
-            return {"status": "success", "message": "Attendance already marked", "data": existing}
+                updates["login_time"] = now_ist
+            if str(existing.get("status", "")).lower() != "present":
+                updates["status"] = "Present"
+            
+            if updates:
+                sheets_repo.update("attendance", existing["attendance_id"], updates)
+            return {"status": "success", "message": "Attendance marked", "data": existing}
         
         # 2. Create new record
         att_id = f"att_{user_id}_{today_str.replace('-', '')}"
         record = {
             "attendance_id": att_id,
-            "id": att_id,
             "user_id": str(user_id),
             "date": today_str,
             "login_time": now_ist,
             "logout_time": "",
-            "status": "Present",
-            "is_deleted": False,
-            "created_at": now_ist,
-            "updated_at": now_ist
+            "status": "Present"
         }
         
         inserted = sheets_repo.insert("attendance", record)
@@ -68,8 +70,7 @@ def mark_checkout(db: SheetsDB, user_id: str) -> dict:
             return {"status": "success", "message": "Already checked out", "data": existing}
 
         sheets_repo.update("attendance", existing["attendance_id"], {
-            "logout_time": now_ist,
-            "updated_at": now_ist
+            "logout_time": now_ist
         })
         
         return {"status": "success", "message": "Checked out successfully"}
@@ -87,152 +88,75 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         if not target_date_str:
             target_date_str = get_today_date_ist().isoformat()
             
-        target_date_compare = str(target_date_str).split('T')[0].split(' ')[0]
+        target_date_compare = str(target_date_str).split('T')[0]
         
-        # Robust date match for DD/MM/YYYY and ISO formats
-        def dates_match(row_date, target_date):
-            if not row_date or not target_date: return False
-            r_str = str(row_date).strip().split('T')[0].split(' ')[0]
-            t_str = str(target_date).strip().split('T')[0].split(' ')[0]
-            if r_str == t_str: return True
-            
-            # Alternative: Try converting DD/MM/YYYY to YYYY-MM-DD
-            try:
-                if '/' in r_str:
-                    parts = r_str.split('/')
-                    if len(parts) == 3:
-                        # Handle 15/1/2026 or 15/01/2026
-                        d, m, y = parts
-                        norm_r = f"{y}-{m.zfill(2)}-{d.zfill(2)}"
-                        if norm_r == t_str: return True
-            except: pass
-            return False
-
-        # Get all users and filter by tracked roles
-        tracked_roles = ['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master', 'fab master', 'file master']
-        all_users = db.query(User).all()
-        active_users = []
-        for u in all_users:
-            if getattr(u, 'is_deleted', False): continue
-            
-            # Use strip and lower for robust matching
-            approval_status = str(getattr(u, 'approval_status', '')).strip().lower()
-            role = str(getattr(u, 'role', '')).strip().lower()
-            
-            # Accept 'approved' or 'active' or empty/none if admin
-            is_approved = approval_status in ['approved', 'active', '1', 'true', 'yes']
-            
-            if is_approved and role in tracked_roles:
-                active_users.append(u)
+        # 1. Fetch all users and attendance
+        from app.repositories.sheets_repository import sheets_repo
+        all_users = sheets_repo.get_all("users") # active=True filtered by repo.get_all
+        all_att = sheets_repo.get_all("attendance")
         
-        # Get all attendance
-        all_att = db.query(Attendance).all()
-        
+        # 2. Build attendance map for target date
         attendance_map = {}
         for a in all_att:
-            if getattr(a, 'is_deleted', False): continue
-            
-            if dates_match(getattr(a, 'date', ''), target_date_compare):
-                uid = str(getattr(a, 'user_id', '')).strip()
-                if not uid: continue
-                # Keep the latest record if multiple exist
-                attendance_map[uid] = a
+            # Simple date comparison
+            row_date = str(a.get("date", "")).split('T')[0]
+            if row_date == target_date_compare:
+                uid = str(a.get("user_id", "")).strip()
+                if uid:
+                    attendance_map[uid] = a
         
-        present_users = []
+        present_records = []
         absent_users = []
-        records = []
         
-        for user in active_users:
-            user_id_str = str(getattr(user, 'id', ''))
-            user_info = {
-                "id": user_id_str,
-                "name": getattr(user, 'full_name', '') or getattr(user, 'username', ''),
-                "username": getattr(user, 'username', ''),
-                "role": getattr(user, 'role', ''),
-                "unit_id": getattr(user, 'unit_id', '')
-            }
+        # 3. Tracked roles
+        tracked_roles = ['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master']
+        
+        for user in all_users:
+            # Robust active check for dict-based user data
+            u_active = str(user.get("active", "true")).lower().strip()
+            if u_active not in ["true", "1", "yes", "active"]:
+                continue
+                
+            u_role = str(user.get("role", "")).lower().strip()
+            if u_role not in tracked_roles:
+                continue
+                
+            u_id = str(user.get("user_id", user.get("id", "")))
+            u_name = str(user.get("username", ""))
             
-            attendance = attendance_map.get(user_id_str)
+            att = attendance_map.get(u_id)
             
-            if attendance and str(getattr(attendance, 'status', '')).lower() == 'present':
-                att_data = {
-                    "status": "Present",
-                    "check_in": str(getattr(attendance, 'check_in', '') or ""),
-                    "check_out": str(getattr(attendance, 'check_out', '') or ""),
-                    "login_time": str(getattr(attendance, 'login_time', '') or "")
-                }
-                present_users.append({**user_info, **att_data})
-                records.append({
-                    "user_id": user_id_str,
-                    "user": user_info["name"],
-                    "username": user_info["username"],
-                    "role": user_info["role"],
-                    "check_in": att_data['check_in'],
-                    "check_out": att_data['check_out'],
+            if att and str(att.get("status", "")).lower() == "present":
+                present_records.append({
+                    "user_id": u_id,
+                    "username": u_name,
+                    "role": u_role,
+                    "login_time": str(att.get("login_time", "")),
+                    "logout_time": str(att.get("logout_time", "")),
                     "status": "Present",
                     "date": target_date_compare
                 })
             else:
-                absent_users.append(user_info)
+                absent_users.append({
+                    "user_id": u_id,
+                    "username": u_name,
+                    "role": u_role
+                })
 
         return {
             "success": True,
             "date": target_date_compare,
-            "total_tracked": len(active_users),
-            "present": len(present_users), 
-            "absent": len(absent_users),   
-            "present_count": len(present_users),
+            "present_count": len(present_records),
             "absent_count": len(absent_users),
-            "present_users": present_users,
-            "absent_users": absent_users,
-            "records": records,            
-            "all_records": records
+            "records": present_records, # For compatibility with UI showing Present list
+            "all_records": present_records + [{"user_id": u["user_id"], "username": u["username"], "status": "Absent"} for u in absent_users],
+            "present_users": present_records,
+            "absent_users": absent_users
         }
     except Exception as e:
         print(f"❌ Error in get_attendance_summary: {e}")
-        return {
-            "success": False,
-            "date": str(target_date_str),
-            "total_tracked": 0,
-            "present": 0,
-            "absent": 0,
-            "present_users": [],
-            "absent_users": [],
-            "records": []
-        }
+        return {"success": False, "error": str(e)}
 
 def get_all_attendance(db: SheetsDB, target_date_str: Optional[str] = None):
-    """Implementation of mandatory task: Fetch all attendance records."""
-    try:
-        # If date is provided, return for that date
-        if target_date_str:
-             results = get_attendance_summary(db, target_date_str)
-             if results.get("success"):
-                 return results.get("all_records", [])
-             return []
-        
-        # If no date, return ALL attendance records from cache
-        all_att = db.query(Attendance).all()
-        all_users = db.query(User).all()
-        user_map = {str(getattr(u, 'id', '')): u for u in all_users}
-        
-        results = []
-        for a in all_att:
-            if getattr(a, 'is_deleted', False): continue
-            uid = str(getattr(a, 'user_id', ''))
-            user = user_map.get(uid)
-            results.append({
-                "id": str(getattr(a, 'id', '')),
-                "user_id": uid,
-                "user": getattr(user, 'full_name', '') or getattr(user, 'username', 'Unknown'),
-                "username": getattr(user, 'username', 'Unknown'),
-                "status": getattr(a, 'status', ''),
-                "date": str(getattr(a, 'date', '')).split('T')[0],
-                "check_in": str(getattr(a, 'check_in', '') or ""),
-                "check_out": str(getattr(a, 'check_out', '') or ""),
-                "login_time": str(getattr(a, 'login_time', '') or "")
-            })
-        return results
-    except Exception as e:
-        print(f"❌ Error in get_all_attendance: {e}")
-        return []
+    """Fetch all attendance records with user info injected."""
+    return get_attendance_summary(db, target_date_str).get("records", [])
