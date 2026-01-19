@@ -303,3 +303,19 @@ class SheetsDB:
 def get_sheets_db():
     return SheetsDB()
 
+def verify_sheets_structure():
+    """
+    Mandatory startup verification: Ensure all tables exist in Google Sheets.
+    Creates missing sheets automatically.
+    """
+    print("🔍 [Startup] Verifying Google Sheets structure...")
+    try:
+        for sheet_name, headers in SHEETS_SCHEMA.items():
+            # Trigger creation/verification
+            google_sheets.ensure_worksheet(sheet_name, headers)
+        print("✅ [Startup] All required sheets verified and accessible.")
+    except Exception as e:
+        print(f"❌ [Startup] Critical Error verifying sheets: {e}")
+        # In production, we should probably fail fast if we can't reach sheets
+        raise RuntimeError(f"Startup failed: Google Sheets structure is invalid or inaccessible: {e}")
+

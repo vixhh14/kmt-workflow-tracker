@@ -95,18 +95,39 @@ class GoogleSheetsService:
         return self._spreadsheet
 
     def get_worksheet(self, name: str):
-        """Returns a gspread Worksheet object by name."""
+        """Returns a gspread Worksheet object by name (exact or case-insensitive fallback)."""
+        spreadsheet = self._get_spreadsheet()
         try:
-            return self._get_spreadsheet().worksheet(name)
+            return spreadsheet.worksheet(name)
         except gspread.WorksheetNotFound:
-            print(f"⚠️ Worksheet '{name}' not found. Attempting to find by title case or lowercase...")
             # Try case-insensitive fallback
-            for sheet in self._get_spreadsheet().worksheets():
+            for sheet in spreadsheet.worksheets():
                 if sheet.title.lower() == name.lower():
                     return sheet
             raise
         except Exception as e:
             print(f"❌ Error getting worksheet {name}: {e}")
+            raise
+
+    def ensure_worksheet(self, name: str, expected_headers: List[str]):
+        """Verifies worksheet exists; creates it with headers if missing."""
+        try:
+            # First, check if it exists (case-insensitive)
+            try:
+                ws = self.get_worksheet(name)
+                print(f"✅ Worksheet verified: {ws.title}")
+                return ws
+            except gspread.WorksheetNotFound:
+                # Create it
+                print(f"✨ Creating missing worksheet: {name}")
+                spreadsheet = self._get_spreadsheet()
+                ws = spreadsheet.add_worksheet(title=name, rows="100", cols=str(len(expected_headers)))
+                # Add headers immediately
+                ws.append_row(expected_headers)
+                print(f"🚀 Worksheet '{name}' created with {len(expected_headers)} headers.")
+                return ws
+        except Exception as e:
+            print(f"❌ Critical error ensuring worksheet {name}: {e}")
             raise
 
     def _normalize_header(self, h: str) -> str:

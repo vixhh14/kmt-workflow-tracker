@@ -32,33 +32,54 @@ async def read_machines(db: Any = Depends(get_db)):
         
     return results
 
-@router.post("", response_model=MachineOut)
+@router.post("", response_model=MachineOut, status_code=201)
 async def create_machine(machine: MachineCreate, db: Any = Depends(get_db)):
-    # Mandatory: Check uniqueness of machine_name (case-insensitive and trimmed)
+    """Creates a machine using plain dictionary (Sheets-native)."""
+    # 1. Mandatory Uniqueness Check
     new_name = machine.machine_name.strip()
     existing = db.query(Machine).all()
     if any(str(getattr(m, 'machine_name', '')).strip().lower() == new_name.lower() and not getattr(m, 'is_deleted', False) for m in existing):
         raise HTTPException(status_code=400, detail=f"Machine with name '{new_name}' already exists")
 
-    new_m = Machine(
-        **machine.dict(),
-        created_at=get_current_time_ist().isoformat(),
-        status="active",
-        is_active=True,
-        is_deleted=False
-    )
-    db.add(new_m)
-    db.commit()
-    return new_m
+    # 2. Build Plain Dictionary (Avoids model constructor conflicts)
+    m_id = str(uuid.uuid4())
+    now = get_current_time_ist().isoformat()
+    
+    # Extract data from Pydantic model
+    payload = machine.dict()
+    
+    # Build canonical row data
+    new_m_data = {
+        **payload,
+        "id": m_id,
+        "machine_id": m_id,
+        "created_at": now,
+        "updated_at": now,
+        "status": payload.get("status", "active"), # Explicitly handle status
+        "is_active": True,
+        "is_deleted": False
+    }
+    
+    # 3. Insert directly via repository
+    # db.add(new_m) would normally work with SheetsDB if we used models,
+    # but the user requested avoiding models to stop keyword conflicts.
+    # SheetsDB.add accepts instances. Let's use db.repository.insert for raw dict.
+    from app.repositories.sheets_repository import sheets_repo
+    try:
+        inserted = sheets_repo.insert("machines", new_m_data)
+        return inserted
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to write to Google Sheets: {e}")
 
 @router.put("/{machine_id}", response_model=MachineOut)
 async def update_machine(machine_id: str, machine_update: MachineUpdate, db: Any = Depends(get_db)):
+    """Updates a machine using plain dict updates."""
     m = db.query(Machine).filter(id=machine_id).first()
     if not m: raise HTTPException(status_code=404, detail="Machine not found")
     
     data = machine_update.dict(exclude_unset=True)
     
-    # If name is being changed, check uniqueness
+    # Check uniqueness if name changes
     if "machine_name" in data:
         new_name = data["machine_name"].strip()
         if new_name.lower() != str(getattr(m, 'machine_name', '')).strip().lower():
@@ -66,20 +87,27 @@ async def update_machine(machine_id: str, machine_update: MachineUpdate, db: Any
             if any(str(getattr(ex, 'machine_name', '')).strip().lower() == new_name.lower() and str(getattr(ex, 'id', '')) != machine_id and not getattr(ex, 'is_deleted', False) for ex in existing):
                 raise HTTPException(status_code=400, detail=f"Machine name '{new_name}' taken")
 
-    for k, v in data.items():
-        setattr(m, k, v)
-    m.updated_at = get_current_time_ist().isoformat()
-    db.commit()
-    return m
+    # Update row data
+    from app.repositories.sheets_repository import sheets_repo
+    data["updated_at"] = get_current_time_ist().isoformat()
+    
+    success = sheets_repo.update("machines", machine_id, data)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to update Google Sheets")
+    
+    # Return updated object
+    return {**m.dict(), **data}
 
 @router.delete("/{machine_id}")
 async def delete_machine(machine_id: str, db: Any = Depends(get_db)):
-    m = db.query(Machine).filter(id=machine_id).first()
-    if not m: raise HTTPException(status_code=404, detail="Machine not found")
-    # Soft delete: sets is_active to False as per user request
-    m.is_active = False
-    m.is_deleted = True # Also mark deleted for backend filtering consistency
-    m.updated_at = get_current_time_ist().isoformat()
-    db.commit()
+    """Soft delete machine."""
+    from app.repositories.sheets_repository import sheets_repo
+    success = sheets_repo.update("machines", machine_id, {
+        "is_active": False,
+        "is_deleted": True,
+        "updated_at": get_current_time_ist().isoformat()
+    })
+    if not success:
+         raise HTTPException(status_code=500, detail="Failed to delete from Google Sheets")
     return {"message": "Success"}
 

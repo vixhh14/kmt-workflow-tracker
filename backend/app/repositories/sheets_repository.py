@@ -27,15 +27,17 @@ class SheetsRepository:
             with _CACHE_LOCK:
                 if sheet_name in _GLOBAL_CACHE and now < _CACHE_EXPIRY.get(sheet_name, 0):
                     return _GLOBAL_CACHE[sheet_name]
-                # Negative cache check - if we failed recently, return empty to stop storms
-                if sheet_name in _NO_CACHE and now < _NO_CACHE[sheet_name]:
-                     print(f"🛑 [SheetsRepo] Skipping fetch for {sheet_name} (Negative Cache)")
-                     return []
 
         # Cache expired or missing, refresh it
         try:
             # One bulk read per sheet
-            data = google_sheets.read_all_bulk(sheet_name)
+            try:
+                data = google_sheets.read_all_bulk(sheet_name)
+            except gspread.exceptions.WorksheetNotFound:
+                # If worksheet is missing, we DONOR cache a failure. 
+                # Instead, we return empty and let the caller/startup handle creation or error.
+                print(f"⚠️ [SheetsRepo] Worksheet '{sheet_name}' not found.")
+                return []
             
             # Extract raw headers for mapping
             raw_headers = []
@@ -47,7 +49,6 @@ class SheetsRepository:
             with _CACHE_LOCK:
                 _GLOBAL_CACHE[sheet_name] = data
                 _CACHE_EXPIRY[sheet_name] = now + CACHE_TTL
-                if sheet_name in _NO_CACHE: del _NO_CACHE[sheet_name]
                 
                 if raw_headers:
                     _RAW_HEADERS[sheet_name] = raw_headers
@@ -63,9 +64,7 @@ class SheetsRepository:
         except Exception as e:
             print(f"❌ [SheetsRepo] Failed to fetch {sheet_name}: {e}")
             with _CACHE_LOCK:
-                # Set negative cache for 30 seconds
-                _NO_CACHE[sheet_name] = now + 30
-                # Fallback to expired cache if available
+                # Fallback to expired cache if available, but never cache long-term failure
                 if sheet_name in _GLOBAL_CACHE:
                     return _GLOBAL_CACHE[sheet_name]
                 return []

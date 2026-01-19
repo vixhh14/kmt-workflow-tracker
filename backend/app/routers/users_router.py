@@ -14,7 +14,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 
 @router.post("/", response_model=UserOut)
 async def create_user(user_data: UserCreate, db: any = Depends(get_db), current_admin: User = Depends(get_current_active_admin)):
-    """Allow admin to create a new user manually."""
+    """Allow admin to create a new user manually using Sheets-native dict."""
     all_users = db.query(User).all()
     if any(str(getattr(u, 'username', '')).lower() == user_data.username.lower() for u in all_users):
         raise HTTPException(status_code=400, detail="Username already exists")
@@ -23,15 +23,30 @@ async def create_user(user_data: UserCreate, db: any = Depends(get_db), current_
     if not is_valid:
         raise HTTPException(status_code=400, detail=errors[0])
     
-    new_user = User(
+    from app.repositories.sheets_repository import sheets_repo
+    from app.core.time_utils import get_current_time_ist
+    
+    u_id = str(uuid4())
+    now = get_current_time_ist().isoformat()
+    
+    # 1. Build canonical dict
+    user_dict = {
         **user_data.dict(exclude={'password'}),
-        password_hash=hash_password(user_data.password),
-        approval_status='approved', # Admin added users are auto-approved
-        active=True
-    )
-    db.add(new_user)
-    db.commit()
-    return new_user
+        "user_id": u_id,
+        "id": u_id,
+        "password": hash_password(user_data.password), # Map to 'password' column
+        "approval_status": 'approved',
+        "is_active": True,
+        "is_deleted": False,
+        "created_at": now,
+        "updated_at": now
+    }
+    
+    try:
+        inserted = sheets_repo.insert("users", user_dict)
+        return inserted
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save user to Google Sheets: {e}")
 
 @router.get("/", response_model=List[UserOut])
 async def list_users(exclude_id: Optional[str] = None, db: any = Depends(get_db)):
@@ -58,18 +73,39 @@ async def update_user(user_id: str, user_update: UserUpdate, db: any = Depends(g
     u = db.query(User).filter(id=user_id).first()
     if not u or getattr(u, 'is_deleted', False): raise HTTPException(status_code=404, detail="User not found")
     
-    data = user_update.dict(exclude_none=True)
-    for k, v in data.items():
-        setattr(u, k, v)
-    u.updated_at = datetime.now().isoformat()
-    db.commit()
-    return u
+    from app.repositories.sheets_repository import sheets_repo
+    from app.core.time_utils import get_current_time_ist
+    
+    # 1. Prepare Update Dictionary (Plain Dict)
+    data = user_update.dict(exclude_unset=True)
+    data["updated_at"] = get_current_time_ist().isoformat()
+    
+    try:
+        # 2. Strict Sheet Write
+        success = sheets_repo.update("users", user_id, data)
+        if not success: raise RuntimeError("Sheets update returned False")
+        
+        # 3. Return combined state
+        return {**u.dict(), **data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update user in Google Sheets: {e}")
 
 @router.delete("/{user_id}")
 async def delete_user(user_id: str, db: any = Depends(get_db), current_admin: User = Depends(get_current_active_admin)):
     u = db.query(User).filter(id=user_id).first()
     if not u or getattr(u, 'is_deleted', False): raise HTTPException(status_code=404, detail="User not found")
-    u.is_deleted = True
-    u.updated_at = datetime.now().isoformat()
-    db.commit()
-    return {"message": "Deleted"}
+    
+    from app.repositories.sheets_repository import sheets_repo
+    from app.core.time_utils import get_current_time_ist
+    
+    try:
+        # 1. Soft Delete via Mandatory Status Update
+        success = sheets_repo.update("users", user_id, {
+            "is_deleted": True,
+            "is_active": False,
+            "updated_at": get_current_time_ist().isoformat()
+        })
+        if not success: raise RuntimeError("Sheets update returned False")
+        return {"message": "Deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete user from Google Sheets: {e}")

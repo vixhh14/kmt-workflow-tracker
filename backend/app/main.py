@@ -87,8 +87,17 @@ async def root():
 @app.on_event("startup")
 async def startup_event():
     """
-    Startup tasks for Google Sheets backend.
+    Mandatory startup tasks for Google Sheets backend.
+    Ensures all required worksheets and headers exist.
     """
-    print("🚀 App starting with Google Sheets Backend")
-    print(f"📊 Using Spreadsheet ID: {os.getenv('GOOGLE_SHEET_ID')}")
-    print("✅ Startup completed")
+    print("🚀 [Startup] Initializing Google Sheets Backend...")
+    try:
+        from app.core.sheets_db import verify_sheets_structure
+        verify_sheets_structure()
+        print("✅ [Startup] Google Sheets initialization complete.")
+    except Exception as e:
+        print(f"🛑 [Startup] CRITICAL FAILURE: {e}")
+        # We don't raise here to allow the app to start (partially) for debugging, 
+        # but in strict production, raising would be better.
+        # Actually, per user request: "Fail fast if critical sheets are missing"
+        raise RuntimeError(f"Backend failed to start: {e}")

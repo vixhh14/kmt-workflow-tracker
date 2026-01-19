@@ -41,29 +41,37 @@ def mark_present(db: SheetsDB, user_id: str, ip_address: Optional[str] = None) -
         
         if existing_attendance:
             # If already logged in today, just update login_time but keep original check_in
+            upd_data = {}
             if not getattr(existing_attendance, 'login_time', None):
-                existing_attendance.login_time = now_ist.isoformat()
+                upd_data["login_time"] = now_ist.isoformat()
             if ip_address:
-                existing_attendance.ip_address = ip_address
+                upd_data["ip_address"] = ip_address
             
-            db.commit()
+            if upd_data:
+                from app.repositories.sheets_repository import sheets_repo
+                sheets_repo.update("attendance", existing_attendance.id, upd_data)
+            
             return {"status": "success", "message": "Attendance already marked", "data": existing_attendance.dict()}
         else:
-            # Create new attendance record
-            new_attendance = Attendance(
-                date=today_str,
-                user_id=str(user_id),
-                status="Present",
-                check_in=now_ist.isoformat(),
-                login_time=now_ist.isoformat(),
-                ip_address=ip_address or "unknown",
-                created_at=now_ist.isoformat(),
-                is_deleted=False
-            )
+            # Create new attendance record using plain DICT
+            import uuid
+            att_id = f"att_{int(now_ist.timestamp())}"
+            new_attendance = {
+                "id": att_id,
+                "date": today_str,
+                "user_id": str(user_id),
+                "status": "Present",
+                "check_in": now_ist.isoformat(),
+                "login_time": now_ist.isoformat(),
+                "ip_address": ip_address or "unknown",
+                "created_at": now_ist.isoformat(),
+                "updated_at": now_ist.isoformat(),
+                "is_deleted": False
+            }
             
-            db.add(new_attendance)
-            db.commit()
-            return {"status": "success", "message": "Checked in successfully", "data": new_attendance.dict()}
+            from app.repositories.sheets_repository import sheets_repo
+            inserted = sheets_repo.insert("attendance", new_attendance)
+            return {"status": "success", "message": "Checked in successfully", "data": inserted}
     
     except Exception as e:
         print(f"❌ Error in mark_present: {e}")
@@ -113,11 +121,15 @@ def mark_checkout(db: SheetsDB, user_id: str) -> dict:
         if getattr(attendance, 'check_out', None) and str(getattr(attendance, 'check_out', '')).strip():
             return {"status": "success", "message": "Already checked out", "data": attendance.dict()}
 
-        attendance.check_out = now_ist.isoformat()
-        attendance.updated_at = now_ist.isoformat()
-        db.commit()
+        from app.repositories.sheets_repository import sheets_repo
+        data = {
+            "check_out": now_ist.isoformat(),
+            "updated_at": now_ist.isoformat()
+        }
+        success = sheets_repo.update("attendance", attendance.id, data)
+        if not success: raise RuntimeError("Sheets update returned False")
         
-        return {"status": "success", "message": "Checked out successfully", "data": attendance.dict()}
+        return {"status": "success", "message": "Checked out successfully", "data": {**attendance.dict(), **data}}
     
     except Exception as e:
         print(f"❌ Error in mark_checkout: {e}")

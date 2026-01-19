@@ -158,46 +158,52 @@ async def create_task(
     priority_norm = (task.priority or "MEDIUM").upper()
     if priority_norm not in ["LOW", "MEDIUM", "HIGH"]:
         priority_norm = "MEDIUM"
-    assigned_by = getattr(current_user, 'id', '')
+    assigned_by = str(getattr(current_user, 'id', ''))
+    now_ist = get_current_time_ist().isoformat()
+    t_id = str(uuid.uuid4())
 
     try:
-        new_task = Task(
-            title=task.title.strip(),
-            description=task.description.strip() if task.description else None,
-            project=project_name,
-            project_id=task.project_id,
-            part_item=task.part_item.strip() if task.part_item else None,
-            nos_unit=task.nos_unit.strip() if task.nos_unit else None,
-            status=task.status or "pending",
-            priority=priority_norm,
-            assigned_by=assigned_by,
-            assigned_to=assigned_to,
-            machine_id=task.machine_id,
-            due_date=task.due_date,
+        # 5. Build canonical row data (Plain Dictionary)
+        # Replaces Task() instantiation to avoid keyword conflicts
+        new_task_data = {
+            "id": t_id,
+            "title": task.title.strip(),
+            "description": task.description.strip() if task.description else "",
+            "project_id": task.project_id if task.project_id else "",
+            "project": project_name,
+            "part_item": task.part_item.strip() if task.part_item else "",
+            "nos_unit": task.nos_unit.strip() if task.nos_unit else "",
+            "status": task.status or "pending",
+            "priority": priority_norm,
+            "assigned_by": assigned_by,
+            "assigned_to": str(assigned_to) if assigned_to else "",
+            "machine_id": str(task.machine_id) if task.machine_id else "",
+            "due_date": str(task.due_date) if task.due_date else "",
+            "work_order_number": task.work_order_number.strip(),
+            "created_at": now_ist,
+            "updated_at": now_ist,
+            "is_deleted": False,
+            "total_duration_seconds": 0,
+            "total_held_seconds": 0,
+            "expected_completion_time": 0
+        }
+        
+        # 6. Insert directly via Sheets Repository
+        from app.repositories.sheets_repository import sheets_repo
+        inserted = sheets_repo.insert("tasks", new_task_data)
+        
+        # Ensure 'project' field is present for response (if not in inserted)
+        if "project" not in inserted:
+            inserted["project"] = project_name
+            
+        print(f"✅ Task created successfully in GS: {t_id}")
+        return inserted
 
-            work_order_number=task.work_order_number.strip(),
-            created_at=get_current_time_ist(),
-        )
-        
-        db.add(new_task)
-        db.commit()
-        
-        # Return as dict to be safe with response_model=dict
-        task_dict = {k: getattr(new_task, k) for k in SHEETS_SCHEMA["Tasks"] if hasattr(new_task, k)}
-        # Set 'id' from 'task_id' for frontend compatibility if needed, or just let schema handle it
-        if "id" not in task_dict: task_dict["id"] = new_task.task_id
-        # Ensure datetimes are ISO strings for the dict
-        for key, value in task_dict.items():
-            if isinstance(value, datetime):
-                task_dict[key] = value.isoformat()
-        
-        return task_dict
     except Exception as e:
-        # db.rollback() # SheetsDB doesn't have rollback
         print(f"❌ Error in create_task: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Critical database error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to write task to Google Sheets: {str(e)}")
 
 # Get task time logs for a specific task
 @router.get("/{task_id}/time-logs", response_model=List[dict])

@@ -41,18 +41,36 @@ async def get_pending_approvals(db: any = Depends(get_db)):
 async def approve_user(user_id: str, action: ApprovalAction, approved_by: str = "admin", db: any = Depends(get_db)):
     user = db.query(UserModel).filter(id=user_id).first()
     if not user: raise HTTPException(status_code=404, detail="User not found")
-    user.approval_status = 'approved'
-    user.updated_at = get_current_time_ist().isoformat()
-    if action.notes: user.notes = action.notes
-    db.commit()
+    
+    from app.repositories.sheets_repository import sheets_repo
+    from app.core.time_utils import get_current_time_ist
+    
+    update_data = {
+        "approval_status": 'approved',
+        "updated_at": get_current_time_ist().isoformat()
+    }
+    if action.notes: update_data["notes"] = action.notes
+    
+    success = sheets_repo.update("users", user_id, update_data)
+    if not success: raise HTTPException(status_code=500, detail="Failed to update Google Sheets")
+    
     return {"message": f"User {user_id} approved"}
 
 @router.post("/{user_id}/reject")
 async def reject_user(user_id: str, action: ApprovalAction, rejected_by: str = "admin", db: any = Depends(get_db)):
     user = db.query(UserModel).filter(id=user_id).first()
     if not user: raise HTTPException(status_code=404, detail="User not found")
-    user.approval_status = 'rejected'
-    user.updated_at = get_current_time_ist().isoformat()
-    if action.notes: user.notes = action.notes
-    db.commit()
+    
+    from app.repositories.sheets_repository import sheets_repo
+    from app.core.time_utils import get_current_time_ist
+    
+    update_data = {
+        "approval_status": 'rejected',
+        "updated_at": get_current_time_ist().isoformat()
+    }
+    if action.notes: update_data["notes"] = action.notes
+    
+    success = sheets_repo.update("users", user_id, update_data)
+    if not success: raise HTTPException(status_code=500, detail="Failed to update Google Sheets")
+    
     return {"message": f"User {user_id} rejected"}
