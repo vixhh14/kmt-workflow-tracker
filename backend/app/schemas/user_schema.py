@@ -17,10 +17,8 @@ class UserUpdate(BaseModel):
 
 class UserOut(UserBase):
     user_id: str
-    id: str # Alias for user_id
     active: bool = True
     created_at: Optional[Union[datetime, str]] = None
-    password_hash: Optional[str] = None
 
     @field_serializer('created_at')
     def serialize_dt(self, dt: Optional[Union[datetime, str]], _info):

@@ -36,8 +36,8 @@ async def login(credentials: LoginRequest, background_tasks: BackgroundTasks, db
         if not user:
             raise HTTPException(status_code=401, detail="Incorrect username or password")
         
-        # Define user_role before use
-        user_role = str(getattr(user, 'role', 'operator') or "operator").lower().strip()
+        # Standardize on role everywhere as per core principles
+        role = str(getattr(user, 'role', 'operator') or "operator").lower().strip()
 
         # Status check
         if not bool(getattr(user, 'active', True)):
@@ -53,7 +53,7 @@ async def login(credentials: LoginRequest, background_tasks: BackgroundTasks, db
         
         # JWT Token
         u_id = str(getattr(user, 'user_id', getattr(user, 'id', '')))
-        token_data = {"sub": str(getattr(user, 'username', '')), "id": u_id, "role": user_role}
+        token_data = {"sub": str(getattr(user, 'username', '')), "id": u_id, "role": role}
         access_token = create_access_token(data=token_data)
         
         # Mark Attendance (IST) in background
@@ -73,10 +73,10 @@ async def login(credentials: LoginRequest, background_tasks: BackgroundTasks, db
             token_type="bearer",
             user={
                 "id": u_id,
+                "user_id": u_id,
                 "username": str(getattr(user, 'username', '')),
                 "email": str(getattr(user, 'email', '') or ""),
-                "role": str(user_role),
-                "full_name": str(getattr(user, 'username', '')) # Fallback as full_name is removed from lean schema
+                "role": role
             }
         )
     except HTTPException: raise
@@ -231,7 +231,8 @@ async def signup(user_data: dict, db: any = Depends(get_db)):
         "email": user_data['email'],
         "active": True, # Always write active=TRUE as per mandatory rules
         "created_at": now,
-        "password_hash": hash_password(user_data['password'])
+        "password_hash": hash_password(user_data['password']),
+        "approval_status": "pending"
     }
     
     try:

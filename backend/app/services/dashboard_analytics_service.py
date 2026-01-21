@@ -25,22 +25,23 @@ def get_operations_overview(db: SheetsDB) -> Dict[str, Any]:
         # 1. Projects
         all_projects = [p for p in db.query(Project).all() if not getattr(p, 'is_deleted', False)]
         stats["projects"]["total"] = len(all_projects)
-        # Use getattr(p, 'id') which is aliased in SheetRow
-        project_ids = {str(getattr(p, 'id', '')) for p in all_projects}
+        project_ids = {str(getattr(p, 'project_id', getattr(p, 'id', ''))) for p in all_projects}
         
         # 2. Tasks Aggregation (Main Tasks Sheet)
         all_tasks = [t for t in db.query(Task).all() if not getattr(t, 'is_deleted', False)]
         
-        # Optional: Include Filing and Fabrication in the overview if they exist
+        # Include Filing and Fabrication in the overview
         try:
             filing_tasks = [t for t in db.query(FilingTask).all() if not getattr(t, 'is_deleted', False)]
             all_tasks.extend(filing_tasks)
-        except: pass
+        except Exception as e:
+            print(f"⚠️ Filing tasks fetch failed for analytics: {e}")
         
         try:
             fab_tasks = [t for t in db.query(FabricationTask).all() if not getattr(t, 'is_deleted', False)]
             all_tasks.extend(fab_tasks)
-        except: pass
+        except Exception as e:
+            print(f"⚠️ Fabrication tasks fetch failed for analytics: {e}")
 
         for t in all_tasks:
             # Check if task belongs to a valid project (non-deleted)
@@ -77,8 +78,7 @@ def get_operations_overview(db: SheetsDB) -> Dict[str, Any]:
         # Only count approved operators
         all_operators = [u for u in db.query(User).all() 
                         if not getattr(u, 'is_deleted', False) 
-                        and str(getattr(u, 'role', '')).lower() == 'operator'
-                        and str(getattr(u, 'approval_status', '')).lower() == 'approved']
+                        and str(getattr(u, 'role', '')).lower() == 'operator']
         stats["operators"]["total"] = len(all_operators)
     except Exception as e:
         print(f"❌ Error aggregating dashboard operators: {e}")

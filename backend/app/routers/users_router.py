@@ -93,13 +93,13 @@ async def search_users(q: str, db: any = Depends(get_db)):
 
 @router.get("/{user_id}", response_model=UserOut)
 async def get_user_by_id(user_id: str, db: any = Depends(get_db)):
-    u = db.query(User).filter(id=user_id).first()
+    u = db.query(User).filter(user_id=user_id).first()
     if not u or getattr(u, 'is_deleted', False): raise HTTPException(status_code=404, detail="User not found")
     return u
 
 @router.put("/{user_id}", response_model=UserOut)
 async def update_user(user_id: str, user_update: UserUpdate, db: any = Depends(get_db), current_admin: User = Depends(get_current_active_admin)):
-    u = db.query(User).filter(id=user_id).first()
+    u = db.query(User).filter(user_id=user_id).first()
     if not u or getattr(u, 'is_deleted', False): raise HTTPException(status_code=404, detail="User not found")
     
     from app.repositories.sheets_repository import sheets_repo
@@ -120,18 +120,32 @@ async def update_user(user_id: str, user_update: UserUpdate, db: any = Depends(g
 
 @router.delete("/{user_id}")
 async def delete_user(user_id: str, db: any = Depends(get_db), current_admin: User = Depends(get_current_active_admin)):
-    u = db.query(User).filter(id=user_id).first()
+    u = db.query(User).filter(user_id=user_id).first()
     if not u or getattr(u, 'is_deleted', False): raise HTTPException(status_code=404, detail="User not found")
     
     from app.repositories.sheets_repository import sheets_repo
-    from app.core.time_utils import get_current_time_ist
     
     try:
         # 1. Soft Delete via Mandatory Status Update
         success = sheets_repo.update("users", user_id, {
-            "active": False
+            "active": False,
+            "is_deleted": True
         })
         if not success: raise RuntimeError("Sheets update returned False")
         return {"message": "Deleted"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete user from Google Sheets: {e}")
+
+@router.get("/{user_id}/operational-tasks")
+async def get_user_operational_tasks(user_id: str, db: any = Depends(get_db)):
+    """Fetch filing and fabrication tasks for a user."""
+    from app.models.models_db import FilingTask, FabricationTask
+    
+    filing = [t.dict() for t in db.query(FilingTask).all() if str(getattr(t, 'assigned_to', '')).lower() == str(user_id).lower() and not getattr(t, 'is_deleted', False)]
+    fabrication = [t.dict() for t in db.query(FabricationTask).all() if str(getattr(t, 'assigned_to', '')).lower() == str(user_id).lower() and not getattr(t, 'is_deleted', False)]
+    
+    return {
+        "filing": filing,
+        "fabrication": fabrication,
+        "tasks": filing + fabrication
+    }

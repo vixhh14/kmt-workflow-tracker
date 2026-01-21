@@ -22,7 +22,6 @@ class MachineUpdate(BaseModel):
 
 class MachineOut(MachineBase):
     machine_id: str
-    id: str # Alias for machine_id
     unit_name: Optional[str] = None
     category_name: Optional[str] = None
     is_deleted: bool = False
@@ -47,9 +46,3 @@ class MachineOut(MachineBase):
         if isinstance(dt, str):
             return dt
         return dt.isoformat()
-
-    @field_serializer('id')
-    def serialize_id(self, v, _info):
-        if v is None:
-            return None
-        return str(v)

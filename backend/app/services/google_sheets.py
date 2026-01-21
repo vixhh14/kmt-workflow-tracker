@@ -134,11 +134,6 @@ class GoogleSheetsService:
         raw_headers = all_values[0]
         normalized_headers = [self._normalize_header(h) for h in raw_headers]
         
-        # Ensure at least one 'id' key for the primary column
-        if "id" not in normalized_headers and len(normalized_headers) > 0:
-            if normalized_headers[0].endswith("_id"):
-                normalized_headers[0] = "id"
-        
         records = []
         for i, values in enumerate(all_values[1:]):
             padded_values = values + [""] * (len(raw_headers) - len(values))
@@ -151,14 +146,17 @@ class GoogleSheetsService:
             records.append(record)
         return records
 
-    def ensure_worksheet(self, name: str, expected_headers: List[str]):
-        """Verifies worksheet exists; creates it with headers if missing."""
+    def ensure_worksheet(self, name: str, expected_headers: List[str], force_headers: bool = False):
+        """Verifies worksheet exists; creates it with headers if missing OR forced."""
         try:
             # First, check if it exists (case-insensitive)
             try:
                 ws = self.get_worksheet(name)
-                # Verify headers if empty
-                if ws.row_count < 1:
+                # Verify headers if empty or forced
+                if force_headers:
+                     ws.update('A1', [expected_headers])
+                elif ws.row_count < 1:
+                     # Only append if totally empty
                      ws.append_row(expected_headers)
                 print(f"✅ Worksheet verified: {ws.title}")
                 return ws
@@ -166,7 +164,7 @@ class GoogleSheetsService:
                 # Create it
                 print(f"✨ Creating missing worksheet: {name}")
                 spreadsheet = self._get_spreadsheet()
-                ws = spreadsheet.add_worksheet(title=name, rows="5000", cols=str(len(expected_headers)))
+                ws = spreadsheet.add_worksheet(title=name, rows="5000", cols=str(max(26, len(expected_headers))))
                 # Add headers immediately
                 ws.append_row(expected_headers)
                 print(f"🚀 Worksheet '{name}' created.")

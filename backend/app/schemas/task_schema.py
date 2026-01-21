@@ -101,7 +101,7 @@ class TaskUpdate(BaseModel):
         return v
 
 class TaskOut(TaskBase):
-    id: str
+    task_id: str
     created_at: Optional[Union[datetime, str]] = None
     updated_at: Optional[Union[datetime, str]] = None
     started_at: Optional[Union[datetime, str]] = None
@@ -126,7 +126,7 @@ class TaskOut(TaskBase):
             return dt
         return dt.isoformat()
 
-    @field_serializer('id', 'project_id', 'machine_id')
+    @field_serializer('task_id', 'project_id', 'machine_id')
     def serialize_id(self, v, _info):
         if v is None:
             return None
@@ -238,7 +238,9 @@ class OperationalTaskUpdate(BaseModel):
         return v
 
 class OperationalTaskOut(OperationalTaskBase):
-    id: str
+    fabrication_task_id: Optional[str] = None
+    filing_task_id: Optional[str] = None
+    id: str 
     created_at: Optional[Union[datetime, str]] = None
     updated_at: Optional[Union[datetime, str]] = None
     
@@ -261,7 +263,7 @@ class OperationalTaskOut(OperationalTaskBase):
             return dt
         return dt.isoformat()
 
-    @field_serializer('id', 'project_id', 'machine_id')
+    @field_serializer('id', 'fabrication_task_id', 'filing_task_id', 'project_id', 'machine_id')
     def serialize_id(self, v, _info):
         if v is None:
             return None

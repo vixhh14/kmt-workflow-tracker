@@ -1,5 +1,10 @@
 
-from typing import Dict, Any, List
+import os
+import gspread
+from google.oauth2.service_account import Credentials
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Worksheet names as specified by user - strictly canonical and locked
 SHEETS_SCHEMA = {
@@ -49,32 +54,35 @@ SHEETS_SCHEMA = {
     "planningtasks": ["planning_task_id", "title", "description", "status", "created_at", "is_deleted", "updated_at"]
 }
 
-def normalize_row(sheet_name: str, data: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Unified normalization layer. Ensures all writes are schema-aligned.
-    """
-    if sheet_name not in SHEETS_SCHEMA:
-        return data
+def repair_headers():
+    sheet_id = os.getenv("GOOGLE_SHEET_ID")
+    if not sheet_id:
+        print("❌ GOOGLE_SHEET_ID missing!")
+        return
 
-    canonical_headers = SHEETS_SCHEMA[sheet_name]
-    normalized = {}
+    print(f"Repairing sheet headers for: {sheet_id}")
+    
+    try:
+        creds = Credentials.from_service_account_file("service_account.json", scopes=["https://www.googleapis.com/auth/spreadsheets"])
+        client = gspread.authorize(creds)
+        spreadsheet = client.open_by_key(sheet_id)
+        
+        current_worksheets = {ws.title: ws for ws in spreadsheet.worksheets()}
+        
+        for name, headers in SHEETS_SCHEMA.items():
+            if name in current_worksheets:
+                ws = current_worksheets[name]
+                print(f"Updating headers for '{name}'...")
+                # Update row 1
+                ws.update('A1', [headers])
+            else:
+                print(f"Sheet '{name}' missing. Creating...")
+                spreadsheet.add_worksheet(title=name, rows="1000", cols="26").update('A1', [headers])
+        
+        print("\n✅ All headers repaired according to SHEETS_SCHEMA!")
+        
+    except Exception as e:
+        print(f"❌ Error during repair: {e}")
 
-    for header in canonical_headers:
-        val = data.get(header, "")
-        
-        # 1. Trim strings
-        if isinstance(val, str):
-            val = val.strip()
-        
-        # 2. Standardize Booleans
-        if header in ["active", "is_active", "is_deleted", "status"]:
-             if isinstance(val, str):
-                 low = val.lower()
-                 if low in ["true", "1", "yes", "active"]: val = True
-                 elif low in ["false", "0", "no", "inactive", ""]: val = False
-             else:
-                 val = bool(val)
-
-        normalized[header] = val
-        
-    return normalized
+if __name__ == "__main__":
+    repair_headers()

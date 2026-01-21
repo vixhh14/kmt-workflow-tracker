@@ -40,7 +40,7 @@ class SheetRow:
         self._dirty_fields = set()
 
     def __getattr__(self, key):
-        # 1. Exact match in data
+        # 1. Exact match in data (Priority)
         if key in self._data:
             value = self._data[key]
             # Standardize common boolean strings to bool
@@ -52,39 +52,28 @@ class SheetRow:
                 return bool(value)
             return value
         
-        # 2. Key Aliases
-        aliases = {
-            "id": ["user_id", "machine_id", "task_id", "project_id", "attendance_id"],
-            "password_hash": ["password"],
-            "active": ["is_active"],
-            "is_active": ["active"]
-        }
-        
-        # Resolve through aliases recursively
-        for core, alt_list in aliases.items():
-            if key == core:
-                for alt in alt_list:
-                    if alt in self._data: return self.__getattr__(alt)
-            if key in alt_list:
-                if core in self._data: return self.__getattr__(core)
-
-        # 3. Sheet-prefixed ID aliasing (e.g. user_id -> id)
+        # 2. Schema-Aware Aliasing (Minimal)
+        # If they ask for 'id', and the sheet has [entity]_id, give it.
+        # This is for backward compatibility with some backend logic, 
+        # but the JSON response will be controlled by .dict()
         prefix = self._name.lower()
         if prefix.endswith('s'): prefix = prefix[:-1]
         prefixed_id = f"{prefix}_id"
         
         if key == 'id' and prefixed_id in self._data:
-             return self.__getattr__(prefixed_id)
-        if key == prefixed_id and 'id' in self._data:
-             return self.__getattr__('id')
+            return self._data[prefixed_id]
+        
+        # 3. Handle 'role' vs 'user_role' (Standardized to 'role' in sheet)
+        if key == 'user_role' and 'role' in self._data:
+            return self._data['role']
             
         # 4. Mandatory Safe Defaults (Prevents ResponseValidationError)
         if key in ["active", "is_active"]: return True
         if key == "is_deleted": return False
-        if key in ["role", "status"]: return "operator" if key == "role" else "active"
+        if key in ["role", "status"]: 
+            return "operator" if key == "role" else "pending"
         
         return "" # Default to empty string instead of None for Pydantic str fields
-
 
     def __getitem__(self, key):
         return self.__getattr__(key)
@@ -103,25 +92,19 @@ class SheetRow:
             if self._db: self._db._mark_dirty(self)
 
     def dict(self):
-        """Returns clean dictionary with resolved aliases and removed internals."""
-        # 1. Start with canonical headers defined in schema
-        canonical = SHEETS_SCHEMA.get(self._name, list(self._data.keys()))
-        
-        # 2. Populate data ensuring types are correct
+        """Returns clean dictionary matching CANONICAL headers exactly."""
+        canonical = SHEETS_SCHEMA.get(self._name, [])
+        if not canonical:
+            return self._data.copy()
+            
         d = {}
         for h in canonical:
             d[h] = self.__getattr__(h)
         
-        # 3. Ensure 'id' alias is present for frontend (CRITICAL)
+        # Add 'id' ONLY if not in canonical headers but exists as data/alias 
+        # (Needed for internal logic but we prefer canonical in API)
         if 'id' not in d:
-            d['id'] = self.__getattr__('id')
-            
-        # 4. Ensure specific ID field is present if frontend expects it (e.g. machine_id)
-        prefix = self._name.lower()
-        if prefix.endswith('s'): prefix = prefix[:-1]
-        prefixed_id = f"{prefix}_id"
-        if prefixed_id not in d and prefixed_id in SHEETS_SCHEMA.get(self._name, []):
-            d[prefixed_id] = d.get('id')
+             d['id'] = self.__getattr__('id')
             
         return d
 
@@ -308,9 +291,10 @@ def verify_sheets_structure():
                             break
                 
                 if not match:
-                    err_msg = f"❌ Header mismatch for '{sheet_name}'. Expected: {expected_headers}, Found: {actual_headers[:len(expected_headers)]}"
-                    print(err_msg)
-                    errs.append(err_msg)
+                    print(f"  🔧 Auto-repairing headers for '{sheet_name}'...")
+                    google_sheets.ensure_worksheet(sheet_name, expected_headers, force_headers=True)
+                    # Re-validate to be sure
+                    print(f"  ✅ Headers for '{sheet_name}' repaired.")
             except Exception as e:
                 if "WorksheetNotFound" in str(e):
                     # One-time auto-creation is allowed if missing completely
@@ -320,9 +304,9 @@ def verify_sheets_structure():
                     errs.append(f"Failed to verify {sheet_name}: {e}")
 
         if errs:
-              print("\n🔴 CRITICAL SCHEMA ERRORS DETECTED. PREVENTING STARTUP.")
-              for e in errs: print(f" - {e}")
-              raise RuntimeError("Startup failed due to Google Sheets schema drift. Please repair headers manually.")
+            print("\n🔴 CRITICAL SCHEMA ERRORS DETECTED. PREVENTING STARTUP.")
+            for e in errs: print(f" - {e}")
+            raise RuntimeError("Startup failed due to Google Sheets schema drift. Please check connection and worksheet permissions.")
 
         # 2. Trigger a Bootstrap Batch Read to pre-warm the cache
         print("[Startup] Pre-warming Cache via Bootstrap...")

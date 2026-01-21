@@ -26,10 +26,9 @@ class ApproveUserRequest(BaseModel):
     role: Optional[str] = "operator"
 
 class UserResponse(BaseModel):
-    id: str
+    user_id: str
     username: str
     email: Optional[str] = None
-    full_name: Optional[str] = None
     role: str
     approval_status: Optional[str] = None
     created_at: Optional[str] = None
@@ -64,7 +63,7 @@ async def get_project_analytics(project: Optional[str] = None, db: any = Depends
     tasks = [t for t in all_tasks if not getattr(t, 'is_deleted', False)]
     
     if project and project != "all":
-        tasks = [t for t in tasks if str(getattr(t, 'project', '')) == project or str(getattr(t, 'project_id', '')) == project]
+        tasks = [t for t in tasks if str(getattr(t, 'project_id', '')) == project]
     
     status_counts = {
         "pending": len([t for t in tasks if str(getattr(t, 'status', '')).lower() == 'pending']),
@@ -110,7 +109,7 @@ async def change_admin_password(request: ChangePasswordRequest, current_admin: U
         raise HTTPException(status_code=400, detail="Incorrect old password")
     if request.new_password != request.confirm_new_password:
         raise HTTPException(status_code=400, detail="Passwords do not match")
-    user = db.query(User).filter(id=getattr(current_admin, 'id', '')).first()
+    user = db.query(User).filter(user_id=getattr(current_admin, 'user_id', '')).first()
     if not user: raise HTTPException(status_code=404, detail="User not found")
     user.password_hash = hash_password(request.new_password)
     user.updated_at = get_current_time_ist().isoformat()
@@ -132,7 +131,8 @@ async def approve_user(username: str, request: ApproveUserRequest, db: any = Dep
         u_email = getattr(user, 'email', None)
         if u_email: 
             send_approval_email(u_email, getattr(user, 'username', ''), "https://kmt-workflow-tracker.vercel.app/login")
-    except: pass
+    except Exception as e:
+        print(f"⚠️ Email sending failed: {e}")
     return {"message": "Approved"}
 
 @router.post("/users/{username}/reject")
@@ -146,7 +146,7 @@ async def reject_user(username: str, db: any = Depends(get_db)):
 
 @router.patch("/users/{user_id}/status")
 async def update_user_status(user_id: str, status_update: UserStatusUpdate, db: any = Depends(get_db)):
-    user = db.query(User).filter(id=user_id).first()
+    user = db.query(User).filter(user_id=user_id).first()
     if not user: raise HTTPException(status_code=404, detail="Not found")
     user.approval_status = status_update.status
     user.updated_at = get_current_time_ist().isoformat()
@@ -155,7 +155,7 @@ async def update_user_status(user_id: str, status_update: UserStatusUpdate, db: 
 
 @router.patch("/users/{user_id}/role")
 async def update_user_role(user_id: str, role_update: UserRoleUpdate, db: any = Depends(get_db)):
-    user = db.query(User).filter(id=user_id).first()
+    user = db.query(User).filter(user_id=user_id).first()
     if not user: raise HTTPException(status_code=404, detail="Not found")
     user.role = role_update.role
     user.updated_at = get_current_time_ist().isoformat()

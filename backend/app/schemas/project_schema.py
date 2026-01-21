@@ -16,25 +16,22 @@ class ProjectUpdate(BaseModel):
     project_code: Optional[str] = None
 
 class ProjectOut(BaseModel):
-    # Map database project_id to frontend id
-    id: str = Field(alias="project_id")
-    project_name: str = "Unknown Project"
-    work_order_number: Optional[str] = None
+    project_id: str
+    project_name: str
     client_name: Optional[str] = None
     project_code: Optional[str] = None
     created_at: Optional[str] = None
+    is_deleted: bool = False
 
-    @field_serializer('id')
+    @field_serializer('project_id')
     def serialize_id(self, v, _info):
-        """Serialize ID to string for JSON response"""
-        return str(v) if v else None
+        return str(v) if v else ""
     
     @field_serializer('created_at')
-    def serialize_datetime(self, dt: Optional[datetime], _info):
-        """Serialize datetime to ISO 8601 string"""
+    def serialize_datetime(self, dt, _info):
         if isinstance(dt, datetime):
             return dt.isoformat()
-        return dt
+        return str(dt or "")
 
     model_config = ConfigDict(
         from_attributes=True,
