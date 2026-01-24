@@ -119,17 +119,18 @@ def generate_title(row: Dict[str, Any]) -> str:
     if row.get('title') and str(row.get('title')).strip():
         return str(row['title']).strip()
     
-    # Try part_item
-    if row.get('part_item') and str(row.get('part_item')).strip():
-        return str(row['part_item']).strip()
-    
+    # Try part_item (but ignore if it looks like a date)
+    part = str(row.get('part_item', '')).strip()
+    if part and not part.startswith('202') and 'T' not in part:
+         return part
+
     # Try work_order_number
     if row.get('work_order_number') and str(row.get('work_order_number')).strip():
         return f"WO-{row['work_order_number']}"
     
     # Try description
-    if row.get('description') and str(row.get('description')).strip():
-        desc = str(row['description']).strip()
+    desc = str(row.get('description', '')).strip()
+    if desc:
         return desc[:50] + "..." if len(desc) > 50 else desc
     
     # Try task_id or filing_task_id
@@ -186,7 +187,7 @@ def normalize_task_row(row: Dict[str, Any], task_type: str = "general") -> Dict[
         'description': safe_str(row.get('description'), ""),
         'project': safe_str(row.get('project'), ""),
         'project_id': safe_str(row.get('project_id'), ""),
-        'part_item': safe_str(row.get('part_item'), ""),
+        'part_item': (lambda x: "" if x.startswith('202') or 'T' in x else x)(safe_str(row.get('part_item'), "")),
         'nos_unit': safe_str(row.get('nos_unit'), ""),
         'work_order_number': safe_str(row.get('work_order_number'), ""),
         'assigned_to': safe_str(row.get('assigned_to'), ""),

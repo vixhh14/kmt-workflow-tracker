@@ -136,22 +136,32 @@ async def change_admin_password(request: ChangePasswordRequest, current_admin: U
 
 @router.post("/users/{username}/approve")
 async def approve_user(username: str, request: ApproveUserRequest, db: any = Depends(get_db)):
-    user = db.query(User).filter(username=username).first()
-    if not user: raise HTTPException(status_code=404, detail="Not found")
-    user.approval_status = "approved"
-    user.unit_id = request.unit_id
-    user.machine_types = request.machine_types
-    if request.role: user.role = request.role
-    user.updated_at = get_current_time_ist().isoformat()
-    db.commit()
     try:
-        from app.core.email_utils import send_approval_email
-        u_email = getattr(user, 'email', None)
-        if u_email: 
-            send_approval_email(u_email, getattr(user, 'username', ''), "https://kmt-workflow-tracker.vercel.app/login")
+        user = db.query(User).filter(username=username).first()
+        if not user: raise HTTPException(status_code=404, detail="Not found")
+        
+        user.approval_status = "approved"
+        user.unit_id = request.unit_id
+        user.machine_types = request.machine_types
+        if request.role: user.role = request.role
+        user.updated_at = get_current_time_ist().isoformat()
+        db.commit()
+        
+        # Email Notification (Best Effort)
+        try:
+            from app.core.email_utils import send_approval_email
+            u_email = getattr(user, 'email', None)
+            if u_email: 
+                send_approval_email(u_email, getattr(user, 'username', ''), "https://kmt-workflow-tracker.vercel.app/login")
+        except Exception as e:
+            print(f"⚠️ Email sending failed but user approved: {e}")
+            
+        return {"message": "Approved"}
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"⚠️ Email sending failed: {e}")
-    return {"message": "Approved"}
+        print(f"❌ Critical Approval Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/users/{username}/reject")
 async def reject_user(username: str, db: any = Depends(get_db)):

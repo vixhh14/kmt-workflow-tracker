@@ -1,10 +1,10 @@
-from pydantic import BaseModel, ConfigDict, field_validator, field_serializer
+from pydantic import BaseModel, ConfigDict, field_validator, field_serializer, Field
 from typing import Optional, Union
 from datetime import datetime, date
 from uuid import UUID
 
 class TaskBase(BaseModel):
-    title: str
+    title: Optional[str] = None
     project: Optional[str] = None
     project_id: Optional[str] = None
     description: Optional[str] = None
@@ -241,8 +241,8 @@ class OperationalTaskUpdate(BaseModel):
 class OperationalTaskOut(OperationalTaskBase):
     fabrication_task_id: Optional[str] = None
     filing_task_id: Optional[str] = None
-    id: str
-    title: Optional[str] = None  # ADDED: Required for dashboard display
+    id: Optional[str] = None # Relaxed to optional
+    title: Optional[str] = Field(None, description="Task Title") 
     created_at: Optional[Union[datetime, str]] = None
     updated_at: Optional[Union[datetime, str]] = None
     
@@ -253,21 +253,34 @@ class OperationalTaskOut(OperationalTaskBase):
     on_hold_at: Optional[Union[datetime, str]] = None
     resumed_at: Optional[Union[datetime, str]] = None
     completed_at: Optional[Union[datetime, str]] = None
-    total_active_duration: Optional[int] = 0
+    total_active_duration: Optional[Union[int, str]] = 0 # Accept string "" and coerce
+    is_deleted: Optional[bool] = False
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator('total_active_duration', mode='before')
+    @classmethod
+    def validate_duration(cls, v):
+        if v == "" or v is None:
+            return 0
+        try:
+            return int(float(v))
+        except:
+            return 0
 
     @field_serializer('created_at', 'updated_at', 'started_at', 'on_hold_at', 'resumed_at', 'completed_at', 'due_date')
     def serialize_dt(self, dt: Optional[Union[datetime, str]], _info):
         if dt is None:
             return None
         if isinstance(dt, str):
+            if dt == "": return None
             return dt
         return dt.isoformat()
 
     @field_serializer('id', 'fabrication_task_id', 'filing_task_id', 'project_id', 'machine_id')
     def serialize_id(self, v, _info):
         if v is None:
-            return None
+            return ""
         return str(v)
+
 
