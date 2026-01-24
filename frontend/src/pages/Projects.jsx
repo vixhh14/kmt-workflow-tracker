@@ -203,7 +203,7 @@ const Projects = () => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                             <button
-                                                onClick={() => handleDelete(project.project_id)}
+                                                onClick={() => handleDelete(project.project_id || project.id)}
                                                 className="text-red-600 hover:text-red-900"
                                             >
                                                 <Trash2 size={16} />
