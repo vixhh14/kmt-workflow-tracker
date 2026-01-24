@@ -27,18 +27,20 @@ const Subtask = ({ taskId, taskAssigneeId }) => {
     const fetchSubtasks = async () => {
         try {
             setLoading(true);
+            setError('');
             const response = await getSubtasks(taskId);
-            setSubtasks(response.data);
+            const data = Array.isArray(response.data) ? response.data : [];
+            setSubtasks(data);
             // Initialize edit state with current values
             const initialEdits = {};
-            response.data.forEach(st => {
+            data.forEach(st => {
                 initialEdits[st.id] = { status: st.status, notes: st.notes || '' };
             });
             setEdits(initialEdits);
-            setError('');
         } catch (err) {
             console.error('Failed to fetch subtasks:', err);
             setError('Failed to load subtasks');
+            setSubtasks([]); // Set to empty array on error
         } finally {
             setLoading(false);
         }
@@ -107,8 +109,8 @@ const Subtask = ({ taskId, taskAssigneeId }) => {
         }
     };
 
-    if (loading && subtasks.length === 0) {
-        return <div className="text-sm text-gray-500 p-4">Loading subtasks...</div>;
+    if (loading) {
+        return <div className="text-sm text-gray-500 p-4 italic">Loading subtasks...</div>;
     }
 
     return (

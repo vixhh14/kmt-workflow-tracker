@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getPlanningDashboardSummary } from '../../api/planning';
-import { getDashboardOverview, getProjectOverviewStats } from '../../api/services';
+
 import { Folder, TrendingUp, Settings, Clock, CheckCircle, Users, Activity, RefreshCw, Pause, UserPlus } from 'lucide-react';
 import QuickAssign from '../../components/QuickAssign';
 import OperationalTaskSection from '../../components/OperationalTaskSection.jsx';
@@ -47,27 +47,21 @@ const PlanningDashboard = () => {
             setError(null);
 
             console.log('🔄 Fetching planning dashboard...');
-            const [overviewRes, projectStatsRes, response] = await Promise.all([
-                getDashboardOverview(),
-                getProjectOverviewStats(),
-                getPlanningDashboardSummary()
-            ]);
+            const response = await getPlanningDashboardSummary();
             console.log('✅ Planning dashboard loaded');
 
-            const tasks = overviewRes?.data?.tasks || { total: 0, in_progress: 0, pending: 0, completed: 0, on_hold: 0 };
-            const machines = overviewRes?.data?.machines || { active: 0 };
-            const projectStats = projectStatsRes?.data || { total: 0 };
+            const data = response.data;
 
             setSummary({
-                total_projects: projectStats.total || 0,
-                total_tasks: tasks.total || 0,
-                total_tasks_running: tasks.in_progress || 0,
-                machines_active: machines.active || 0,
-                pending_tasks: tasks.pending || 0,
-                completed_tasks: (tasks.completed || 0) + (tasks.ended || 0),
-                on_hold_tasks: tasks.on_hold || 0,
-                project_summary: response?.data?.project_summary || [],
-                operator_status: response?.data?.operator_status || []
+                total_projects: data.total_projects || 0,
+                total_tasks: data.total_tasks || 0,
+                total_tasks_running: data.total_tasks_running || 0,
+                machines_active: data.machines_active || 0,
+                pending_tasks: data.pending_tasks || 0,
+                completed_tasks: data.completed_tasks || 0,
+                on_hold_tasks: data.on_hold_tasks || 0,
+                project_summary: data.project_summary || [],
+                operator_status: data.operator_status || []
             });
         } catch (err) {
             console.error('❌ Failed to fetch planning dashboard:', err);

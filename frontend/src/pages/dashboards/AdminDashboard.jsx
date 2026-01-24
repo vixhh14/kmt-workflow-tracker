@@ -190,6 +190,11 @@ const AdminDashboard = () => {
         { name: 'On Hold', value: taskStats.on_hold || 0, color: COLORS['On Hold'] }
     ].filter(item => item.value > 0);
 
+    // Debug logging
+    console.log('📊 Task Stats for Chart:', taskStats);
+    console.log('📊 Chart Data:', chartData);
+    console.log('📊 Chart has data:', chartData.length > 0);
+
     const formatDuration = (seconds) => {
         if (!seconds || seconds <= 0) return '0m';
         const h = Math.floor(seconds / 3600);
