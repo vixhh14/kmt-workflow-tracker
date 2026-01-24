@@ -59,8 +59,12 @@ async def list_users(exclude_id: Optional[str] = None, db: any = Depends(get_db)
                 continue
                 
             # 2. Filter Unapproved Users (They belong in Pending Approvals only)
-            if str(getattr(u, 'approval_status', 'approved')).lower().strip() != 'approved':
-                continue
+            # RELAXED CHECK: Allow empty/None as approved for legacy/migration safety
+            status = str(getattr(u, 'approval_status', '')).lower().strip()
+            if status not in ['approved', '', 'none', 'true']: 
+                # If explicit 'pending' or 'rejected', skip. If empty, allow (legacy)
+                if status in ['pending', 'rejected']:
+                    continue
 
             # 3. Skip excluded user (usually self)
             u_id = str(getattr(u, 'user_id', getattr(u, 'id', '')))

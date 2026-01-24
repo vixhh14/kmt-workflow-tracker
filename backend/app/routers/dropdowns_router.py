@@ -84,7 +84,9 @@ async def get_assignable_users(
                 continue
             
             # User Requirement: Pending users should NOT appear in assignable users
-            if str(getattr(u, 'approval_status', 'approved')).lower().strip() != 'approved':
+            # RELAXED: Allow empty status
+            status = str(getattr(u, 'approval_status', '')).lower().strip()
+            if status in ['pending', 'rejected']:
                 continue
             
             role = str(getattr(u, 'role', '')).lower()

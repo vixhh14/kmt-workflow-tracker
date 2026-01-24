@@ -106,8 +106,8 @@ def calculate_machine_runtime(db: any, target_date: date) -> List[dict]:
 def calculate_user_activity(db: any, target_date: date) -> List[dict]:
     target_date_str = target_date.isoformat()
     target_date_str = target_date.isoformat()
-    # Filter: Not deleted, specific roles, AND approved
-    users = [u for u in db.query(User).all() if not u.is_deleted and str(u.role).lower() in ['operator', 'supervisor', 'fab_master', 'file_master'] and str(getattr(u, 'approval_status', 'approved')).lower() == 'approved']
+    # Filter: Not deleted, specific roles, AND approved (or legacy empty)
+    users = [u for u in db.query(User).all() if not u.is_deleted and str(u.role).lower() in ['operator', 'supervisor', 'fab_master', 'file_master'] and str(getattr(u, 'approval_status', '')).lower() not in ['pending', 'rejected']]
     
     logs = [l for l in db.query(UserWorkLog).all() if str(l.date).startswith(target_date_str)]
     
