@@ -60,6 +60,7 @@ async def create_unit(unit: UnitCreate, db: Any = Depends(get_db)):
         unit_id=new_id,
         name=unit.name.strip(),
         description=unit.description,
+        status="active",
         created_at=datetime.now().isoformat()
     )
     

@@ -61,8 +61,9 @@ def calculate_detailed_user_activity(db: any, user_id: str, target_date: date) -
 # Helper functions refactored for SheetsDB
 def calculate_machine_runtime(db: any, target_date: date) -> List[dict]:
     target_date_str = target_date.isoformat()
+    target_date_str = target_date.isoformat()
     machines = [m for m in db.query(Machine).all() if not m.is_deleted]
-    units = {str(u.id): str(u.name) for u in db.query(Unit).all()}
+    units = {str(getattr(u, 'unit_id', getattr(u, 'id', ''))): str(u.name) for u in db.query(Unit).all()}
     categories = {str(c.id): str(c.name) for c in db.query(MachineCategory).all()}
     
     # Logs for specifically this date
@@ -88,11 +89,12 @@ def calculate_machine_runtime(db: any, target_date: date) -> List[dict]:
     results = []
     for m_id, stats in machine_stats.items():
         m = stats["obj"]
+        m_id_actual = str(getattr(m, 'machine_id', getattr(m, 'id', '')))
         results.append({
-            "machine_id": str(m.id),
+            "machine_id": m_id_actual,
             "machine_name": str(m.machine_name),
-            "unit": units.get(str(m.unit_id), ""),
-            "category": categories.get(str(m.category_id), ""),
+            "unit": units.get(str(getattr(m, 'unit_id', getattr(m, 'id', ''))), ""),
+            "category": categories.get(str(getattr(m, 'category_id', getattr(m, 'id', ''))), ""),
             "date": target_date_str,
             "runtime_seconds": stats["runtime"],
             "tasks_run_count": stats["completed_tasks"],
@@ -103,7 +105,9 @@ def calculate_machine_runtime(db: any, target_date: date) -> List[dict]:
 
 def calculate_user_activity(db: any, target_date: date) -> List[dict]:
     target_date_str = target_date.isoformat()
-    users = [u for u in db.query(User).all() if not u.is_deleted and str(u.role).lower() in ['operator', 'supervisor', 'fab_master', 'file_master']]
+    target_date_str = target_date.isoformat()
+    # Filter: Not deleted, specific roles, AND approved
+    users = [u for u in db.query(User).all() if not u.is_deleted and str(u.role).lower() in ['operator', 'supervisor', 'fab_master', 'file_master'] and str(getattr(u, 'approval_status', 'approved')).lower() == 'approved']
     
     logs = [l for l in db.query(UserWorkLog).all() if str(l.date).startswith(target_date_str)]
     

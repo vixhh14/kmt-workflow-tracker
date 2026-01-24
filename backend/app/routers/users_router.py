@@ -58,7 +58,11 @@ async def list_users(exclude_id: Optional[str] = None, db: any = Depends(get_db)
             if not bool(getattr(u, 'active', True)) or bool(getattr(u, 'is_deleted', False)):
                 continue
                 
-            # 2. Skip excluded user (usually self)
+            # 2. Filter Unapproved Users (They belong in Pending Approvals only)
+            if str(getattr(u, 'approval_status', 'approved')).lower().strip() != 'approved':
+                continue
+
+            # 3. Skip excluded user (usually self)
             u_id = str(getattr(u, 'user_id', getattr(u, 'id', '')))
             if exclude_id and u_id == str(exclude_id):
                 continue
@@ -82,6 +86,10 @@ async def search_users(q: str, db: any = Depends(get_db)):
         try:
             u_name = str(getattr(u, 'username', '')).lower()
             u_email = str(getattr(u, 'email', '') or "").lower()
+            
+            # Filter unapproved
+            if str(getattr(u, 'approval_status', 'approved')).lower().strip() != 'approved':
+                continue
             
             if q in u_name or q in u_email:
                 results.append(UserOut(**u.dict()))

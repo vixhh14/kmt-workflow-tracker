@@ -27,7 +27,10 @@ async def get_projects_dropdown(
     try:
         from app.models.models_db import Project
         all_p = db.query(Project).all()
-        return [{"project_id": str(getattr(p, 'project_id', getattr(p, 'id', ''))), "project_name": str(getattr(p, 'project_name', ''))} 
+        return [{"project_id": str(getattr(p, 'project_id', getattr(p, 'id', ''))), 
+                 "project_name": str(getattr(p, 'project_name', '')),
+                 "id": str(getattr(p, 'project_id', getattr(p, 'id', ''))),
+                 "name": str(getattr(p, 'project_name', ''))} 
                 for p in all_p if not getattr(p, 'is_deleted', False)]
     except Exception as e:
         print(f"❌ Error in projects dropdown: {e}")
@@ -41,7 +44,10 @@ async def get_machines_dropdown(
     try:
         from app.models.models_db import Machine
         all_m = db.query(Machine).all()
-        return [{"machine_id": str(getattr(m, 'machine_id', getattr(m, 'id', ''))), "machine_name": str(getattr(m, 'machine_name', ''))} 
+        return [{"machine_id": str(getattr(m, 'machine_id', getattr(m, 'id', ''))), 
+                 "machine_name": str(getattr(m, 'machine_name', '')),
+                 "id": str(getattr(m, 'machine_id', getattr(m, 'id', ''))),
+                 "name": str(getattr(m, 'machine_name', ''))} 
                 for m in all_m if not getattr(m, 'is_deleted', False)]
     except Exception as e:
         print(f"❌ Error in machines dropdown: {e}")
@@ -55,8 +61,10 @@ async def get_units_dropdown(
     try:
         from app.models.models_db import Unit
         all_u = db.query(Unit).all()
-        return [{"unit_id": str(getattr(u, 'unit_id', getattr(u, 'id', ''))), "name": str(getattr(u, 'name', ''))} 
-                for u in all_u if not getattr(u, 'is_deleted', False)]
+        return [{"unit_id": str(getattr(u, 'unit_id', getattr(u, 'id', ''))), 
+                 "name": str(getattr(u, 'name', '')),
+                 "id": str(getattr(u, 'unit_id', getattr(u, 'id', '')))} 
+                for u in all_u if not getattr(u, 'is_deleted', False) and str(getattr(u, 'status', 'active')).lower() == 'active']
     except Exception as e:
         print(f"❌ Error in units dropdown: {e}")
         return []
@@ -103,16 +111,26 @@ async def bootstrap_data(
     try:
         from app.models.models_db import Unit, MachineCategory, Project, Machine
         
-        p = [{"project_id": str(getattr(p, 'project_id', getattr(p, 'id', ''))), "project_name": str(getattr(p, 'project_name', ''))} 
+        p = [{"project_id": str(getattr(p, 'project_id', getattr(p, 'id', ''))), 
+              "project_name": str(getattr(p, 'project_name', '')),
+              "id": str(getattr(p, 'project_id', getattr(p, 'id', ''))), 
+              "name": str(getattr(p, 'project_name', ''))} 
              for p in db.query(Project).all() if not getattr(p, 'is_deleted', False)]
                    
-        m = [{"machine_id": str(getattr(m, 'machine_id', getattr(m, 'id', ''))), "machine_name": str(getattr(m, 'machine_name', ''))} 
+        m = [{"machine_id": str(getattr(m, 'machine_id', getattr(m, 'id', ''))), 
+              "machine_name": str(getattr(m, 'machine_name', '')),
+              "id": str(getattr(m, 'machine_id', getattr(m, 'id', ''))), 
+              "name": str(getattr(m, 'machine_name', ''))} 
              for m in db.query(Machine).all() if not getattr(m, 'is_deleted', False)]
                    
-        u = [{"unit_id": str(getattr(u, 'unit_id', getattr(u, 'id', ''))), "name": str(getattr(u, 'name', ''))} 
-             for u in db.query(Unit).all() if not getattr(u, 'is_deleted', False)]
+        u = [{"unit_id": str(getattr(u, 'unit_id', getattr(u, 'id', ''))), 
+              "name": str(getattr(u, 'name', '')),
+              "id": str(getattr(u, 'unit_id', getattr(u, 'id', '')))} 
+             for u in db.query(Unit).all() if not getattr(u, 'is_deleted', False) and str(getattr(u, 'status', 'active')).lower() == 'active']
                  
-        c = [{"category_id": str(getattr(c, 'category_id', getattr(c, 'id', ''))), "name": str(getattr(c, 'name', ''))} 
+        c = [{"category_id": str(getattr(c, 'category_id', getattr(c, 'id', ''))), 
+              "name": str(getattr(c, 'name', '')),
+              "id": str(getattr(c, 'category_id', getattr(c, 'id', '')))} 
              for c in db.query(MachineCategory).all() if not getattr(c, 'is_deleted', False)]
         
         return {

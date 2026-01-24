@@ -64,8 +64,12 @@ class SheetRow:
         # 4. Mandatory Safe Defaults (Prevents ResponseValidationError)
         if key in ["active", "is_active"]: return True
         if key == "is_deleted": return False
-        if key in ["role", "status"]: 
-            return "operator" if key == "role" else "pending"
+        if key == "role": return "operator"
+        if key == "status":
+            # Default 'active' for configuration tables, 'pending' for work items
+            if self._name in ["machines", "projects", "units", "machinecategories"]:
+                return "active"
+            return "pending"
         
         return "" # Default to empty string instead of None for Pydantic str fields
 

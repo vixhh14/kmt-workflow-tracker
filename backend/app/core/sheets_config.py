@@ -43,8 +43,8 @@ SHEETS_SCHEMA = {
     "taskhold": ["hold_id", "task_id", "user_id", "hold_reason", "hold_started_at", "hold_ended_at", "is_deleted", "created_at", "updated_at"],
     "machineruntimelog": ["log_id", "machine_id", "task_id", "start_time", "end_time", "duration_seconds", "date", "is_deleted", "created_at", "updated_at"],
     "userworklog": ["log_id", "user_id", "task_id", "machine_id", "start_time", "end_time", "duration_seconds", "date", "is_deleted", "created_at", "updated_at"],
-    "units": ["unit_id", "name", "description", "created_at", "updated_at", "is_deleted"],
-    "machinecategories": ["category_id", "name", "description", "created_at", "updated_at", "is_deleted"],
+    "units": ["unit_id", "name", "description", "created_at", "updated_at", "is_deleted", "status"],
+    "machinecategories": ["category_id", "name", "description", "created_at", "updated_at", "is_deleted", "status"],
     "reschedulerequests": ["reschedule_id", "task_id", "new_date", "reason", "status", "created_at", "is_deleted", "updated_at"],
     "planningtasks": ["planning_task_id", "title", "description", "status", "created_at", "is_deleted", "updated_at"]
 }
