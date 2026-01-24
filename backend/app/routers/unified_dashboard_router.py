@@ -53,14 +53,31 @@ async def get_admin_dashboard(
 
         # 6. Aggregate Stats Memory-Only
         overview = get_operations_overview(db)
+        
+        # 6.5 Sanitize Tasks (Fix Boolean Status Crash)
+        sanitized_tasks = []
+        for t in combined_tasks:
+            # Convert SQLAlchemy model to dict if needed
+            t_data = t.dict() if hasattr(t, 'dict') else t.__dict__.copy() if hasattr(t, '__dict__') else t
+            
+            # Fix status
+            raw_status = t_data.get('status', 'pending')
+            if raw_status is True or str(raw_status).lower() == 'true':
+                 t_data['status'] = 'pending'
+            elif raw_status is False or str(raw_status).lower() == 'false':
+                 t_data['status'] = 'completed'
+            else:
+                 t_data['status'] = raw_status
+                 
+            sanitized_tasks.append(t_data)
 
         # 7. Machine Status Calculation
         machine_status_map = {}
-        active_machine_tasks = [t for t in combined_tasks if str(getattr(t, 'status', '')).lower() in ('in_progress', 'in progress', 'on_hold', 'onhold', 'on hold') and getattr(t, 'machine_id', None)]
+        active_machine_tasks = [t for t in sanitized_tasks if str(t.get('status', '')).lower() in ('in_progress', 'in progress', 'on_hold', 'onhold', 'on hold') and t.get('machine_id')]
         
         for t in active_machine_tasks:
-            mid = str(getattr(t, 'machine_id', ''))
-            status = str(getattr(t, 'status', '')).lower()
+            mid = str(t.get('machine_id', ''))
+            status = str(t.get('status', '')).lower()
             if status in ('in_progress', 'in progress'): machine_status_map[mid] = 'running'
             elif status in ('on_hold', 'onhold', 'on hold') and machine_status_map.get(mid) != 'running': machine_status_map[mid] = 'on_hold'
         
@@ -83,7 +100,7 @@ async def get_admin_dashboard(
                     "project_name": str(getattr(p, 'project_name', ''))
                 } for p in projects
             ], 
-            "tasks": [t.dict() if hasattr(t, 'dict') else t for t in combined_tasks], 
+            "tasks": sanitized_tasks, 
             "machines": machines_data,  
             "users": [u.dict() for u in users], 
             "operators": [u.dict() for u in users if str(getattr(u, 'role', '')).lower() == 'operator'],
