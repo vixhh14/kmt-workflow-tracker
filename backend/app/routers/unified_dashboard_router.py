@@ -74,7 +74,15 @@ async def get_admin_dashboard(
             })
         
         return {
-            "projects": [p.dict() for p in projects], 
+            "projects": [
+                {
+                    **p.dict(),
+                    "id": str(getattr(p, 'project_id', getattr(p, 'id', ''))),
+                    "project_id": str(getattr(p, 'project_id', getattr(p, 'id', ''))),
+                    "name": str(getattr(p, 'project_name', '')),
+                    "project_name": str(getattr(p, 'project_name', ''))
+                } for p in projects
+            ], 
             "tasks": [t.dict() if hasattr(t, 'dict') else t for t in combined_tasks], 
             "machines": machines_data,  
             "users": [u.dict() for u in users], 
