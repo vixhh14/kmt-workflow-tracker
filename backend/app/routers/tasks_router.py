@@ -92,7 +92,8 @@ async def read_tasks(
                 "project_id": task_project_id if task_project_id else None,
                 "part_item": getattr(t, 'part_item', ''),
                 "nos_unit": getattr(t, 'nos_unit', ''),
-                "status": getattr(t, 'status', 'pending'),
+                # FIX: Boolean status safety
+                "status": "pending" if getattr(t, 'status', 'pending') is True or str(getattr(t, 'status', 'pending')).lower() == 'true' else getattr(t, 'status', 'pending'),
                 "priority": getattr(t, 'priority', 'MEDIUM'),
                 "assigned_by": getattr(t, 'assigned_by', ''),
                 "assigned_to": getattr(t, 'assigned_to', ''),
