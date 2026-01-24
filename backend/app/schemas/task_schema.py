@@ -142,6 +142,7 @@ class RescheduleRequestModel(BaseModel):
 # Operational Tasks (Filing/Fabrication)
 
 class OperationalTaskBase(BaseModel):
+    title: Optional[str] = None  # ADDED: Manual title input
     project_id: Optional[str] = None
     part_item: Optional[str] = None
     quantity: Optional[int] = 1
@@ -240,7 +241,8 @@ class OperationalTaskUpdate(BaseModel):
 class OperationalTaskOut(OperationalTaskBase):
     fabrication_task_id: Optional[str] = None
     filing_task_id: Optional[str] = None
-    id: str 
+    id: str
+    title: Optional[str] = None  # ADDED: Required for dashboard display
     created_at: Optional[Union[datetime, str]] = None
     updated_at: Optional[Union[datetime, str]] = None
     
@@ -268,3 +270,4 @@ class OperationalTaskOut(OperationalTaskBase):
         if v is None:
             return None
         return str(v)
+

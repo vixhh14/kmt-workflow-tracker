@@ -61,13 +61,18 @@ async def create_filing_task(data: OperationalTaskCreate, db: Any = Depends(get_
         task_data['status'] = task_data.get('status', 'pending')
         task_data['is_deleted'] = False
         
+        # Title comes from user input (not auto-generated)
+        # If not provided, use part_item as fallback
+        if not task_data.get('title'):
+            task_data['title'] = task_data.get('part_item', 'Filing Task')
+        
         # Auto-assign to FILE_MASTER if no assignee
         if not task_data.get('assigned_to'):
             file_masters = [u for u in db.query(User).all() if getattr(u, 'role', '') == 'file_master' and not getattr(u, 'is_deleted', False)]
             if file_masters:
                 task_data['assigned_to'] = str(getattr(file_masters[0], 'user_id', getattr(file_masters[0], 'id', '')))
         
-        print(f"📝 Creating filing task: {task_data.get('task_project', 'Unknown')}")
+        print(f"📝 Creating filing task: {task_data['title']}")
         
         new_task = FilingTask(**task_data)
         db.add(new_task)
@@ -97,13 +102,18 @@ async def create_fab_task(data: OperationalTaskCreate, db: Any = Depends(get_db)
         task_data['status'] = task_data.get('status', 'pending')
         task_data['is_deleted'] = False
         
+        # Title comes from user input (not auto-generated)
+        # If not provided, use part_item as fallback
+        if not task_data.get('title'):
+            task_data['title'] = task_data.get('part_item', 'Fabrication Task')
+        
         # Auto-assign to FAB_MASTER if no assignee
         if not task_data.get('assigned_to'):
             fab_masters = [u for u in db.query(User).all() if getattr(u, 'role', '') == 'fab_master' and not getattr(u, 'is_deleted', False)]
             if fab_masters:
                 task_data['assigned_to'] = str(getattr(fab_masters[0], 'user_id', getattr(fab_masters[0], 'id', '')))
         
-        print(f"📝 Creating fabrication task: {task_data.get('task_project', 'Unknown')}")
+        print(f"📝 Creating fabrication task: {task_data['title']}")
         
         new_task = FabricationTask(**task_data)
         db.add(new_task)

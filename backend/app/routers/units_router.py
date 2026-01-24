@@ -36,9 +36,8 @@ async def get_units(db: Any = Depends(get_db)):
         if len(all_units) == 0:
             print("⚠️ No units found, seeding default units...")
             default_units = [
-                {"name": "Unit A", "description": "Production Unit A"},
-                {"name": "Unit B", "description": "Production Unit B"},
-                {"name": "Unit C", "description": "Production Unit C"},
+                {"name": "Unit 1", "description": "Production Unit 1"},
+                {"name": "Unit 2", "description": "Production Unit 2"},
             ]
             
             for idx, unit_data in enumerate(default_units, start=1):
