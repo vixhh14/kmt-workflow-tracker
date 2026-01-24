@@ -156,6 +156,15 @@ def normalize_task_row(row: Dict[str, Any], task_type: str = "general") -> Dict[
         ""
     )
     
+    # HEURISTIC: Fix shifted headers (Date in Part Item)
+    part_val = safe_str(row.get('part_item'), "")
+    due_val = safe_datetime(row.get('due_date') or row.get('due_datetime'))
+    
+    # If part_item looks like a date and due_date is missing, move it
+    if not due_val and (part_val.startswith('202') or 'T' in part_val):
+        due_val = part_val
+        part_val = "" # Clear it from part_item
+    
     normalized = {
         # REQUIRED FIELDS - MUST ALWAYS EXIST
         'task_id': safe_str(task_id, "unknown"),
@@ -175,7 +184,7 @@ def normalize_task_row(row: Dict[str, Any], task_type: str = "general") -> Dict[
         # DATETIME FIELDS - ISO format or None
         'created_at': safe_datetime(row.get('created_at')),
         'updated_at': safe_datetime(row.get('updated_at')),
-        'due_date': safe_datetime(row.get('due_date') or row.get('due_datetime')),
+        'due_date': due_val,
         'started_at': safe_datetime(row.get('started_at')),
         'completed_at': safe_datetime(row.get('completed_at')),
         'on_hold_at': safe_datetime(row.get('on_hold_at')),
@@ -187,10 +196,10 @@ def normalize_task_row(row: Dict[str, Any], task_type: str = "general") -> Dict[
         'description': safe_str(row.get('description'), ""),
         'project': safe_str(row.get('project'), ""),
         'project_id': safe_str(row.get('project_id'), ""),
-        'part_item': (lambda x: "" if x.startswith('202') or 'T' in x else x)(safe_str(row.get('part_item'), "")),
+        'part_item': (lambda x: "" if x.startswith('202') or 'T' in x else x)(part_val),
         'nos_unit': safe_str(row.get('nos_unit'), ""),
         'work_order_number': safe_str(row.get('work_order_number'), ""),
-        'assigned_to': safe_str(row.get('assigned_to'), ""),
+        'assigned_to': (lambda x: "" if x in ["HMT", "hmt"] or x.startswith("PROJ-") else x)(safe_str(row.get('assigned_to'), "")),
         'assigned_by': safe_str(row.get('assigned_by'), ""),
         'machine_id': safe_str(row.get('machine_id'), ""),
         'hold_reason': safe_str(row.get('hold_reason'), ""),
