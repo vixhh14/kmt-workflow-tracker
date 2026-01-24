@@ -29,12 +29,12 @@ async def get_pending_tasks(db: any = Depends(get_db)):
         pending = [t for t in all_tasks if not getattr(t, 'is_deleted', False) and (not getattr(t, 'assigned_to', None) or getattr(t, 'status', '') == 'pending')]
         
         all_users = db.query(User).all()
-        user_map = {str(getattr(u, 'id', '')): u for u in all_users}
+        user_map = {str(getattr(u, 'user_id', getattr(u, 'id', ''))): u for u in all_users}
         all_machines = db.query(Machine).all()
-        machine_map = {str(getattr(m, 'id', '')): m for m in all_machines}
+        machine_map = {str(getattr(m, 'machine_id', getattr(m, 'id', ''))): m for m in all_machines}
         
         return [{
-            "id": str(getattr(t, 'id', '')),
+            "id": str(getattr(t, 'task_id', getattr(t, 'id', ''))),
             "title": getattr(t, 'title', '') or "",
             "project": getattr(t, 'project', '') or "",
             "description": getattr(t, 'description', '') or "",
@@ -78,9 +78,9 @@ async def get_running_tasks(
             running = [t for t in running if str(getattr(t, 'assigned_to', '')) == str(operator_id)]
 
         all_users = db.query(User).all()
-        user_map = {str(getattr(u, 'id', '')): u for u in all_users}
+        user_map = {str(getattr(u, 'user_id', getattr(u, 'id', ''))): u for u in all_users}
         all_machines = db.query(Machine).all()
-        machine_map = {str(getattr(m, 'id', '')): m for m in all_machines}
+        machine_map = {str(getattr(m, 'machine_id', getattr(m, 'id', ''))): m for m in all_machines}
         all_holds = db.query(TaskHold).all()
         
         task_list = []
@@ -97,7 +97,7 @@ async def get_running_tasks(
                 held_seconds = getattr(t, 'total_held_seconds', 0) or 0
                 duration_seconds = max(0, total_elapsed - held_seconds)
             
-            t_holds = [h for h in all_holds if str(getattr(h, 'task_id', '')) == str(getattr(t, 'id', ''))]
+            t_holds = [h for h in all_holds if str(getattr(h, 'task_id', '')) == str(getattr(t, 'task_id', getattr(t, 'id', '')))]
             holds_serialized = [
                 {
                     "start": str(getattr(h, 'hold_started_at', '')),
@@ -109,7 +109,7 @@ async def get_running_tasks(
             ]
 
             task_list.append({
-                "id": str(getattr(t, 'id', '')),
+                "id": str(getattr(t, 'task_id', getattr(t, 'id', ''))),
                 "title": getattr(t, 'title', '') or "",
                 "project": getattr(t, 'project', '') or "",
                 "operator_id": str(getattr(t, 'assigned_to', '')) if getattr(t, 'assigned_to', None) else "",
@@ -143,7 +143,7 @@ async def get_task_status(
         operators = [u for u in all_users if not getattr(u, 'is_deleted', False) and getattr(u, 'approval_status', '') == 'approved' and getattr(u, 'role', '') == 'operator']
         
         if operator_id and operator_id != "all":
-            operators = [u for u in operators if str(getattr(u, 'id', '')) == str(operator_id)]
+            operators = [u for u in operators if str(getattr(u, 'user_id', getattr(u, 'id', ''))) == str(operator_id)]
             
         all_tasks = db.query(Task).all()
         tasks_filtered = [t for t in all_tasks if not getattr(t, 'is_deleted', False)]
@@ -162,7 +162,7 @@ async def get_task_status(
             
         operator_stats = []
         for operator in operators:
-            op_id_str = str(getattr(operator, 'id', ''))
+            op_id_str = str(getattr(operator, 'user_id', getattr(operator, 'id', '')))
             operator_tasks = [t for t in tasks_filtered if str(getattr(t, 'assigned_to', '')) == op_id_str]
             
             completed = len([t for t in operator_tasks if getattr(t, 'status', '') == 'completed'])
@@ -282,11 +282,11 @@ async def assign_task(
 ):
     """Assign a task to an operator"""
     try:
-        task = db.query(Task).filter(id=request.task_id).first()
+        task = db.query(Task).filter(task_id=request.task_id).first()
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
         
-        operator = db.query(User).filter(id=request.operator_id).first()
+        operator = db.query(User).filter(user_id=request.operator_id).first()
         if not operator:
             raise HTTPException(status_code=404, detail="Operator not found")
         
@@ -309,7 +309,7 @@ async def assign_task(
         return {
             "message": "Task assigned successfully",
             "task": {
-                "id": str(getattr(task, 'id', '')),
+                "id": str(getattr(task, 'task_id', getattr(task, 'id', ''))),
                 "title": getattr(task, 'title', ''),
                 "assigned_to": str(getattr(task, 'assigned_to', '')),
                 "status": getattr(task, 'status', '')

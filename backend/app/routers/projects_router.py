@@ -71,7 +71,7 @@ async def create_project(project: ProjectCreate, db: Any = Depends(get_db)):
 @router.get("/{project_id}", response_model=ProjectOut)
 async def read_project(project_id: str, db: Any = Depends(get_db)):
     """Get a specific project by ID."""
-    project = db.query(Project).filter(id=project_id).first()
+    project = db.query(Project).filter(project_id=project_id).first()
     if not project or getattr(project, 'is_deleted', False):
         raise HTTPException(status_code=404, detail="Project not found")
     
@@ -86,7 +86,7 @@ async def update_project(
     current_user: User = Depends(get_current_user)
 ):
     """Update an existing project."""
-    db_project = db.query(Project).filter(id=project_id).first()
+    db_project = db.query(Project).filter(project_id=project_id).first()
     if not db_project:
         raise HTTPException(status_code=404, detail="Project not found")
     
@@ -96,7 +96,7 @@ async def update_project(
         new_code = update_data["project_code"].strip()
         # Use simple keyword filter for uniqueness
         existing = db.query(Project).filter(project_code=new_code, is_deleted=False).all()
-        if any(str(getattr(p, 'id', '')) != str(project_id) for p in existing):
+        if any(str(getattr(p, 'project_id', getattr(p, 'id', ''))) != str(project_id) for p in existing):
              raise HTTPException(status_code=409, detail=f"Project code '{new_code}' is already in use.")
         update_data["project_code"] = new_code
 
@@ -126,7 +126,7 @@ async def update_project(
 @router.delete("/{project_id}")
 async def delete_project(project_id: str, db: Any = Depends(get_db)):
     """Delete a project."""
-    project = db.query(Project).filter(id=project_id).first()
+    project = db.query(Project).filter(project_id=project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
         

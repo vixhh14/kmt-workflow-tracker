@@ -49,7 +49,7 @@ async def get_planning_dashboard_summary(db: any = Depends(get_db)):
             })
         
         projects = db.query(DBProject).all()
-        p_map_info = {str(getattr(p, 'id', '')): getattr(p, 'project_name', '') for p in projects if not getattr(p, 'is_deleted', False)}
+        p_map_info = {str(getattr(p, 'project_id', getattr(p, 'id', ''))): getattr(p, 'project_name', '') for p in projects if not getattr(p, 'is_deleted', False)}
         
         project_stats = {name: {'total': 0, 'completed': 0, 'ended': 0, 'in_progress': 0, 'pending': 0, 'on_hold': 0} for name in p_map_info.values()}
         project_stats["Unassigned"] = {'total': 0, 'completed': 0, 'ended': 0, 'in_progress': 0, 'pending': 0, 'on_hold': 0}
@@ -109,7 +109,7 @@ async def get_planning_dashboard_summary(db: any = Depends(get_db)):
         
         op_status = []
         for op in ops:
-            op_id_str = str(getattr(op, 'id', ''))
+            op_id_str = str(getattr(op, 'user_id', getattr(op, 'id', '')))
             curr = None
             for t in all_tasks_data:
                 if t['assigned_to'] == op_id_str and str(t['status']).lower().replace(" ", "_") == 'in_progress':

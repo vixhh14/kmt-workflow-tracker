@@ -52,7 +52,7 @@ async def read_machines(db: Any = Depends(get_db)):
                 continue
 
             # 3. Defensive Check: Ensure required ID fields are populated
-            if not norm_data.get("id") or not norm_data.get("machine_id"):
+            if not norm_data.get("machine_id"):
                 print(f"⚠️ [Machines] Skipping row with missing ID: {norm_data.get('machine_name', 'Unnamed')}")
                 continue
 

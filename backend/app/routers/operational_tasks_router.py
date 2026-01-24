@@ -17,8 +17,8 @@ async def get_filing_tasks(db: Any = Depends(get_db)):
     tasks = db.query(FilingTask).filter(is_deleted=False).all()
     
     # Pre-load maps for efficiency (cached)
-    projects = {str(p.id): p.project_name for p in db.query(Project).all()}
-    machines = {str(m.id): m.machine_name for m in db.query(Machine).all()}
+    projects = {str(getattr(p, 'project_id', getattr(p, 'id', ''))): p.project_name for p in db.query(Project).all()}
+    machines = {str(getattr(m, 'machine_id', getattr(m, 'id', ''))): m.machine_name for m in db.query(Machine).all()}
 
     results = []
     for t in tasks:
@@ -34,8 +34,8 @@ async def get_fabrication_tasks(db: Any = Depends(get_db)):
     tasks = db.query(FabricationTask).filter(is_deleted=False).all()
     
     # Pre-load maps (cached)
-    projects = {str(p.id): p.project_name for p in db.query(Project).all()}
-    machines = {str(m.id): m.machine_name for m in db.query(Machine).all()}
+    projects = {str(getattr(p, 'project_id', getattr(p, 'id', ''))): p.project_name for p in db.query(Project).all()}
+    machines = {str(getattr(m, 'machine_id', getattr(m, 'id', ''))): m.machine_name for m in db.query(Machine).all()}
 
     results = []
     for t in tasks:
@@ -71,7 +71,7 @@ async def create_fab_task(data: OperationalTaskCreate, db: Any = Depends(get_db)
 
 @router.put("/filing/{task_id}", response_model=OperationalTaskOut)
 async def update_filing_task(task_id: str, data: OperationalTaskUpdate, db: Any = Depends(get_db)):
-    task = db.query(FilingTask).filter(id=task_id).first()
+    task = db.query(FilingTask).filter(filing_task_id=task_id).first()
     if not task: raise HTTPException(status_code=404, detail="Task not found")
     for k, v in data.dict(exclude_unset=True).items():
         setattr(task, k, v)
@@ -81,7 +81,7 @@ async def update_filing_task(task_id: str, data: OperationalTaskUpdate, db: Any 
 
 @router.put("/fabrication/{task_id}", response_model=OperationalTaskOut)
 async def update_fab_task(task_id: str, data: OperationalTaskUpdate, db: Any = Depends(get_db)):
-    task = db.query(FabricationTask).filter(id=task_id).first()
+    task = db.query(FabricationTask).filter(fabrication_task_id=task_id).first()
     if not task: raise HTTPException(status_code=404, detail="Task not found")
     for k, v in data.dict(exclude_unset=True).items():
         setattr(task, k, v)

@@ -52,16 +52,10 @@ class SheetRow:
                 return bool(value)
             return value
         
-        # 2. Schema-Aware Aliasing (Minimal)
-        # If they ask for 'id', and the sheet has [entity]_id, give it.
-        # This is for backward compatibility with some backend logic, 
-        # but the JSON response will be controlled by .dict()
-        prefix = self._name.lower()
-        if prefix.endswith('s'): prefix = prefix[:-1]
-        prefixed_id = f"{prefix}_id"
-        
-        if key == 'id' and prefixed_id in self._data:
-            return self._data[prefixed_id]
+        # 2. Strict Schema Access (No Aliasing)
+        # User Requirement: ❗ No aliasing (id → machine_id) at runtime
+        # Access must use the exact field name defined in SHEETS_SCHEMA.
+
         
         # 3. Handle 'role' vs 'user_role' (Standardized to 'role' in sheet)
         if key == 'user_role' and 'role' in self._data:

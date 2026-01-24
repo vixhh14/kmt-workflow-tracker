@@ -116,6 +116,12 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
             u_active = str(user.get("active", "true")).lower().strip()
             if u_active not in ["true", "1", "yes", "active"]:
                 continue
+            
+            # User Requirement: Attendance is derived ONLY from approved users
+            # Default to 'approved' for legacy users who might miss this field, but strictly filter 'pending'
+            u_approval = str(user.get("approval_status", "approved")).lower().strip()
+            if u_approval != "approved":
+                continue
                 
             u_role = str(user.get("role", "")).lower().strip()
             if u_role not in tracked_roles:

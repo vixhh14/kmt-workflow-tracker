@@ -47,6 +47,20 @@ async def get_machines_dropdown(
         print(f"❌ Error in machines dropdown: {e}")
         return []
 
+@router.get("/units")
+async def get_units_dropdown(
+    db: any = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        from app.models.models_db import Unit
+        all_u = db.query(Unit).all()
+        return [{"unit_id": str(getattr(u, 'unit_id', getattr(u, 'id', ''))), "name": str(getattr(u, 'name', ''))} 
+                for u in all_u if not getattr(u, 'is_deleted', False)]
+    except Exception as e:
+        print(f"❌ Error in units dropdown: {e}")
+        return []
+
 @router.get("/users/assignable", response_model=List[UserDropdownItem])
 async def get_assignable_users(
     db: any = Depends(get_db),
@@ -59,6 +73,10 @@ async def get_assignable_users(
         results = []
         for u in all_u:
             if getattr(u, 'is_deleted', False) or not bool(getattr(u, 'active', True)):
+                continue
+            
+            # User Requirement: Pending users should NOT appear in assignable users
+            if str(getattr(u, 'approval_status', 'approved')).lower().strip() != 'approved':
                 continue
             
             role = str(getattr(u, 'role', '')).lower()
@@ -91,10 +109,10 @@ async def bootstrap_data(
         m = [{"machine_id": str(getattr(m, 'machine_id', getattr(m, 'id', ''))), "machine_name": str(getattr(m, 'machine_name', ''))} 
              for m in db.query(Machine).all() if not getattr(m, 'is_deleted', False)]
                    
-        u = [{"id": str(getattr(u, 'id', '')), "name": str(getattr(u, 'name', ''))} 
+        u = [{"unit_id": str(getattr(u, 'unit_id', getattr(u, 'id', ''))), "name": str(getattr(u, 'name', ''))} 
              for u in db.query(Unit).all() if not getattr(u, 'is_deleted', False)]
                  
-        c = [{"id": str(getattr(c, 'id', '')), "name": str(getattr(c, 'name', ''))} 
+        c = [{"category_id": str(getattr(c, 'category_id', getattr(c, 'id', ''))), "name": str(getattr(c, 'name', ''))} 
              for c in db.query(MachineCategory).all() if not getattr(c, 'is_deleted', False)]
         
         return {
