@@ -62,13 +62,23 @@ const Projects = () => {
     };
 
     const handleDelete = async (id) => {
+        // Validate ID before attempting delete
+        if (!id || id === 'undefined' || id === 'null') {
+            alert('Error: Invalid project ID. Cannot delete project.');
+            console.error('Invalid project ID:', id);
+            return;
+        }
+
         if (window.confirm('Are you sure you want to delete this project?')) {
             try {
+                console.log('Deleting project with ID:', id);
                 await deleteProject(id);
+                alert('Project deleted successfully!');
                 fetchProjects();
             } catch (err) {
                 console.error('Failed to delete project:', err);
-                alert('Failed to delete project');
+                const message = err.response?.data?.detail || err.message || 'Failed to delete project';
+                alert(`Error: ${message}`);
             }
         }
     };
