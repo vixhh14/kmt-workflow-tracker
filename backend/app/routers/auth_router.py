@@ -40,8 +40,14 @@ async def login(credentials: LoginRequest, background_tasks: BackgroundTasks, db
         role = str(getattr(user, 'role', 'operator') or "operator").lower().strip()
 
         # Status check
-        if not bool(getattr(user, 'active', True)):
+        # FIX: Robust string check for active status (handle 'false', '0', 'no')
+        is_active = str(getattr(user, 'active', 'true')).lower().strip()
+        if is_active in ['false', '0', 'no', 'inactive']:
             raise HTTPException(status_code=403, detail="Account is inactive")
+        
+        # User Requirement: Login only if approved
+        if str(getattr(user, 'approval_status', 'approved')).lower().strip() in ['pending', 'rejected']:
+             raise HTTPException(status_code=403, detail="Account pending approval")
         
         # Password verification
         u_hash = getattr(user, 'password_hash', None)

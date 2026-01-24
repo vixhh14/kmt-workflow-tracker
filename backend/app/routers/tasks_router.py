@@ -74,6 +74,15 @@ async def read_tasks(
     # Load projects once (cached)
     all_projects = db.query("Project").all()
     project_map = {str(getattr(p, 'id', '')): getattr(p, 'project_name', '') for p in all_projects if not getattr(p, 'is_deleted', False)}
+    
+    # Load Users Map (Cached)
+    from app.models.models_db import User, Machine
+    all_users = db.query(User).all()
+    user_map = {str(getattr(u, 'user_id', getattr(u, 'id', ''))): u.dict() for u in all_users}
+    
+    # Load Machines Map (Cached)
+    all_machines = db.query(Machine).all()
+    machine_map = {str(getattr(m, 'machine_id', getattr(m, 'id', ''))): m.dict() for m in all_machines}
 
     results = []
     for t in tasks:
@@ -84,20 +93,36 @@ async def read_tasks(
             if (not resolved_project or resolved_project == '-') and task_project_id:
                 resolved_project = project_map.get(task_project_id, "-")
 
+            # Resolve Names
+            p_name = resolved_project if resolved_project != "-" else project_map.get(str(getattr(t, 'project_id', '')), "-")
+            
+            # Map assigned_to (ID -> Username)
+            assignee_id = str(getattr(t, 'assigned_to', ''))
+            assignee_name = user_map.get(assignee_id, {}).get("username", assignee_id)
+            
+            # Map assigned_by (ID -> Username)
+            assigner_id = str(getattr(t, 'assigned_by', ''))
+            assigner_name = user_map.get(assigner_id, {}).get("username", assigner_id)
+            
+            # Map machine_id (ID -> Machine Name)
+            m_id = str(getattr(t, 'machine_id', ''))
+            machine_name = machine_map.get(m_id, {}).get("machine_name", m_id) if m_id else None
+
             task_data = {
                 "id": str(getattr(t, 'id', '')),
+                "task_id": str(getattr(t, 'id', '')), # Mandatory field for schema
                 "title": str(getattr(t, 'title', '') or ""),
                 "description": getattr(t, 'description', ''),
-                "project": resolved_project or "-",
-                "project_id": task_project_id if task_project_id else None,
+                "project": p_name,
+                "project_id": p_name, # MAPPED: project_name in project_id field as requested
                 "part_item": getattr(t, 'part_item', ''),
                 "nos_unit": getattr(t, 'nos_unit', ''),
                 # FIX: Boolean status safety
                 "status": "pending" if getattr(t, 'status', 'pending') is True or str(getattr(t, 'status', 'pending')).lower() == 'true' else getattr(t, 'status', 'pending'),
                 "priority": getattr(t, 'priority', 'MEDIUM'),
-                "assigned_by": getattr(t, 'assigned_by', ''),
-                "assigned_to": getattr(t, 'assigned_to', ''),
-                "machine_id": str(getattr(t, 'machine_id', '')) if getattr(t, 'machine_id', None) else None,
+                "assigned_by": assigner_name, # MAPPED
+                "assigned_to": assignee_name, # MAPPED 
+                "machine_id": machine_name,   # MAPPED
                 "due_date": getattr(t, 'due_date', None),
                 "created_at": getattr(t, 'created_at', None),
                 "started_at": getattr(t, 'started_at', None),

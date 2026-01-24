@@ -129,14 +129,35 @@ async def delete_project(project_id: str, db: Any = Depends(get_db)):
     # Robust ID lookup
     all_projects = db.query(Project).all()
     project = None
+    pid_to_delete = None
+    
     for p in all_projects:
         pid = str(getattr(p, 'project_id', getattr(p, 'id', '')))
         if pid == str(project_id):
             project = p
+            pid_to_delete = pid
             break
             
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+        
+    # Check for active dependencies
+    # We must check if any task (not deleted) links to this project_id
+    related_tasks = db.query(Task).filter(is_deleted=False).all()
+    # Check both project_id and project name (legacy) matches
+    p_name = str(getattr(project, 'project_name', '')).strip()
+    
+    has_tasks = False
+    for t in related_tasks:
+        t_pid = str(getattr(t, 'project_id', ''))
+        t_pname = str(getattr(t, 'project', ''))
+        
+        if (t_pid and t_pid == pid_to_delete) or (t_pname and t_pname == p_name):
+            has_tasks = True
+            break
+            
+    if has_tasks:
+         raise HTTPException(status_code=400, detail="Cannot delete project: it has associated tasks. Please delete or reassign tasks first.")
         
     project.is_deleted = True
     project.updated_at = get_current_time_ist().isoformat()

@@ -122,7 +122,21 @@ def calculate_user_activity(db: any, target_date: date) -> List[dict]:
     target_date_str = target_date.isoformat()
     target_date_str = target_date.isoformat()
     # Filter: Not deleted, specific roles, AND approved (or legacy empty)
-    users = [u for u in db.query(User).all() if not u.is_deleted and str(u.role).lower() in ['operator', 'supervisor', 'fab_master', 'file_master'] and str(getattr(u, 'approval_status', '')).lower() not in ['pending', 'rejected']]
+    users = []
+    all_users = db.query(User).all()
+    for u in all_users:
+        if u.is_deleted: continue
+        
+        # Check Role
+        if str(getattr(u, 'role', '')).lower() not in ['operator', 'supervisor', 'fab_master', 'file_master']:
+            continue
+            
+        # Check Approval (Strict)
+        approval = str(getattr(u, 'approval_status', 'approved')).lower().strip()
+        if approval in ['pending', 'rejected']:
+            continue
+            
+        users.append(u)
     
     logs = [l for l in db.query(UserWorkLog).all() if str(l.date).startswith(target_date_str)]
     

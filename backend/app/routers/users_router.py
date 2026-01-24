@@ -55,7 +55,11 @@ async def list_users(exclude_id: Optional[str] = None, db: any = Depends(get_db)
     for u in all_u:
         try:
             # 1. Skip if deleted or inactive
-            if not bool(getattr(u, 'active', True)) or bool(getattr(u, 'is_deleted', False)):
+            is_del = str(getattr(u, 'is_deleted', 'False')).lower()
+            if is_del in ['true', '1', 'yes']: continue
+            
+            is_active = str(getattr(u, 'active', 'true')).lower().strip()
+            if is_active in ['false', '0', 'no', 'inactive']:
                 continue
                 
             # 2. Filter Unapproved Users (They belong in Pending Approvals only)
