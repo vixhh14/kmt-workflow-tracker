@@ -78,68 +78,89 @@ async def read_tasks(
     # Load Users Map (Cached)
     from app.models.models_db import User, Machine
     all_users = db.query(User).all()
-    user_map = {str(getattr(u, 'user_id', getattr(u, 'id', ''))): u.dict() for u in all_users}
+    user_map = {str(getattr(u, 'user_id', getattr(u, 'id', ''))): u.dict() if hasattr(u, 'dict') else u.__dict__ for u in all_users}
     
     # Load Machines Map (Cached)
     all_machines = db.query(Machine).all()
-    machine_map = {str(getattr(m, 'machine_id', getattr(m, 'id', ''))): m.dict() for m in all_machines}
+    machine_map = {str(getattr(m, 'machine_id', getattr(m, 'id', ''))): m.dict() if hasattr(m, 'dict') else m.__dict__ for m in all_machines}
+
+    # Helper imports
+    from app.core.normalizer import safe_normalize_list, normalize_task_row, safe_str, safe_int
+
+    # Convert tasks to dicts for normalizer
+    task_dicts = [t.dict() if hasattr(t, 'dict') else t.__dict__ for t in tasks]
+
+    # Normalize ALL tasks
+    normalized_tasks = safe_normalize_list(
+        task_dicts,
+        normalize_task_row,
+        "task"
+    )
 
     results = []
-    for t in tasks:
+    for t in normalized_tasks:
         try:
-            # Resolve Project Name if missing
-            resolved_project = getattr(t, 'project', None)
-            task_project_id = str(getattr(t, 'project_id', ''))
-            if (not resolved_project or resolved_project == '-') and task_project_id:
-                resolved_project = project_map.get(task_project_id, "-")
-
-            # Resolve Names
-            p_name = resolved_project if resolved_project != "-" else project_map.get(str(getattr(t, 'project_id', '')), "-")
+            # Enrich with Names
             
-            # Map assigned_to (ID -> Username)
-            assignee_id = str(getattr(t, 'assigned_to', ''))
+            # Resolve Project Name
+            project_name = t.get('project', '')
+            project_id = t.get('project_id', '')
+            
+            if (not project_name or project_name == '-') and project_id:
+                project_name = project_map.get(project_id, "-")
+            elif project_name == '-' and project_id in project_map:
+                project_name = project_map[project_id]
+                
+            if project_id and project_id not in project_map:
+                # Try to find project by name mismatch? No, just keep what we have
+                pass
+                
+            # Resolve Assigned To
+            assignee_id = t.get('assigned_to', '')
             assignee_name = user_map.get(assignee_id, {}).get("username", assignee_id)
             
-            # Map assigned_by (ID -> Username)
-            assigner_id = str(getattr(t, 'assigned_by', ''))
+            # Resolve Assigned By
+            assigner_id = t.get('assigned_by', '')
             assigner_name = user_map.get(assigner_id, {}).get("username", assigner_id)
             
-            # Map machine_id (ID -> Machine Name)
-            m_id = str(getattr(t, 'machine_id', ''))
+            # Resolve Machine
+            m_id = t.get('machine_id', '')
             machine_name = machine_map.get(m_id, {}).get("machine_name", m_id) if m_id else None
 
+            # Build final dict matching TaskOut schema
             task_data = {
-                "id": str(getattr(t, 'id', '')),
-                "task_id": str(getattr(t, 'id', '')), # Mandatory field for schema
-                "title": str(getattr(t, 'title', '') or ""),
-                "description": getattr(t, 'description', ''),
-                "project": p_name,
-                "project_id": p_name, # MAPPED: project_name in project_id field as requested
-                "part_item": getattr(t, 'part_item', ''),
-                "nos_unit": getattr(t, 'nos_unit', ''),
-                # FIX: Boolean status safety
-                "status": "pending" if getattr(t, 'status', 'pending') is True or str(getattr(t, 'status', 'pending')).lower() == 'true' else getattr(t, 'status', 'pending'),
-                "priority": getattr(t, 'priority', 'MEDIUM'),
-                "assigned_by": assigner_name, # MAPPED
-                "assigned_to": assignee_name, # MAPPED 
-                "machine_id": machine_name,   # MAPPED
-                "due_date": getattr(t, 'due_date', None),
-                "created_at": getattr(t, 'created_at', None),
-                "started_at": getattr(t, 'started_at', None),
-                "completed_at": getattr(t, 'completed_at', None),
-                "total_duration_seconds": int(getattr(t, 'total_duration_seconds', 0) or 0),
-                "hold_reason": getattr(t, 'hold_reason', None),
-                "denial_reason": getattr(t, 'denial_reason', None),
-                "actual_start_time": getattr(t, 'actual_start_time', None),
-                "actual_end_time": getattr(t, 'actual_end_time', None),
-                "total_held_seconds": int(getattr(t, 'total_held_seconds', 0) or 0),
-                "work_order_number": getattr(t, 'work_order_number', ''),
-                "ended_by": getattr(t, 'ended_by', None),
-                "end_reason": getattr(t, 'end_reason', None),
-                "expected_completion_time": int(getattr(t, 'expected_completion_time', 0) or 0)
+                "id": t['task_id'],
+                "task_id": t['task_id'],
+                "title": t['title'],
+                "description": t['description'],
+                "project": project_name,
+                "project_id": project_name, # Map name to ID field as requested by frontend quirks
+                "part_item": t['part_item'],
+                "nos_unit": t['nos_unit'],
+                "status": t['status'],
+                "priority": t['priority'],
+                "assigned_by": assigner_name,
+                "assigned_to": assignee_name,
+                "machine_id": machine_name,
+                "due_date": t['due_date'],
+                "created_at": t['created_at'],
+                "started_at": t['started_at'],
+                "completed_at": t['completed_at'],
+                "total_duration_seconds": t['total_duration_seconds'],
+                "hold_reason": t['hold_reason'],
+                "denial_reason": t['denial_reason'],
+                "actual_start_time": t['actual_start_time'],
+                "actual_end_time": t['actual_end_time'],
+                "total_held_seconds": t['total_held_seconds'],
+                "work_order_number": t['work_order_number'],
+                "ended_by": t['ended_by'],
+                "end_reason": t['end_reason'],
+                "expected_completion_time": t['expected_completion_time']
             }
             results.append(task_data)
-        except: continue
+        except Exception as e:
+            print(f"Error processing task {t.get('task_id')}: {e}")
+            continue
             
     return results
 

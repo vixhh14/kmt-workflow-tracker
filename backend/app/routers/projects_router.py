@@ -20,24 +20,39 @@ async def read_projects(
     current_user: User = Depends(get_current_user)
 ):
     """Get all projects from cache."""
+    """Get all projects from cache."""
     # Get all projects and filter out deleted ones
     all_projects = db.query(Project).all()
     
-    # FIXED: Properly filter deleted projects
-    projects = [
-        p for p in all_projects 
-        if not getattr(p, 'is_deleted', False) 
-        and str(getattr(p, 'is_deleted', 'false')).lower() not in ['true', '1', 'yes']
+    # 1. Convert to dicts for safe processing
+    project_dicts = [p.dict() if hasattr(p, 'dict') else p.__dict__ for p in all_projects]
+    
+    # 2. Helper imports
+    from app.core.normalizer import safe_normalize_list, normalize_project_row, safe_bool, safe_str
+
+    # 3. Normalize ALL (this ensures types are safe)
+    normalized_projects = safe_normalize_list(
+        project_dicts,
+        normalize_project_row,
+        "project"
+    )
+    
+    # 4. Filter DELETED projects (Strict Check)
+    # The normalizer sets 'is_deleted' to a proper boolean
+    active_projects = [
+        p for p in normalized_projects 
+        if not p.get('is_deleted')
     ]
     
-    print(f"📊 Projects: Total={len(all_projects)}, Active={len(projects)}, Deleted={len(all_projects) - len(projects)}")
+    print(f"📊 Projects: Total={len(all_projects)}, Active={len(active_projects)}, Deleted={len(all_projects) - len(active_projects)}")
     
-    # Map attributes for frontend compatibility if needed
+    # 5. Map attributes for frontend compatibility if needed
     results = []
-    for p in projects:
-        data = p.dict()
-        data['name'] = data.get('project_name', '')
-        results.append(data)
+    for p in active_projects:
+        # Ensure name is set for frontend (alias for project_name)
+        p['name'] = p.get('project_name', '')
+        results.append(p)
+        
     return results
 
 @router.post("", response_model=ProjectOut)

@@ -96,12 +96,30 @@ async def get_overall_stats(db: any = Depends(get_db)):
 
 @router.get("/pending-users", response_model=List[dict])
 async def get_pending_users(db: any = Depends(get_db)):
-    return [u.dict() for u in db.query(User).all() if not getattr(u, 'is_deleted', False) and str(getattr(u, 'approval_status', '')).lower() == 'pending']
+    """Get all pending users for approval safely."""
+    all_users = db.query(User).all()
+
+    from app.core.normalizer import safe_normalize_list, normalize_user_row
+    
+    # Normalize ALL
+    u_dicts = [u.dict() if hasattr(u, 'dict') else u.__dict__ for u in all_users]
+    normalized = safe_normalize_list(u_dicts, normalize_user_row, "user")
+    
+    # Filter Pending
+    pending = [
+        u for u in normalized
+        if not u.get('is_deleted') 
+        and u.get('approval_status', 'approved').strip().lower() == 'pending'
+    ]
+    
+    return pending
 
 @router.get("/approvals")
 async def get_admin_approvals(db: any = Depends(get_db)):
-    pending = [u.dict() for u in db.query(User).all() if not getattr(u, 'is_deleted', False) and str(getattr(u, 'approval_status', '')).lower() == 'pending']
-    return {"pending_users": pending}
+    """Get pending users count/list for dashboard logic."""
+    # Reuse the same logic to ensure consistency
+    users = await get_pending_users(db)
+    return {"pending_users": users}
 
 @router.put("/change-password")
 async def change_admin_password(request: ChangePasswordRequest, current_admin: User = Depends(get_current_active_admin), db: any = Depends(get_db)):

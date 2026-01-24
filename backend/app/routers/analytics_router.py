@@ -72,16 +72,18 @@ async def get_task_dist(db: any = Depends(get_db)):
         "pending": 0,
         "in_progress": 0,
         "completed": 0,
-        "on_hold": 0
+        "on_hold": 0,
+        "denied": 0
     }
     
+    from app.core.normalizer import normalize_status
+    
     for t in all_tasks:
-        status = str(getattr(t, 'status', 'pending')).lower().strip()
-        if status in dist:
-            dist[status] += 1
-        else:
-            # Handle any other statuses
-            dist[status] = dist.get(status, 0) + 1
+        raw_status = getattr(t, 'status', 'pending')
+        status = normalize_status(raw_status)
+        
+        # Ensure status key exists in dist
+        dist[status] = dist.get(status, 0) + 1
     
     print(f"📊 Distribution: {dist}")
     return dist

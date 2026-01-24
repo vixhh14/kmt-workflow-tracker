@@ -14,35 +14,61 @@ router = APIRouter(prefix="/operational-tasks", tags=["Operational Tasks"])
 @router.get("/filing", response_model=List[OperationalTaskOut])
 async def get_filing_tasks(db: Any = Depends(get_db)):
     """Get all filing tasks from cache."""
-    tasks = db.query(FilingTask).filter(is_deleted=False).all()
+    tasks = db.query(FilingTask).all()
     
     # Pre-load maps for efficiency (cached)
     projects = {str(getattr(p, 'project_id', getattr(p, 'id', ''))): p.project_name for p in db.query(Project).all()}
     machines = {str(getattr(m, 'machine_id', getattr(m, 'id', ''))): m.machine_name for m in db.query(Machine).all()}
+    
+    from app.core.normalizer import safe_normalize_list, normalize_task_row
+    
+    # Convert to dicts
+    task_dicts = [t.dict() if hasattr(t, 'dict') else t.__dict__ for t in tasks]
+    
+    # Normalize with type='filing'
+    normalized_tasks = safe_normalize_list(
+        task_dicts,
+        normalize_task_row,
+        "filing"
+    )
 
     results = []
-    for t in tasks:
-        data = t.dict()
-        data['project_name'] = projects.get(str(getattr(t, 'project_id', '')), 'Unknown')
-        data['machine_name'] = machines.get(str(getattr(t, 'machine_id', '')), 'Manual/None')
-        results.append(data)
+    for t in normalized_tasks:
+        # Enrich
+        t['project_name'] = projects.get(str(t.get('project_id', '')), 'Unknown')
+        t['machine_name'] = machines.get(str(t.get('machine_id', '')), 'Manual/None')
+        results.append(t)
+        
     return results
 
 @router.get("/fabrication", response_model=List[OperationalTaskOut])
 async def get_fabrication_tasks(db: Any = Depends(get_db)):
     """Get all fabrication tasks from cache."""
-    tasks = db.query(FabricationTask).filter(is_deleted=False).all()
+    tasks = db.query(FabricationTask).all()
     
     # Pre-load maps (cached)
     projects = {str(getattr(p, 'project_id', getattr(p, 'id', ''))): p.project_name for p in db.query(Project).all()}
     machines = {str(getattr(m, 'machine_id', getattr(m, 'id', ''))): m.machine_name for m in db.query(Machine).all()}
 
+    from app.core.normalizer import safe_normalize_list, normalize_task_row
+    
+    # Convert to dicts
+    task_dicts = [t.dict() if hasattr(t, 'dict') else t.__dict__ for t in tasks]
+    
+    # Normalize with type='fabrication'
+    normalized_tasks = safe_normalize_list(
+        task_dicts,
+        normalize_task_row,
+        "fabrication"
+    )
+
     results = []
-    for t in tasks:
-        data = t.dict()
-        data['project_name'] = projects.get(str(getattr(t, 'project_id', '')), 'Unknown')
-        data['machine_name'] = machines.get(str(getattr(t, 'machine_id', '')), 'Manual/None')
-        results.append(data)
+    for t in normalized_tasks:
+        # Enrich
+        t['project_name'] = projects.get(str(t.get('project_id', '')), 'Unknown')
+        t['machine_name'] = machines.get(str(t.get('machine_id', '')), 'Manual/None')
+        results.append(t)
+        
     return results
 
 @router.post("/filing", response_model=OperationalTaskOut)

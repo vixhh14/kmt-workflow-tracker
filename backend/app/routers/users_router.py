@@ -51,35 +51,41 @@ async def list_users(exclude_id: Optional[str] = None, db: any = Depends(get_db)
     """List all active users with safety guard."""
     all_u = db.query(User).all()
     
-    results = []
-    for u in all_u:
-        try:
-            # 1. Skip if deleted or inactive
-            is_del = str(getattr(u, 'is_deleted', 'False')).lower()
-            if is_del in ['true', '1', 'yes']: continue
-            
-            is_active = str(getattr(u, 'active', 'true')).lower().strip()
-            if is_active in ['false', '0', 'no', 'inactive']:
-                continue
-                
-            # 2. Filter Unapproved Users (They belong in Pending Approvals only)
-            # RELAXED CHECK: Allow empty/None as approved for legacy/migration safety
-            status = str(getattr(u, 'approval_status', '')).lower().strip()
-            if status not in ['approved', '', 'none', 'true']: 
-                # If explicit 'pending' or 'rejected', skip. If empty, allow (legacy)
-                if status in ['pending', 'rejected']:
-                    continue
+    # helper imports 
+    from app.core.normalizer import safe_normalize_list, normalize_user_row, safe_bool, safe_str
 
-            # 3. Skip excluded user (usually self)
-            u_id = str(getattr(u, 'user_id', getattr(u, 'id', '')))
-            if exclude_id and u_id == str(exclude_id):
+    # 1. Convert to dicts
+    u_dicts = [u.dict() if hasattr(u, 'dict') else u.__dict__ for u in all_u]
+
+    # 2. Normalize
+    normalized_users = safe_normalize_list(
+        u_dicts,
+        normalize_user_row,
+        "user"
+    )
+
+    results = []
+    for u in normalized_users:
+        try:
+            # 3. Skip if deleted (already handled by normalizer but safe to double check)
+            if u['is_deleted']: continue
+            
+            # 4. Filter inactive
+            if not u['active']: continue
+                
+            # 5. Filter Unapproved (if that logic is desired here)
+            # RELAXED: Allow empty status as approved (legacy)
+            status = u.get('approval_status', 'approved').lower().strip()
+            if status in ['pending', 'rejected']:
+                continue
+
+            # 6. Skip excluded user
+            if exclude_id and u['user_id'] == str(exclude_id):
                 continue
             
-            # 3. Final Validation
-            results.append(UserOut(**u.dict()))
+            results.append(UserOut(**u))
         except Exception as e:
-            msg = getattr(u, 'username', 'Unknown')
-            print(f"❌ [Users] Invalid row '{msg}' skipped: {e}")
+            print(f"❌ [Users] Error processing user: {e}")
             
     return results
 
