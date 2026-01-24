@@ -20,8 +20,17 @@ async def read_projects(
     current_user: User = Depends(get_current_user)
 ):
     """Get all projects from cache."""
-    # Query returns all non-deleted projects if we use the right filter
-    projects = db.query(Project).filter(is_deleted=False).all()
+    # Get all projects and filter out deleted ones
+    all_projects = db.query(Project).all()
+    
+    # FIXED: Properly filter deleted projects
+    projects = [
+        p for p in all_projects 
+        if not getattr(p, 'is_deleted', False) 
+        and str(getattr(p, 'is_deleted', 'false')).lower() not in ['true', '1', 'yes']
+    ]
+    
+    print(f"📊 Projects: Total={len(all_projects)}, Active={len(projects)}, Deleted={len(all_projects) - len(projects)}")
     
     # Map attributes for frontend compatibility if needed
     results = []
