@@ -79,14 +79,22 @@ def calculate_machine_runtime(db: any, target_date: date) -> List[dict]:
     # Tasks completed on this date
     completed_on_date = [t for t in db.query(Task).all() if not t.is_deleted and str(t.status).lower() == 'completed' and t.actual_end_time and str(t.actual_end_time).startswith(target_date_str)]
     
-    machine_stats = {str(m.id): {"runtime": 0, "completed_tasks": 0, "is_running_now": False, "obj": m} for m in machines}
+    # Initialize stats for ALL valid machines (using robust ID lookup)
+    machine_stats = {}
+    for m in machines:
+        mid = str(getattr(m, 'machine_id', getattr(m, 'id', '')))
+        machine_stats[mid] = {"runtime": 0, "completed_tasks": 0, "is_running_now": False, "obj": m}
     
     for log in logs:
         mid_str = str(log.machine_id)
+        # Try finding key match
         if mid_str in machine_stats:
             machine_stats[mid_str]["runtime"] += int(log.duration_seconds or 0)
             if not log.end_time: # Still running
                 machine_stats[mid_str]["is_running_now"] = True
+        else:
+            # Fallback for ID mismatch if log stores different ID format
+            pass # (Optional: add smart lookup if needed)
     
     for t in completed_on_date:
         mid_str = str(t.machine_id)

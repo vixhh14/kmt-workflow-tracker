@@ -112,9 +112,19 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         tracked_roles = ['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master']
         
         for user in all_users:
-            # Robust active check for dict-based user data
-            u_active = str(user.get("active", "true")).lower().strip()
-            if u_active not in ["true", "1", "yes", "active"]:
+            # 1. Check is_deleted (Primary Soft Delete)
+            is_del = str(user.get("is_deleted", "false")).lower().strip()
+            if is_del in ["true", "1", "yes"]:
+                continue
+                
+            # 2. Check explicitly inactive status (Secondary)
+            u_status = str(user.get("status", "")).lower().strip()
+            if u_status == "inactive":
+                continue
+                
+            # 3. Legacy 'active' field check (Only filter if explicitly false)
+            u_active = str(user.get("active", "")).lower().strip()
+            if u_active in ["false", "0", "no", "inactive"]:
                 continue
             
             # User Requirement: Attendance is derived ONLY from approved users

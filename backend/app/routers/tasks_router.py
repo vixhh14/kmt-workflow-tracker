@@ -166,14 +166,25 @@ async def create_task(
         else:
              raise HTTPException(status_code=400, detail=f"Assigned user '{assigned_to}' does not exist or is inactive")
 
-    # 3. Project Validation & Sync
+    # 3. Project Validation & Sync (Robust ID Check)
     project_name = task.project.strip() if task.project else "-"
     if task.project_id:
         p_str = str(task.project_id)
-        project_exists = db.query(DBProject).filter(id=p_str).first()
-        if not project_exists:
+        all_projects = db.query(DBProject).all()
+        project_match = None
+        for p in all_projects:
+            pid = str(getattr(p, 'project_id', getattr(p, 'id', '')))
+            if pid == p_str:
+                project_match = p
+                break
+        
+        if not project_match:
+             # Retry with just ID match if schema differs
+             project_match = next((p for p in all_projects if str(getattr(p, 'id', '')) == p_str), None)
+
+        if not project_match:
             raise HTTPException(status_code=400, detail=f"Selected project (ID: {task.project_id}) not found")
-        project_name = project_exists.project_name
+        project_name = project_match.project_name
 
     # 4. Normalization
     priority_norm = (task.priority or "MEDIUM").upper()
