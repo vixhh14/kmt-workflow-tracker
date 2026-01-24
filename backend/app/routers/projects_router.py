@@ -140,26 +140,14 @@ async def delete_project(project_id: str, db: Any = Depends(get_db)):
             
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-        
-    # Check for active dependencies
-    # We must check if any task (not deleted) links to this project_id
-    related_tasks = db.query(Task).filter(is_deleted=False).all()
-    # Check both project_id and project name (legacy) matches
-    p_name = str(getattr(project, 'project_name', '')).strip()
     
-    has_tasks = False
-    for t in related_tasks:
-        t_pid = str(getattr(t, 'project_id', ''))
-        t_pname = str(getattr(t, 'project', ''))
-        
-        if (t_pid and t_pid == pid_to_delete) or (t_pname and t_pname == p_name):
-            has_tasks = True
-            break
-            
-    if has_tasks:
-         raise HTTPException(status_code=400, detail="Cannot delete project: it has associated tasks. Please delete or reassign tasks first.")
+    # REMOVED RESTRICTION: Allow deletion regardless of associated tasks
+    # User requirement: Projects should be deletable without any criteria
+    print(f"🗑️ Deleting project: {getattr(project, 'project_name', 'Unknown')} (ID: {pid_to_delete})")
         
     project.is_deleted = True
     project.updated_at = get_current_time_ist().isoformat()
     db.commit()
+    
+    print(f"✅ Project deleted successfully: {pid_to_delete}")
     return {"message": "Project deleted successfully"}

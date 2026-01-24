@@ -83,7 +83,7 @@ def mark_checkout(db: SheetsDB, user_id: str) -> dict:
 def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
     """
     Get attendance summary for a specific date (YYYY-MM-DD). Defaults to today.
-    FIXED: Relaxed approval_status filtering - defaults to 'approved' if field is empty/missing
+    CRITICAL FIX: Extremely lenient filtering to ensure users are shown
     """
     try:
         if not target_date_str:
@@ -93,16 +93,18 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         
         # 1. Fetch all users and attendance
         from app.repositories.sheets_repository import sheets_repo
-        all_users = sheets_repo.get_all("users") # active=True filtered by repo.get_all
+        all_users = sheets_repo.get_all("users")
         all_att = sheets_repo.get_all("attendance")
         
-        print(f"📊 Attendance Summary: Checking {len(all_users)} users for date {target_date_compare}")
+        print(f"\n{'='*60}")
+        print(f"🔍 ATTENDANCE DEBUG - Date: {target_date_compare}")
+        print(f"{'='*60}")
+        print(f"📊 Total users in system: {len(all_users)}")
         print(f"📊 Total attendance records: {len(all_att)}")
         
         # 2. Build attendance map for target date
         attendance_map = {}
         for a in all_att:
-            # Simple date comparison
             row_date = str(a.get("date", "")).split('T')[0]
             if row_date == target_date_compare:
                 uid = str(a.get("user_id", "")).strip()
@@ -114,71 +116,78 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         present_records = []
         absent_users = []
         
-        # 3. Tracked roles
+        # 3. Tracked roles - EXPANDED to include all roles
         tracked_roles = ['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master']
         
+        filtered_count = 0
         for user in all_users:
-            # 1. Check is_deleted (Primary Soft Delete)
-            is_del = str(user.get("is_deleted", "false")).lower().strip()
-            if is_del in ["true", "1", "yes"]:
-                continue
-                
-            # 2. Check explicitly inactive status (Secondary)
-            u_status = str(user.get("status", "")).lower().strip()
-            if u_status == "inactive":
-                continue
-                
-            # 3. Legacy 'active' field check (Only filter if explicitly false)
-            u_active = str(user.get("active", "")).lower().strip()
-            if u_active in ["false", "0", "no", "inactive"]:
+            user_id = str(user.get("user_id", user.get("id", "")))
+            username = str(user.get("username", "Unknown"))
+            
+            # CRITICAL: Very lenient filtering
+            # Only exclude if EXPLICITLY deleted or inactive
+            is_deleted = str(user.get("is_deleted", "false")).lower().strip()
+            if is_deleted in ["true", "1", "yes"]:
+                filtered_count += 1
+                print(f"  ❌ Filtered (deleted): {username}")
                 continue
             
-            # FIXED: More lenient approval_status check
-            # Default to 'approved' if field is empty or missing
-            # Only exclude if explicitly 'pending' or 'rejected'
-            u_approval = str(user.get("approval_status", "")).lower().strip()
-            if not u_approval:
-                u_approval = "approved"  # Default to approved for legacy users
+            # Check status - only exclude if explicitly "inactive"
+            status = str(user.get("status", "active")).lower().strip()
+            if status == "inactive":
+                filtered_count += 1
+                print(f"  ❌ Filtered (inactive status): {username}")
+                continue
             
-            if u_approval in ["pending", "rejected"]:
+            # REMOVED: approval_status check - include ALL users regardless of approval
+            # This was causing users to not show up
+            
+            # Check role
+            role = str(user.get("role", "")).lower().strip()
+            if role and role not in tracked_roles:
+                filtered_count += 1
+                print(f"  ❌ Filtered (role '{role}' not tracked): {username}")
                 continue
                 
-            u_role = str(user.get("role", "")).lower().strip()
-            if u_role not in tracked_roles:
-                continue
-                
-            u_id = str(user.get("user_id", user.get("id", "")))
-            u_name = str(user.get("username", ""))
-            
-            att = attendance_map.get(u_id)
+            # User passed all filters
+            att = attendance_map.get(user_id)
             
             if att and str(att.get("status", "")).lower() == "present":
                 present_records.append({
-                    "user_id": u_id,
-                    "username": u_name,
-                    "role": u_role,
+                    "user_id": user_id,
+                    "username": username,
+                    "role": role,
                     "login_time": str(att.get("login_time", "")),
                     "logout_time": str(att.get("logout_time", "")),
                     "status": "Present",
                     "date": target_date_compare
                 })
+                print(f"  ✅ PRESENT: {username} ({role})")
             else:
                 absent_users.append({
-                    "user_id": u_id,
-                    "username": u_name,
-                    "role": u_role
+                    "user_id": user_id,
+                    "username": username,
+                    "role": role
                 })
+                print(f"  ⚪ ABSENT: {username} ({role})")
 
-        print(f"✅ Attendance Summary: {len(present_records)} present, {len(absent_users)} absent")
+        print(f"\n{'='*60}")
+        print(f"📊 FINAL COUNTS:")
+        print(f"  Total users checked: {len(all_users)}")
+        print(f"  Filtered out: {filtered_count}")
+        print(f"  Present: {len(present_records)}")
+        print(f"  Absent: {len(absent_users)}")
+        print(f"{'='*60}\n")
 
         return {
             "success": True,
             "date": target_date_compare,
             "present_count": len(present_records),
             "absent_count": len(absent_users),
-            "present": len(present_records),  # Add alias for frontend compatibility
-            "absent": len(absent_users),  # Add alias for frontend compatibility
-            "records": present_records, # For compatibility with UI showing Present list
+            "present": len(present_records),
+            "absent": len(absent_users),
+            "total_tracked": len(present_records) + len(absent_users),
+            "records": present_records,
             "all_records": present_records + [{"user_id": u["user_id"], "username": u["username"], "status": "Absent", "role": u["role"]} for u in absent_users],
             "present_users": present_records,
             "absent_users": absent_users
@@ -187,7 +196,15 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         print(f"❌ Error in get_attendance_summary: {e}")
         import traceback
         traceback.print_exc()
-        return {"success": False, "error": str(e), "present_count": 0, "absent_count": 0, "present_users": [], "absent_users": []}
+        return {
+            "success": False, 
+            "error": str(e), 
+            "present_count": 0, 
+            "absent_count": 0, 
+            "total_tracked": 0,
+            "present_users": [], 
+            "absent_users": []
+        }
 
 def get_all_attendance(db: SheetsDB, target_date_str: Optional[str] = None):
     """Fetch all attendance records with user info injected."""

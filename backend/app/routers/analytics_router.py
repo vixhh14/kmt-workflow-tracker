@@ -54,11 +54,36 @@ async def get_operator_performance(
 
 @router.get("/task-distribution")
 async def get_task_dist(db: any = Depends(get_db)):
-    tasks = [t for t in db.query(Task).all() if not t.is_deleted]
-    dist = {}
-    for t in tasks:
-        s = str(t.status).lower()
-        dist[s] = dist.get(s, 0) + 1
+    """Get task status distribution across ALL task types (general, filing, fabrication)"""
+    from app.models.models_db import FilingTask, FabricationTask
+    
+    # Get all task types
+    general_tasks = [t for t in db.query(Task).all() if not getattr(t, 'is_deleted', False)]
+    filing_tasks = [t for t in db.query(FilingTask).all() if not getattr(t, 'is_deleted', False)]
+    fab_tasks = [t for t in db.query(FabricationTask).all() if not getattr(t, 'is_deleted', False)]
+    
+    # Combine all tasks
+    all_tasks = general_tasks + filing_tasks + fab_tasks
+    
+    print(f"📊 Task Distribution: {len(general_tasks)} general, {len(filing_tasks)} filing, {len(fab_tasks)} fabrication")
+    
+    # Count by status
+    dist = {
+        "pending": 0,
+        "in_progress": 0,
+        "completed": 0,
+        "on_hold": 0
+    }
+    
+    for t in all_tasks:
+        status = str(getattr(t, 'status', 'pending')).lower().strip()
+        if status in dist:
+            dist[status] += 1
+        else:
+            # Handle any other statuses
+            dist[status] = dist.get(status, 0) + 1
+    
+    print(f"📊 Distribution: {dist}")
     return dist
 
 @router.get("/production-trend")

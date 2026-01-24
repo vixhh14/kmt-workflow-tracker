@@ -161,3 +161,28 @@ async def update_user_role(user_id: str, role_update: UserRoleUpdate, db: any = 
     user.updated_at = get_current_time_ist().isoformat()
     db.commit()
     return {"message": "Updated"}
+
+@router.delete("/users/{user_id}")
+async def delete_user(user_id: str, db: any = Depends(get_db), current_admin: User = Depends(get_current_active_admin)):
+    """Delete a user (soft delete) - No restrictions"""
+    from app.core.time_utils import get_current_time_ist
+    
+    user = db.query(User).filter(user_id=user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Prevent self-deletion
+    if str(getattr(user, 'user_id', '')) == str(getattr(current_admin, 'user_id', '')):
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    
+    # REMOVED RESTRICTION: Allow deletion regardless of assigned tasks
+    # User requirement: Users should be deletable without any criteria
+    print(f"🗑️ Deleting user: {getattr(user, 'username', 'Unknown')} (ID: {user_id})")
+    
+    user.is_deleted = True
+    user.updated_at = get_current_time_ist().isoformat()
+    db.commit()
+    
+    print(f"✅ User deleted successfully: {user_id}")
+    return {"message": "User deleted successfully"}
+

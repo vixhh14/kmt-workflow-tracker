@@ -46,28 +46,76 @@ async def get_fabrication_tasks(db: Any = Depends(get_db)):
     return results
 
 @router.post("/filing", response_model=OperationalTaskOut)
-async def create_filing_task(data: OperationalTaskCreate, db: Any = Depends(get_db)):
-    new_task = FilingTask(
-        **data.dict(),
-        created_at=get_current_time_ist().isoformat(),
-        status="pending",
-        is_deleted=False
-    )
-    db.add(new_task)
-    db.commit()
-    return new_task
+async def create_filing_task(data: OperationalTaskCreate, db: Any = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Create a new filing task with proper error handling"""
+    try:
+        task_id = str(uuid.uuid4())
+        now = get_current_time_ist().isoformat()
+        
+        # Build task data dictionary
+        task_data = data.dict()
+        task_data['filing_task_id'] = task_id
+        task_data['id'] = task_id
+        task_data['created_at'] = now
+        task_data['updated_at'] = now
+        task_data['status'] = task_data.get('status', 'pending')
+        task_data['is_deleted'] = False
+        
+        # Auto-assign to FILE_MASTER if no assignee
+        if not task_data.get('assigned_to'):
+            file_masters = [u for u in db.query(User).all() if getattr(u, 'role', '') == 'file_master' and not getattr(u, 'is_deleted', False)]
+            if file_masters:
+                task_data['assigned_to'] = str(getattr(file_masters[0], 'user_id', getattr(file_masters[0], 'id', '')))
+        
+        print(f"📝 Creating filing task: {task_data.get('task_project', 'Unknown')}")
+        
+        new_task = FilingTask(**task_data)
+        db.add(new_task)
+        db.commit()
+        
+        print(f"✅ Filing task created: {task_id}")
+        return new_task
+    except Exception as e:
+        print(f"❌ Error creating filing task: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to create filing task: {str(e)}")
 
 @router.post("/fabrication", response_model=OperationalTaskOut)
-async def create_fab_task(data: OperationalTaskCreate, db: Any = Depends(get_db)):
-    new_task = FabricationTask(
-        **data.dict(),
-        created_at=get_current_time_ist().isoformat(),
-        status="pending",
-        is_deleted=False
-    )
-    db.add(new_task)
-    db.commit()
-    return new_task
+async def create_fab_task(data: OperationalTaskCreate, db: Any = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Create a new fabrication task with proper error handling"""
+    try:
+        task_id = str(uuid.uuid4())
+        now = get_current_time_ist().isoformat()
+        
+        # Build task data dictionary
+        task_data = data.dict()
+        task_data['fabrication_task_id'] = task_id
+        task_data['id'] = task_id
+        task_data['created_at'] = now
+        task_data['updated_at'] = now
+        task_data['status'] = task_data.get('status', 'pending')
+        task_data['is_deleted'] = False
+        
+        # Auto-assign to FAB_MASTER if no assignee
+        if not task_data.get('assigned_to'):
+            fab_masters = [u for u in db.query(User).all() if getattr(u, 'role', '') == 'fab_master' and not getattr(u, 'is_deleted', False)]
+            if fab_masters:
+                task_data['assigned_to'] = str(getattr(fab_masters[0], 'user_id', getattr(fab_masters[0], 'id', '')))
+        
+        print(f"📝 Creating fabrication task: {task_data.get('task_project', 'Unknown')}")
+        
+        new_task = FabricationTask(**task_data)
+        db.add(new_task)
+        db.commit()
+        
+        print(f"✅ Fabrication task created: {task_id}")
+        return new_task
+    except Exception as e:
+        print(f"❌ Error creating fabrication task: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to create fabrication task: {str(e)}")
 
 @router.put("/filing/{task_id}", response_model=OperationalTaskOut)
 async def update_filing_task(task_id: str, data: OperationalTaskUpdate, db: Any = Depends(get_db)):
