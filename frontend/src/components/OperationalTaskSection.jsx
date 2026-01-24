@@ -231,23 +231,28 @@ const OperationalTaskSection = ({ type, machineId, machineName, userId, userName
                                 <select
                                     required
                                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white"
-                                    value={formData.project_id || ''}
+                                    value={formData.project_id}
                                     onChange={e => {
-                                        const pId = e.target.value;
-                                        setFormData({
-                                            ...formData,
-                                            project_id: pId || ''
-                                        });
+                                        const val = e.target.value;
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            project_id: val
+                                        }));
                                     }}
                                 >
-                                    <option value="" disabled hidden>
+                                    <option value="">
                                         {loading ? '-- Loading Projects --' : (initialProjects?.length || projects.length) === 0 ? '-- No Projects Available --' : '-- Select Project --'}
                                     </option>
-                                    {(initialProjects?.length > 0 ? initialProjects : projects).map(p => (
-                                        <option key={p?.id || p?.project_id || Math.random()} value={p?.id || p?.project_id || ''}>
-                                            {p?.name || p?.project_name || 'Unknown Project'}
-                                        </option>
-                                    ))}
+                                    {(initialProjects?.length > 0 ? initialProjects : projects).map(p => {
+                                        const pid = p?.project_id || p?.id;
+                                        const pname = p?.project_name || p?.name || 'Unknown Project';
+                                        if (!pid) return null;
+                                        return (
+                                            <option key={pid} value={pid}>
+                                                {pname}
+                                            </option>
+                                        );
+                                    })}
                                 </select>
                             </div>
 

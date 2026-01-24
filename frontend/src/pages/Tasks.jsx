@@ -650,14 +650,17 @@ const Tasks = () => {
                                         onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     >
-                                        <option value="" disabled hidden>-- Select User --</option>
+                                        <option value="">-- Select User --</option>
                                         {users
                                             .filter(u => ['operator', 'supervisor', 'fab_master', 'file_master'].includes(u?.role))
-                                            .map((user) => (
-                                                <option key={user?.user_id} value={user?.user_id}>
-                                                    {user?.full_name || user?.username} ({user?.role})
-                                                </option>
-                                            ))}
+                                            .map((user) => {
+                                                const uid = user?.user_id || user?.id;
+                                                return (
+                                                    <option key={uid} value={uid}>
+                                                        {user?.full_name || user?.username} ({user?.role})
+                                                    </option>
+                                                );
+                                            })}
                                     </select>
                                 </div>
                                 <div>
@@ -669,14 +672,17 @@ const Tasks = () => {
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                         disabled={loading || users.length === 0}
                                     >
-                                        <option value="" disabled hidden>-- Select User --</option>
+                                        <option value="">-- Select User --</option>
                                         {users
                                             .filter(u => ['admin', 'supervisor', 'planning'].includes(u?.role))
-                                            .map((user) => (
-                                                <option key={user?.user_id} value={user?.user_id}>
-                                                    {user?.full_name || user?.username || 'Unknown'} ({user?.role || 'unknown'})
-                                                </option>
-                                            ))}
+                                            .map((user) => {
+                                                const uid = user?.user_id || user?.id;
+                                                return (
+                                                    <option key={uid} value={uid}>
+                                                        {user?.full_name || user?.username || 'Unknown'} ({user?.role || 'unknown'})
+                                                    </option>
+                                                );
+                                            })}
                                     </select>
                                 </div>
                             </>

@@ -424,15 +424,15 @@ const AdminDashboard = () => {
                     </div>
                     {attendanceSummary.present_users && attendanceSummary.present_users.length > 0 ? (
                         <div className="space-y-2 max-h-60 overflow-y-auto">
-                            {attendanceSummary.present_users.map(user => (
+                            {attendanceSummary.present_users.map((user, idx) => (
                                 <div
-                                    key={user.id}
+                                    key={user.user_id || user.id || idx}
                                     className="flex items-center justify-between p-2 bg-green-50 rounded-lg"
                                 >
                                     <div>
-                                        <p className="font-medium text-gray-900">{user.name}</p>
-                                        {user.role && (
-                                            <p className="text-xs text-gray-600 capitalize">{user.role}</p>
+                                        <p className="font-medium text-gray-900">{user.username || user.name || user.full_name || 'Unknown User'}</p>
+                                        {(user.role || user.user_role) && (
+                                            <p className="text-xs text-gray-600 capitalize">{user.role || user.user_role}</p>
                                         )}
                                     </div>
                                     <div className="h-2 w-2 bg-green-500 rounded-full"></div>
@@ -464,15 +464,15 @@ const AdminDashboard = () => {
                     </div>
                     {attendanceSummary.absent_users && attendanceSummary.absent_users.length > 0 ? (
                         <div className="space-y-2 max-h-60 overflow-y-auto">
-                            {attendanceSummary.absent_users.map(user => (
+                            {attendanceSummary.absent_users.map((user, idx) => (
                                 <div
-                                    key={user.id}
+                                    key={user.user_id || user.id || idx}
                                     className="flex items-center justify-between p-2 bg-red-50 rounded-lg"
                                 >
                                     <div>
-                                        <p className="font-medium text-gray-900">{user.name}</p>
-                                        {user.role && (
-                                            <p className="text-xs text-gray-600 capitalize">{user.role}</p>
+                                        <p className="font-medium text-gray-900">{user.username || user.name || user.full_name || 'Unknown User'}</p>
+                                        {(user.role || user.user_role) && (
+                                            <p className="text-xs text-gray-600 capitalize">{user.role || user.user_role}</p>
                                         )}
                                     </div>
                                     <div className="h-2 w-2 bg-red-500 rounded-full"></div>
@@ -482,7 +482,7 @@ const AdminDashboard = () => {
                     ) : (
                         <div className="text-center py-8 text-gray-500">
                             <UserCheck className="mx-auto mb-2" size={32} />
-                            <p>All users are present today</p>
+                            <p>All users are present today (or none monitored)</p>
                         </div>
                     )}
                 </div>

@@ -315,13 +315,14 @@ const Reports = () => {
                                 {reportData.map((row, idx) => (
                                     <React.Fragment key={idx}>
                                         {activeTab === 'machine-summary' && (
-                                            <tr className="hover:bg-gray-50">
-                                                <td className="px-6 py-4 font-medium text-gray-900">{row.machine_name}</td>
-                                                <td className="px-6 py-4 text-gray-600">{row.category}</td>
-                                                <td className="px-6 py-4 text-gray-600 font-mono">{formatDuration(row.runtime_seconds)}</td>
-                                                <td className="px-6 py-4 text-gray-600">{row.tasks_run_count}</td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${row.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                                            <tr className="hover:bg-gray-50" key={row.machine_id || idx}>
+                                                <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.machine_name || 'Unknown Machine'}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600">{row.category}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600">{formatDuration(row.runtime_seconds)}</td>
+                                                <td className="px-4 py-3 text-sm text-gray-600">{row.tasks_run_count}</td>
+                                                <td className="px-4 py-3 text-sm">
+                                                    <span className={`px-2 py-1 text-xs rounded-full ${row.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                                                        }`}>
                                                         {row.status}
                                                     </span>
                                                 </td>
