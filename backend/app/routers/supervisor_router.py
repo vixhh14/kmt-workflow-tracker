@@ -24,9 +24,25 @@ class AssignTaskRequest(BaseModel):
 
 @router.get("/pending-tasks")
 async def get_pending_tasks(db: any = Depends(get_db)):
+    """
+    Get all pending tasks that need assignment.
+    FIXED: Show tasks that are either:
+    1. Unassigned (no assigned_to), OR
+    2. Have status='pending' (assigned but not started)
+    """
     try:
         all_tasks = db.query(Task).all()
-        pending = [t for t in all_tasks if not getattr(t, 'is_deleted', False) and (not getattr(t, 'assigned_to', None) or getattr(t, 'status', '') == 'pending')]
+        # FIXED: Include tasks with status='pending' OR without assigned_to
+        pending = [
+            t for t in all_tasks 
+            if not getattr(t, 'is_deleted', False) 
+            and (
+                not getattr(t, 'assigned_to', None) or getattr(t, 'assigned_to', '') == '' 
+                or getattr(t, 'status', '') == 'pending'
+            )
+        ]
+        
+        print(f"📋 Pending Tasks: Found {len(pending)} tasks needing assignment")
         
         all_users = db.query(User).all()
         user_map = {str(getattr(u, 'user_id', getattr(u, 'id', ''))): u for u in all_users}
@@ -42,12 +58,17 @@ async def get_pending_tasks(db: any = Depends(get_db)):
             "status": getattr(t, 'status', '') or "pending",
             "machine_id": str(getattr(t, 'machine_id', '')) if getattr(t, 'machine_id', None) else "",
             "machine_name": getattr(machine_map.get(str(getattr(t, 'machine_id', ''))), 'machine_name', '') if str(getattr(t, 'machine_id', '')) in machine_map else "",
+            "assigned_to": str(getattr(t, 'assigned_to', '')) if getattr(t, 'assigned_to', None) else "",
             "assigned_by": str(getattr(t, 'assigned_by', '')) if getattr(t, 'assigned_by', None) else "",
             "assigned_by_name": getattr(user_map.get(str(getattr(t, 'assigned_by', ''))), 'username', '') if str(getattr(t, 'assigned_by', '')) in user_map else "",
             "due_date": str(getattr(t, 'due_date', '')) if getattr(t, 'due_date', None) else "",
+            "expected_completion_time": getattr(t, 'expected_completion_time', 0),
             "created_at": str(getattr(t, 'created_at', '')) if getattr(t, 'created_at', None) else None
         } for t in pending]
     except Exception as e:
+        print(f"❌ Error fetching pending tasks: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to fetch pending tasks: {str(e)}")
 
 

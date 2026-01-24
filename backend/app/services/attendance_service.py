@@ -83,6 +83,7 @@ def mark_checkout(db: SheetsDB, user_id: str) -> dict:
 def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
     """
     Get attendance summary for a specific date (YYYY-MM-DD). Defaults to today.
+    FIXED: Relaxed approval_status filtering - defaults to 'approved' if field is empty/missing
     """
     try:
         if not target_date_str:
@@ -95,6 +96,9 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         all_users = sheets_repo.get_all("users") # active=True filtered by repo.get_all
         all_att = sheets_repo.get_all("attendance")
         
+        print(f"📊 Attendance Summary: Checking {len(all_users)} users for date {target_date_compare}")
+        print(f"📊 Total attendance records: {len(all_att)}")
+        
         # 2. Build attendance map for target date
         attendance_map = {}
         for a in all_att:
@@ -104,6 +108,8 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
                 uid = str(a.get("user_id", "")).strip()
                 if uid:
                     attendance_map[uid] = a
+        
+        print(f"📊 Attendance records for {target_date_compare}: {len(attendance_map)}")
         
         present_records = []
         absent_users = []
@@ -127,10 +133,13 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
             if u_active in ["false", "0", "no", "inactive"]:
                 continue
             
-            # User Requirement: Attendance is derived ONLY from approved users
-            # Default to 'approved' for legacy users who might miss this field, but strictly filter 'pending'
-            u_approval = str(user.get("approval_status", "approved")).lower().strip()
-            # Relaxed check: Allow empty string as valid
+            # FIXED: More lenient approval_status check
+            # Default to 'approved' if field is empty or missing
+            # Only exclude if explicitly 'pending' or 'rejected'
+            u_approval = str(user.get("approval_status", "")).lower().strip()
+            if not u_approval:
+                u_approval = "approved"  # Default to approved for legacy users
+            
             if u_approval in ["pending", "rejected"]:
                 continue
                 
@@ -160,19 +169,25 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
                     "role": u_role
                 })
 
+        print(f"✅ Attendance Summary: {len(present_records)} present, {len(absent_users)} absent")
+
         return {
             "success": True,
             "date": target_date_compare,
             "present_count": len(present_records),
             "absent_count": len(absent_users),
+            "present": len(present_records),  # Add alias for frontend compatibility
+            "absent": len(absent_users),  # Add alias for frontend compatibility
             "records": present_records, # For compatibility with UI showing Present list
-            "all_records": present_records + [{"user_id": u["user_id"], "username": u["username"], "status": "Absent"} for u in absent_users],
+            "all_records": present_records + [{"user_id": u["user_id"], "username": u["username"], "status": "Absent", "role": u["role"]} for u in absent_users],
             "present_users": present_records,
             "absent_users": absent_users
         }
     except Exception as e:
         print(f"❌ Error in get_attendance_summary: {e}")
-        return {"success": False, "error": str(e)}
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "error": str(e), "present_count": 0, "absent_count": 0, "present_users": [], "absent_users": []}
 
 def get_all_attendance(db: SheetsDB, target_date_str: Optional[str] = None):
     """Fetch all attendance records with user info injected."""

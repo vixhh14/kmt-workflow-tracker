@@ -223,36 +223,50 @@ async def create_task(
     try:
         # 5. Build canonical row data (Plain Dictionary)
         # Replaces Task() instantiation to avoid keyword conflicts
+        
+        # Ensure expected_completion_time is set
+        expected_time = int(task.expected_completion_time) if task.expected_completion_time else 0
+        
         new_task_data = {
             "id": t_id,
             "title": task.title.strip(),
             "description": task.description.strip() if task.description else "",
             "project_id": task.project_id if task.project_id else "",
-            "project": project_name,
-            "part_item": task.part_item.strip() if task.part_item else "",
+            "project": project_name,  # CRITICAL: Always set project name
+            "part_item": task.part_item.strip() if task.part_item else "",  # CRITICAL: Set part_item
             "nos_unit": task.nos_unit.strip() if task.nos_unit else "",
             "status": task.status or "pending",
             "priority": priority_norm,
             "assigned_by": assigned_by,
             "assigned_to": str(assigned_to) if assigned_to else "",
             "machine_id": str(task.machine_id) if task.machine_id else "",
-            "due_date": str(task.due_date) if task.due_date else "",
+            "due_date": str(task.due_date) if task.due_date else "",  # CRITICAL: Set due_date in ISO format
             "work_order_number": task.work_order_number.strip(),
             "created_at": now_ist,
             "updated_at": now_ist,
             "is_deleted": False,
             "total_duration_seconds": 0,
             "total_held_seconds": 0,
-            "expected_completion_time": 0
+            "expected_completion_time": expected_time
         }
+        
+        print(f"📝 Creating task with data:")
+        print(f"   - Project: {project_name} (ID: {task.project_id})")
+        print(f"   - Part/Item: {new_task_data['part_item']}")
+        print(f"   - Due Date: {new_task_data['due_date']}")
+        print(f"   - Expected Time: {expected_time} minutes")
         
         # 6. Insert directly via Sheets Repository
         from app.repositories.sheets_repository import sheets_repo
         inserted = sheets_repo.insert("tasks", new_task_data)
         
         # Ensure 'project' field is present for response (if not in inserted)
-        if "project" not in inserted:
+        if "project" not in inserted or not inserted["project"]:
             inserted["project"] = project_name
+        if "part_item" not in inserted:
+            inserted["part_item"] = new_task_data["part_item"]
+        if "due_date" not in inserted:
+            inserted["due_date"] = new_task_data["due_date"]
             
         print(f"✅ Task created successfully in GS: {t_id}")
         return inserted

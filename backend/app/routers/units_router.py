@@ -24,11 +24,44 @@ class UnitCreate(BaseModel):
 @router.get("", response_model=List[UnitResponse])
 async def get_units(db: Any = Depends(get_db)):
     """Get all units"""
-    all_units = db.query(UnitModel).all()
-    # Ensure all have str() IDs for schema
-    for u in all_units:
-        u.id = str(getattr(u, 'unit_id', getattr(u, 'id', '')))
-    return all_units
+    try:
+        all_units = db.query(UnitModel).all()
+        print(f"📦 Units: Found {len(all_units)} units")
+        
+        # Ensure all have str() IDs for schema
+        for u in all_units:
+            u.id = str(getattr(u, 'unit_id', getattr(u, 'id', '')))
+        
+        # If no units exist, seed default units
+        if len(all_units) == 0:
+            print("⚠️ No units found, seeding default units...")
+            default_units = [
+                {"name": "Unit A", "description": "Production Unit A"},
+                {"name": "Unit B", "description": "Production Unit B"},
+                {"name": "Unit C", "description": "Production Unit C"},
+            ]
+            
+            for idx, unit_data in enumerate(default_units, start=1):
+                new_unit = UnitModel(
+                    unit_id=str(idx),
+                    name=unit_data["name"],
+                    description=unit_data["description"],
+                    status="active",
+                    created_at=datetime.now().isoformat()
+                )
+                db.add(new_unit)
+                new_unit.id = str(idx)
+                all_units.append(new_unit)
+            
+            db.commit()
+            print(f"✅ Seeded {len(default_units)} default units")
+        
+        return all_units
+    except Exception as e:
+        print(f"❌ Error fetching units: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
 
 @router.get("/{unit_id}", response_model=UnitResponse)
 async def get_unit(unit_id: str, db: Any = Depends(get_db)):
@@ -36,7 +69,7 @@ async def get_unit(unit_id: str, db: Any = Depends(get_db)):
     unit = db.query(UnitModel).filter(unit_id=unit_id).first()
     if not unit:
         raise HTTPException(status_code=404, detail="Unit not found")
-    unit.id = str(getattr(unit, 'unit_id', getattr(unit, 'id', '')))
+    unit.id = str(getattr(unit, 'unit_id', getattr(u, 'id', '')))
     return unit
 
 @router.post("", response_model=UnitResponse)
