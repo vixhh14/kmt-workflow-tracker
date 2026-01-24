@@ -62,7 +62,14 @@ def calculate_detailed_user_activity(db: any, user_id: str, target_date: date) -
 def calculate_machine_runtime(db: any, target_date: date) -> List[dict]:
     target_date_str = target_date.isoformat()
     target_date_str = target_date.isoformat()
-    machines = [m for m in db.query(Machine).all() if not m.is_deleted]
+    # Filter: Not deleted (handle boolean/string nuances)
+    all_machines = db.query(Machine).all()
+    machines = []
+    for m in all_machines:
+        is_del = str(getattr(m, 'is_deleted', 'False')).lower()
+        if is_del in ['true', '1', 'yes']:
+            continue
+        machines.append(m)
     units = {str(getattr(u, 'unit_id', getattr(u, 'id', ''))): str(u.name) for u in db.query(Unit).all()}
     categories = {str(c.id): str(c.name) for c in db.query(MachineCategory).all()}
     

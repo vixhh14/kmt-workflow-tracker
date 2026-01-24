@@ -126,7 +126,15 @@ async def update_project(
 @router.delete("/{project_id}")
 async def delete_project(project_id: str, db: Any = Depends(get_db)):
     """Delete a project."""
-    project = db.query(Project).filter(project_id=project_id).first()
+    # Robust ID lookup
+    all_projects = db.query(Project).all()
+    project = None
+    for p in all_projects:
+        pid = str(getattr(p, 'project_id', getattr(p, 'id', '')))
+        if pid == str(project_id):
+            project = p
+            break
+            
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
         

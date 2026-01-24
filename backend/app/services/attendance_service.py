@@ -120,7 +120,8 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
             # User Requirement: Attendance is derived ONLY from approved users
             # Default to 'approved' for legacy users who might miss this field, but strictly filter 'pending'
             u_approval = str(user.get("approval_status", "approved")).lower().strip()
-            if u_approval != "approved":
+            # Relaxed check: Allow empty string as valid
+            if u_approval in ["pending", "rejected"]:
                 continue
                 
             u_role = str(user.get("role", "")).lower().strip()

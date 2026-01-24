@@ -136,14 +136,35 @@ async def create_task(
     # 2. Assignee Resolution
     assigned_to = task.assigned_to
     if assigned_to:
-        assignee = db.query(User).filter(id=assigned_to).filter(is_deleted=False).first()
-        if not assignee:
-            # Fallback: check if it's a username
-            assignee = db.query(User).filter(username=assigned_to).filter(is_deleted=False).first()
-            if assignee:
-                assigned_to = assignee.id 
-            else:
-                 raise HTTPException(status_code=400, detail=f"Assigned user '{assigned_to}' does not exist or is inactive")
+        # Robust lookup: Check user_id, id, then username
+        # Also robust check for is_deleted (string/bool)
+        users = db.query(User).all()
+        assignee = None
+        for u in users:
+            # Check deletion
+            is_del = str(getattr(u, 'is_deleted', 'False')).lower()
+            if is_del in ['true', '1', 'yes']: 
+                continue
+                
+            # Check ID match
+            uid = str(getattr(u, 'user_id', getattr(u, 'id', '')))
+            if uid == str(assigned_to):
+                assignee = u
+                break
+            
+            # Check Username match
+            if str(getattr(u, 'username', '')).lower() == str(assigned_to).lower():
+                assignee = u
+                break
+
+        if assignee:
+            assigned_to = str(getattr(assignee, 'user_id', getattr(assignee, 'id', '')))
+            # Validate approval (relaxed)
+            status = str(getattr(assignee, 'approval_status', '')).lower()
+            if status in ['pending', 'rejected']:
+                 raise HTTPException(status_code=400, detail=f"Assigned user '{assigned_to}' is pending approval")
+        else:
+             raise HTTPException(status_code=400, detail=f"Assigned user '{assigned_to}' does not exist or is inactive")
 
     # 3. Project Validation & Sync
     project_name = task.project.strip() if task.project else "-"
