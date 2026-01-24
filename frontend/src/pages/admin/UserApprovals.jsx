@@ -217,6 +217,7 @@ const UserApprovals = () => {
                                                 )}
                                             </div>
                                         </td>
+
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center space-x-2">
                                                 <Briefcase size={16} className="text-gray-400" />
@@ -227,14 +228,16 @@ const UserApprovals = () => {
                                                     disabled={units.length === 0}
                                                 >
                                                     <option value="">{units.length === 0 ? "No Units Available" : "-- Select Unit --"}</option>
-                                                    {units.map((unit) => {
-                                                        const uid = unit.unit_id || unit.id;
-                                                        return (
-                                                            <option key={uid} value={uid}>
-                                                                {unit.name}
-                                                            </option>
-                                                        );
-                                                    })}
+                                                    {units
+                                                        .filter(u => !['unit c', 'unitc'].includes(u.name?.toLowerCase()))
+                                                        .map((unit) => {
+                                                            const uid = unit.unit_id || unit.id;
+                                                            return (
+                                                                <option key={uid} value={uid}>
+                                                                    {unit.name}
+                                                                </option>
+                                                            );
+                                                        })}
                                                 </select>
                                             </div>
                                         </td>
