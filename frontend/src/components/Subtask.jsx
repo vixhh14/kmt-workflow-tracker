@@ -14,7 +14,7 @@ const Subtask = ({ taskId, taskAssigneeId }) => {
     const [edits, setEdits] = useState({});
 
     // Roles allowed to edit: Admin, Planning, Supervisor, or the Operator assigned to the task
-    const isMaster = ['admin', 'planning', 'supervisor'].includes(user?.role);
+    const isMaster = ['admin', 'planning', 'supervisor', 'master'].includes(user?.role?.toLowerCase());
     const isAssignedOperator = user?.role === 'operator' && user?.user_id === taskAssigneeId;
     const canEdit = isMaster || isAssignedOperator;
 

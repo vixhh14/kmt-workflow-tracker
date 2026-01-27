@@ -95,7 +95,6 @@ const OperatorDashboard = () => {
     };
 
     const handleCompleteTask = async (taskId) => {
-        if (!window.confirm('Are you sure you want to complete this task?')) return;
         try {
             setActionLoading(prev => ({ ...prev, [taskId]: 'completing' }));
             await operatorCompleteTask(taskId);
@@ -115,8 +114,8 @@ const OperatorDashboard = () => {
     };
 
     const handleModalSubmit = async () => {
-        if (!modalReason.trim()) {
-            alert('Please provide a reason');
+        if (modalType === 'hold' && !modalReason.trim()) {
+            alert('Please provide a reason to hold the task');
             return;
         }
 
@@ -210,6 +209,16 @@ const OperatorDashboard = () => {
         }
     };
 
+    const getDeadlineColor = (dueDate) => {
+        if (!dueDate) return 'text-gray-500';
+        try {
+            const deadline = new Date(dueDate);
+            const now = new Date();
+            if (deadline < now) return 'text-red-500 font-black animate-pulse'; // Past due
+            return 'text-green-600 font-bold'; // Still have time
+        } catch (e) { return 'text-gray-500'; }
+    };
+
     const filteredTasks = selectedStatus === 'all'
         ? tasks
         : tasks.filter(t => t.status === selectedStatus);
@@ -276,7 +285,7 @@ const OperatorDashboard = () => {
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-3 gap-x-8 text-sm">
                                             <div><p className="text-gray-400 font-bold text-[10px] uppercase tracking-wider mb-0.5">Project</p><p className="font-semibold text-gray-800">{task.project || 'Internal'}</p></div>
                                             <div><p className="text-gray-400 font-bold text-[10px] uppercase tracking-wider mb-0.5">Machine</p><p className="font-semibold text-blue-600">{task.machine_name || 'Manual Bench'}</p></div>
-                                            <div><p className="text-gray-400 font-bold text-[10px] uppercase tracking-wider mb-0.5">Deadline</p><p className="font-bold text-red-500">{formatDueDateTime(task.due_date)}</p></div>
+                                            <div><p className="text-gray-400 font-bold text-[10px] uppercase tracking-wider mb-0.5">Deadline</p><p className={getDeadlineColor(task.due_date)}>{formatDueDateTime(task.due_date)}</p></div>
                                             {task.part_item && <div><p className="text-gray-400 font-bold text-[10px] uppercase tracking-wider mb-0.5">Part/Item</p><p className="font-semibold text-gray-800">{task.part_item}</p></div>}
                                             {task.nos_unit && <div><p className="text-gray-400 font-bold text-[10px] uppercase tracking-wider mb-0.5">Quantity</p><p className="font-semibold text-gray-800">{task.nos_unit}</p></div>}
                                         </div>
@@ -419,7 +428,9 @@ const OperatorDashboard = () => {
                         </div>
                         <div className="p-8">
                             <p className="text-gray-600 font-medium mb-4">
-                                Please provide a brief reason for {modalType === 'hold' ? 'putting this task on hold' : 'ending this task early'}.
+                                {modalType === 'hold'
+                                    ? 'Please provide a reason for putting this task on hold.'
+                                    : 'Optional: Add a note before ending this task.'}
                             </p>
                             <div className="space-y-4">
                                 <div>
