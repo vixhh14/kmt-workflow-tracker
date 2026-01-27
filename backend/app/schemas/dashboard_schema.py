@@ -95,34 +95,6 @@ class RunningTask(BaseModel):
     status: str = "in_progress"
     holds: List[Dict[str, Any]] = []
 
-class AdminDashboardOut(BaseModel):
-    projects: List[DashboardProject]
-    tasks: List[DashboardTask]
-    machines: List[DashboardMachine]
-    users: List[DashboardUser]
-    operators: List[DashboardOperator]
-    overview: DashboardOverview
-    attendance: Optional[AttendanceSummaryOut] = None
-    running_tasks: List[RunningTask] = []
-
-    model_config = ConfigDict(
-        from_attributes=True,
-        populate_by_name=True
-    )
-
-class SupervisorDashboardOut(BaseModel):
-    projects: List[DashboardProject]
-    tasks: List[DashboardTask]
-    machines: List[DashboardMachine]
-    operators: List[DashboardOperator]
-    overview: DashboardOverview
-    attendance: Optional[AttendanceSummaryOut] = None
-    running_tasks: List[RunningTask] = []
-
-    model_config = ConfigDict(
-        from_attributes=True,
-        populate_by_name=True
-    )
 
 class PerformanceMetrics(BaseModel):
     total_tasks: int
@@ -318,3 +290,32 @@ class DetailedUserActivityItem(BaseModel):
 
     holds: List[DetailedHold]
     status: str
+
+class AdminDashboardOut(BaseModel):
+    projects: List[DashboardProject]
+    tasks: List[DashboardTask]
+    machines: List[DashboardMachine]
+    users: List[DashboardUser]
+    operators: List[DashboardOperator]
+    overview: DashboardOverview
+    attendance: Optional[AttendanceSummaryOut] = None
+    running_tasks: List[RunningTask] = []
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True
+    )
+
+class SupervisorDashboardOut(BaseModel):
+    projects: List[DashboardProject]
+    tasks: List[DashboardTask]
+    machines: List[DashboardMachine]
+    operators: List[DashboardOperator]
+    overview: DashboardOverview
+    attendance: Optional[AttendanceSummaryOut] = None
+    running_tasks: List[RunningTask] = []
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True
+    )
