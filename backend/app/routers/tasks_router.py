@@ -728,9 +728,20 @@ async def delete_task(
     if current_user.role not in ["admin", "supervisor", "planning"]:
         raise HTTPException(status_code=403, detail="Not authorized to delete tasks")
         
-    # Robust lookup for task_id (Checks both 'id' and 'task_id' aliases)
-    all_tasks = db.query(Task).all()
-    db_task = next((t for t in all_tasks if str(getattr(t, 'task_id', getattr(t, 'id', ''))) == str(task_id)), None)
+    # Robust lookup for task_id (Checks multiple ID aliases for safety)
+    available_tasks = db.query(Task).all()
+    db_task = None
+    
+    for t in available_tasks:
+        ids = [
+            str(getattr(t, 'task_id', '')).strip(),
+            str(getattr(t, 'id', '')).strip(),
+            str(getattr(t, 'fabrication_task_id', '')).strip(),
+            str(getattr(t, 'filing_task_id', '')).strip()
+        ]
+        if str(task_id).strip() in ids:
+            db_task = t
+            break
 
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")

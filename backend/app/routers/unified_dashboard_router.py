@@ -58,18 +58,14 @@ async def get_admin_dashboard(
         project_map = {str(getattr(p, 'project_id', getattr(p, 'id', ''))): str(getattr(p, 'project_name', '')) for p in projects}
         
         sanitized_tasks = []
-        for t in combined_tasks:
+        for idx, t in enumerate(combined_tasks):
             # Convert SQLAlchemy model to dict if needed
             t_data = t.dict() if hasattr(t, 'dict') else t.__dict__.copy() if hasattr(t, '__dict__') else t
             
-            # Ensure status is always a string and lowercase for consistent frontend filtering
-            # The SheetRow fix handles most of this, but we force it here for absolute safety
+            # Ensure status is always a string and lowercase
             status = str(t_data.get('status', 'pending')).lower().strip()
-            
-            # Legacy mapping for boolean values that might still exist as strings "TRUE"/"FALSE"
             if status in ('true', '1', 'yes', 'active'): status = 'pending'
             if status in ('false', '0', 'no', 'inactive'): status = 'completed'
-            
             t_data['status'] = status
             
             # Fix Project Name (Join)
@@ -77,9 +73,21 @@ async def get_admin_dashboard(
             if not t_data.get('project') and pid in project_map:
                 t_data['project'] = project_map[pid]
             
-            # Frontend compatibility: ensure 'id' is present
-            if 'id' not in t_data:
-                t_data['id'] = t_data.get('task_id', t_data.get('fabrication_task_id', t_data.get('filing_task_id', '')))
+            # CRITICAL: Ensure 'id' is present and NOT empty/undefined
+            # Fallback chain: task_id -> fabrication_task_id -> filing_task_id -> row_index
+            t_id = (
+                str(t_data.get('task_id', '')).strip() or 
+                str(t_data.get('fabrication_task_id', '')).strip() or 
+                str(t_data.get('filing_task_id', '')).strip() or
+                str(t_data.get('id', '')).strip()
+            )
+            
+            if not t_id or t_id.lower() == 'undefined':
+                # Use a combined ID with index for safety
+                t_id = f"TEMP-{idx}-{uuid.uuid4().hex[:4]}"
+            
+            t_data['id'] = t_id
+            t_data['task_id'] = t_id # Sync back
                  
             sanitized_tasks.append(t_data)
 
