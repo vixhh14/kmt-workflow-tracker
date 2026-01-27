@@ -62,15 +62,22 @@ async def get_operator_tasks(
                 for h in task_holds
             ]
             
+            # Ensure ID and status are robustly set for frontend
+            t_id = str(getattr(task, 'task_id', getattr(task, 'id', '')))
+            status = str(getattr(task, 'status', 'pending')).lower().strip()
+            if status in ('true', '1', 'yes', 'active'): status = 'pending'
+            if status in ('false', '0', 'no', 'inactive'): status = 'completed'
+
             task_list.append({
-                "id": str(getattr(task, 'id', '')),
+                "id": t_id,
+                "task_id": t_id,
                 "title": getattr(task, 'title', '') or "",
                 "project": getattr(task, 'project', '') or "",
                 "description": getattr(task, 'description', '') or "",
                 "part_item": getattr(task, 'part_item', '') or "",
                 "nos_unit": getattr(task, 'nos_unit', '') or "",
-                "status": getattr(task, 'status', 'pending'),
-                "priority": getattr(task, 'priority', 'medium'),
+                "status": status,
+                "priority": str(getattr(task, 'priority', 'medium')).upper(),
                 "assigned_to": str(getattr(task, 'assigned_to', '')) if getattr(task, 'assigned_to', None) else "",
                 "machine_id": str(getattr(task, 'machine_id', '')) if getattr(task, 'machine_id', None) else "",
                 "machine_name": machine_name,

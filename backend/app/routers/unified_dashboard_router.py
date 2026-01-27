@@ -62,19 +62,24 @@ async def get_admin_dashboard(
             # Convert SQLAlchemy model to dict if needed
             t_data = t.dict() if hasattr(t, 'dict') else t.__dict__.copy() if hasattr(t, '__dict__') else t
             
-            # Fix status
-            raw_status = t_data.get('status', 'pending')
-            if raw_status is True or str(raw_status).lower() == 'true':
-                 t_data['status'] = 'pending'
-            elif raw_status is False or str(raw_status).lower() == 'false':
-                 t_data['status'] = 'completed'
-            else:
-                 t_data['status'] = raw_status
+            # Ensure status is always a string and lowercase for consistent frontend filtering
+            # The SheetRow fix handles most of this, but we force it here for absolute safety
+            status = str(t_data.get('status', 'pending')).lower().strip()
+            
+            # Legacy mapping for boolean values that might still exist as strings "TRUE"/"FALSE"
+            if status in ('true', '1', 'yes', 'active'): status = 'pending'
+            if status in ('false', '0', 'no', 'inactive'): status = 'completed'
+            
+            t_data['status'] = status
             
             # Fix Project Name (Join)
             pid = str(t_data.get('project_id', ''))
             if not t_data.get('project') and pid in project_map:
                 t_data['project'] = project_map[pid]
+            
+            # Frontend compatibility: ensure 'id' is present
+            if 'id' not in t_data:
+                t_data['id'] = t_data.get('task_id', t_data.get('fabrication_task_id', t_data.get('filing_task_id', '')))
                  
             sanitized_tasks.append(t_data)
 

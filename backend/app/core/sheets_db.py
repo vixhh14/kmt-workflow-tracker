@@ -45,19 +45,26 @@ class SheetRow:
         if key in self._data:
             value = self._data[key]
             # Standardize common boolean strings to bool
-            if key in ["active", "is_active", "is_deleted", "status"]:
+            if key in ["active", "is_active", "is_deleted"]:
                 if isinstance(value, str):
                     low = value.lower().strip()
-                    if low in ["true", "1", "yes", "active"]: return True
-                    if low in ["false", "0", "no", "inactive", ""]: return False
+                    if low in ["true", "1", "yes"]: return True
+                    if low in ["false", "0", "no", ""]: return False
                 return bool(value)
             return value
         
-        # 2. Strict Schema Access (No Aliasing)
-        # User Requirement: ❗ No aliasing (id → machine_id) at runtime
-        # Access must use the exact field name defined in SHEETS_SCHEMA.
+        # 2. Aliasing 'id' to the primary header
+        if key == 'id':
+            # Try to find a header ending in _id
+            headers = SHEETS_SCHEMA.get(self._name, [])
+            for h in headers:
+                if h.endswith("_id") and h in self._data:
+                    return self._data[h]
+            # Fallback check for any header containing id
+            for h in self._data.keys():
+                if 'id' in h.lower() and not h.startswith('_'):
+                    return self._data[h]
 
-        
         # 3. Handle 'role' vs 'user_role' (Standardized to 'role' in sheet)
         if key == 'user_role' and 'role' in self._data:
             return self._data['role']
