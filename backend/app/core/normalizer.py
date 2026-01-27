@@ -148,13 +148,20 @@ def normalize_task_row(row: Dict[str, Any], task_type: str = "general") -> Dict[
     """
     
     # Determine task_id (handle all task types)
-    task_id = (
+    raw_id = (
         row.get('task_id') or 
         row.get('filing_task_id') or 
         row.get('fabrication_task_id') or 
         row.get('id') or 
         ""
     )
+    
+    # CRITICAL FIX for Selection bug: If ID is missing, use row index to ensure uniqueness
+    if not raw_id or str(raw_id).lower() == 'unknown':
+        row_idx = row.get('_row_idx', '??')
+        task_id = f"REF-{row_idx}"
+    else:
+        task_id = str(raw_id)
     
     # HEURISTIC: Fix shifted headers (Date in Part Item)
     part_val = safe_str(row.get('part_item'), "")
@@ -167,8 +174,8 @@ def normalize_task_row(row: Dict[str, Any], task_type: str = "general") -> Dict[
     
     normalized = {
         # REQUIRED FIELDS - MUST ALWAYS EXIST
-        'task_id': safe_str(task_id, "unknown"),
-        'id': safe_str(task_id, "unknown"),
+        'task_id': task_id,
+        'id': task_id,
         'title': generate_title(row),
         'status': normalize_status(row.get('status')),
         'priority': normalize_priority(row.get('priority')),

@@ -54,7 +54,9 @@ async def get_admin_dashboard(
         # 6. Aggregate Stats Memory-Only
         overview = get_operations_overview(db)
         
-        # 6.5 Sanitize Tasks (Fix Boolean Status Crash)
+        # 6.5 Sanitize Tasks (Fix Boolean Status Crash + JOIN Project Names)
+        project_map = {str(getattr(p, 'project_id', getattr(p, 'id', ''))): str(getattr(p, 'project_name', '')) for p in projects}
+        
         sanitized_tasks = []
         for t in combined_tasks:
             # Convert SQLAlchemy model to dict if needed
@@ -68,6 +70,11 @@ async def get_admin_dashboard(
                  t_data['status'] = 'completed'
             else:
                  t_data['status'] = raw_status
+            
+            # Fix Project Name (Join)
+            pid = str(t_data.get('project_id', ''))
+            if not t_data.get('project') and pid in project_map:
+                t_data['project'] = project_map[pid]
                  
             sanitized_tasks.append(t_data)
 

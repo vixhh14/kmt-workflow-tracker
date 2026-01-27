@@ -36,27 +36,45 @@ class AssignTaskRequest(BaseModel):
 async def get_pending_tasks(db: any = Depends(get_db)):
     """
     Get all pending tasks that need assignment.
-    FIXED: Uses normalizer to prevent ResponseValidationError
+    FIXED: Includes Task, FabricationTask, and FilingTask
     """
+    from app.models.models_db import Task, FilingTask, FabricationTask
     try:
+        # 1. Fetch ALL task types
         all_tasks = db.query(Task).all()
-        
+        try:
+            all_tasks.extend(db.query(FilingTask).all())
+            all_tasks.extend(db.query(FabricationTask).all())
+        except Exception as e:
+            logger.warning(f"Failed to fetch specialized tasks for pending list: {e}")
+
         # Convert to dicts
         task_dicts = [t.dict() if hasattr(t, 'dict') else t.__dict__ for t in all_tasks]
         
-        # Filter pending tasks BEFORE normalization
-        pending_dicts = [
-            t for t in task_dicts
-            if is_valid_row(t, "task")
-            and (
-                not t.get('assigned_to') or t.get('assigned_to') == '' 
-                or t.get('status') == 'pending'
-            )
-        ]
+        # 2. Filter pending/unassigned tasks
+        # ROBUST: Allow 'active', 'todo' or empty status as 'pending'
+        pending_dicts = []
+        for t in task_dicts:
+            if not is_valid_row(t, "task"): continue
+            
+            # Canonical status normalization for filter logic
+            status = str(t.get('status', 'pending')).lower().strip()
+            # Catch boolean TRUE that became "active"
+            is_pending_status = status in ['pending', 'active', 'todo', '', 'none']
+            
+            # Task is pending if it has no assignee OR it's explicitly in pending status
+            assigned_to = str(t.get('assigned_to', '')).strip()
+            is_unassigned = not assigned_to or assigned_to.lower() in ['unassigned', '-', 'none']
+            
+            if is_pending_status or is_unassigned:
+                 # Check it's not actually 'in_progress' or 'completed'
+                 if status in ['in_progress', 'completed', 'ended']:
+                      continue
+                 pending_dicts.append(t)
         
         logger.info(f"📋 Pending Tasks: Found {len(pending_dicts)} tasks needing assignment")
         
-        # Normalize ALL tasks to prevent validation errors
+        # 3. Normalize to prevent UI crashes
         normalized_tasks = safe_normalize_list(
             pending_dicts,
             normalize_task_row,

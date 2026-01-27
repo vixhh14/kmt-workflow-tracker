@@ -50,16 +50,20 @@ def get_operations_overview(db: SheetsDB) -> Dict[str, Any]:
             stats["tasks"]["total"] += 1
             status = str(getattr(t, 'status', 'pending')).lower().strip()
             
-            if status == 'pending':
+            # Robust status mapping to prevent empty charts
+            if status in ['pending', 'active', 'todo']:
                 stats["tasks"]["pending"] += 1
-            elif status in ['in_progress', 'in progress', 'running']:
+            elif status in ['in_progress', 'in progress', 'running', 'started']:
                 stats["tasks"]["in_progress"] += 1
-            elif status == 'completed':
+            elif status in ['completed', 'finished', 'done']:
                 stats["tasks"]["completed"] += 1
-            elif status in ['on_hold', 'onhold', 'on hold']:
+            elif status in ['on_hold', 'onhold', 'on hold', 'paused']:
                 stats["tasks"]["on_hold"] += 1
-            elif status == 'ended':
+            elif status in ['ended', 'inactive', 'cancelled']:
                 stats["tasks"]["ended"] += 1
+            else:
+                # Fallback: Count unmapped but non-deleted tasks as pending
+                stats["tasks"]["pending"] += 1
 
     except Exception as e:
         print(f"❌ Error aggregating dashboard tasks: {e}")

@@ -102,14 +102,18 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         print(f"📊 Total users in system: {len(all_users)}")
         print(f"📊 Total attendance records: {len(all_att)}")
         
-        # 2. Build attendance map for target date
         attendance_map = {}
         for a in all_att:
-            row_date = str(a.get("date", "")).split('T')[0]
+            # 1. Date normalization (ensure match even with time)
+            row_date = str(a.get("date", "")).split('T')[0].strip()
             if row_date == target_date_compare:
-                uid = str(a.get("user_id", "")).strip()
+                # 2. Map by both user_id AND username for redundancy
+                uid = str(a.get("user_id", "")).strip().lower()
+                uname = str(a.get("username", "")).strip().lower()
                 if uid:
                     attendance_map[uid] = a
+                if uname:
+                    attendance_map[uname] = a
         
         print(f"📊 Attendance records for {target_date_compare}: {len(attendance_map)}")
         
@@ -121,8 +125,8 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         
         filtered_count = 0
         for user in all_users:
-            user_id = str(user.get("user_id", user.get("id", "")))
-            username = str(user.get("username", "Unknown"))
+            user_id = str(user.get("user_id", user.get("id", ""))).strip().lower()
+            username = str(user.get("username", "Unknown")).strip().lower()
             
             # CRITICAL: Very lenient filtering
             # Only exclude if EXPLICITLY deleted or inactive
@@ -149,8 +153,8 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
                 print(f"  ❌ Filtered (role '{role}' not tracked): {username}")
                 continue
                 
-            # User passed all filters
-            att = attendance_map.get(user_id)
+            # Check attendance map by ID or Username
+            att = attendance_map.get(user_id) or attendance_map.get(username)
             
             if att and str(att.get("status", "")).lower() == "present":
                 present_records.append({

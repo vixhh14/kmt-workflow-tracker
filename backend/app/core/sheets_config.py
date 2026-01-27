@@ -46,7 +46,8 @@ SHEETS_SCHEMA = {
     "units": ["unit_id", "name", "description", "created_at", "updated_at", "is_deleted", "status"],
     "machinecategories": ["category_id", "name", "description", "created_at", "updated_at", "is_deleted", "status"],
     "reschedulerequests": ["reschedule_id", "task_id", "new_date", "reason", "status", "created_at", "is_deleted", "updated_at"],
-    "planningtasks": ["planning_task_id", "title", "description", "status", "created_at", "is_deleted", "updated_at"]
+    "planningtasks": ["planning_task_id", "title", "description", "status", "created_at", "is_deleted", "updated_at"],
+    "subtasks": ["id", "task_id", "title", "status", "notes", "created_at", "updated_at", "is_deleted"]
 }
 
 def normalize_row(sheet_name: str, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -66,12 +67,12 @@ def normalize_row(sheet_name: str, data: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(val, str):
             val = val.strip()
         
-        # 2. Standardize Booleans
-        if header in ["active", "is_active", "is_deleted", "status"]:
+        # 2. Standardize Booleans (ONLY for explicit boolean fields)
+        if header in ["active", "is_active", "is_deleted"]:
              if isinstance(val, str):
                  low = val.lower()
-                 if low in ["true", "1", "yes", "active"]: val = True
-                 elif low in ["false", "0", "no", "inactive", ""]: val = False
+                 if low in ["true", "1", "yes"]: val = True
+                 elif low in ["false", "0", "no", ""]: val = False
              else:
                  val = bool(val)
 
