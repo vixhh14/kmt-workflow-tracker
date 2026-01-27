@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
     Plus, CheckCircle, Clock, AlertCircle, TrendingUp, ListTodo,
     Target, User, Hash, MessageSquare, Calendar, ChevronRight,
-    ArrowUpCircle, ArrowDownCircle, Info, Play, Pause, Square, Filter
+    ArrowUpCircle, ArrowDownCircle, Info, Play, Pause, Square, Filter, Trash2
 } from 'lucide-react';
-import { getOperationalTasks, updateOperationalTask, getAssignableUsers, getProjects } from '../../api/services';
+import { getOperationalTasks, updateOperationalTask, deleteOperationalTask, getAssignableUsers, getProjects } from '../../api/services';
 import { useAuth } from '../../context/AuthContext';
 
 const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
@@ -47,6 +47,7 @@ const OperationalDashboard = ({ type }) => {
         work_order_number: '',
         part_item: '',
         quantity: 1,
+        machine_id: '',
         due_date: '',
         due_time: '11:00',
         priority: 'medium',
@@ -194,12 +195,14 @@ const OperationalDashboard = ({ type }) => {
                 : createFormData.due_date;
 
             const payload = {
+                title: createFormData.part_item, // Use part_item as title
                 project_id: createFormData.project_id,
                 work_order_number: createFormData.work_order_number,
                 part_item: createFormData.part_item,
                 quantity: parseInt(createFormData.quantity),
                 due_date: combinedDueDateTime,
                 priority: createFormData.priority,
+                machine_id: createFormData.machine_id,
                 remarks: createFormData.remarks
             };
 
@@ -210,6 +213,7 @@ const OperationalDashboard = ({ type }) => {
                 work_order_number: '',
                 part_item: '',
                 quantity: 1,
+                machine_id: '',
                 due_date: '',
                 due_time: '11:00',
                 priority: 'medium',
@@ -243,6 +247,17 @@ const OperationalDashboard = ({ type }) => {
         } catch (error) {
             console.error('Failed to assign task:', error);
             alert(error.response?.data?.detail || 'Failed to assign task');
+        }
+    };
+
+    const handleDeleteTask = async (taskId) => {
+        if (!window.confirm('Are you sure you want to delete this task?')) return;
+        try {
+            await deleteOperationalTask(type, taskId);
+            fetchTasks();
+        } catch (error) {
+            console.error('Failed to delete task:', error);
+            alert(error.response?.data?.detail || 'Failed to delete task');
         }
     };
 
@@ -338,91 +353,31 @@ const OperationalDashboard = ({ type }) => {
             {/* Create Task Form */}
             {showCreateForm && (
                 <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 animate-fade-in mb-6">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4 border-b pb-2">Create New Operational Task</h3>
-                    <form onSubmit={handleCreateTask} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* 1. Project */}
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Project *</label>
-                            <select
-                                required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-                                value={createFormData.project_id}
-                                onChange={e => setCreateFormData({ ...createFormData, project_id: e.target.value })}
-                            >
-                                <option value="" disabled hidden>-- Select Project --</option>
-                                {projects.map(p => (
-                                    <option key={p.id || p.project_id} value={p.id || p.project_id}>{p.name || p.project_name}</option>
-                                ))}
-                            </select>
+                    <div className="flex items-center justify-between mb-6 border-b pb-3">
+                        <h3 className="text-lg font-bold text-gray-900">Create New {type === 'filing' ? 'Filing' : 'Fabrication'} Task</h3>
+                        <div className="flex items-center text-xs font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded">
+                            <Clock size={12} className="mr-1" /> AUTO-SYNC ENABLED
                         </div>
-
-                        {/* 2. Work Order Number */}
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Work Order Number *</label>
+                    </div>
+                    <form onSubmit={handleCreateTask} className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        {/* 1. Title */}
+                        <div className="md:col-span-2">
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Task Title / Part Name *</label>
                             <input
                                 required
                                 type="text"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-                                value={createFormData.work_order_number}
-                                onChange={e => setCreateFormData({ ...createFormData, work_order_number: e.target.value })}
-                            />
-                        </div>
-
-                        {/* 3. Part / Item */}
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Part / Item Name *</label>
-                            <input
-                                required
-                                type="text"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                placeholder="e.g. MS Plate Drilling"
+                                className="w-full px-4 py-2.5 bg-gray-50 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 font-bold text-sm transition-all"
                                 value={createFormData.part_item}
                                 onChange={e => setCreateFormData({ ...createFormData, part_item: e.target.value })}
                             />
                         </div>
 
-                        {/* 4. Quantity */}
+                        {/* 2. Priority */}
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Quantity *</label>
-                            <input
-                                required
-                                type="number"
-                                min="1"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-                                value={createFormData.quantity}
-                                onChange={e => setCreateFormData({ ...createFormData, quantity: e.target.value })}
-                            />
-                        </div>
-
-                        {/* 5. Due Date & Time */}
-                        <div className="grid grid-cols-2 gap-2">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Due Date *</label>
-                                <input
-                                    required
-                                    type="date"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-                                    value={createFormData.due_date}
-                                    onChange={e => setCreateFormData({ ...createFormData, due_date: e.target.value })}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Due Time *</label>
-                                <input
-                                    required
-                                    type="time"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-                                    value={createFormData.due_time}
-                                    onChange={e => setCreateFormData({ ...createFormData, due_time: e.target.value })}
-                                />
-                            </div>
-                        </div>
-
-                        {/* 6. Priority */}
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Priority *</label>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Priority Level</label>
                             <select
-                                required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                className="w-full px-4 py-2.5 bg-gray-50 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 font-bold text-sm transition-all"
                                 value={createFormData.priority}
                                 onChange={e => setCreateFormData({ ...createFormData, priority: e.target.value })}
                             >
@@ -433,31 +388,117 @@ const OperationalDashboard = ({ type }) => {
                             </select>
                         </div>
 
-                        {/* 7. Remarks */}
-                        <div className="md:col-span-2">
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Remarks</label>
+                        {/* 3. Project */}
+                        <div>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Link Project *</label>
+                            <select
+                                required
+                                className="w-full px-4 py-2.5 bg-gray-50 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 font-bold text-sm transition-all"
+                                value={createFormData.project_id}
+                                onChange={e => setCreateFormData({ ...createFormData, project_id: e.target.value })}
+                            >
+                                <option value="" disabled hidden>-- Select Project --</option>
+                                {projects.map(p => (
+                                    <option key={p.id || p.project_id} value={p.id || p.project_id}>{p.name || p.project_name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* 4. WO Number */}
+                        <div>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Work Order # *</label>
+                            <input
+                                required
+                                type="text"
+                                placeholder="WO-000"
+                                className="w-full px-4 py-2.5 bg-gray-50 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 font-bold text-sm transition-all"
+                                value={createFormData.work_order_number}
+                                onChange={e => setCreateFormData({ ...createFormData, work_order_number: e.target.value })}
+                            />
+                        </div>
+
+                        {/* 5. Quantity */}
+                        <div>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Target Quantity *</label>
+                            <input
+                                required
+                                type="number"
+                                min="1"
+                                className="w-full px-4 py-2.5 bg-gray-50 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 font-bold text-sm transition-all"
+                                value={createFormData.quantity}
+                                onChange={e => setCreateFormData({ ...createFormData, quantity: e.target.value })}
+                            />
+                        </div>
+
+                        {/* 6. Machine ID */}
+                        <div>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Machine ID / Name</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. HHM8000"
+                                className="w-full px-4 py-2.5 bg-gray-50 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 font-bold text-sm transition-all"
+                                value={createFormData.machine_id || ''}
+                                onChange={e => setCreateFormData({ ...createFormData, machine_id: e.target.value })}
+                            />
+                        </div>
+
+                        {/* 7. Due Date */}
+                        <div>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Deadline Date *</label>
+                            <input
+                                required
+                                type="date"
+                                className="w-full px-4 py-2.5 bg-gray-50 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 font-bold text-sm transition-all"
+                                value={createFormData.due_date}
+                                onChange={e => setCreateFormData({ ...createFormData, due_date: e.target.value })}
+                            />
+                        </div>
+
+                        {/* 8. Due Time */}
+                        <div>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Deadline Time *</label>
+                            <input
+                                required
+                                type="time"
+                                className="w-full px-4 py-2.5 bg-gray-50 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 font-bold text-sm transition-all"
+                                value={createFormData.due_time}
+                                onChange={e => setCreateFormData({ ...createFormData, due_time: e.target.value })}
+                            />
+                        </div>
+
+                        {/* 9. Remarks */}
+                        <div className="md:col-span-3">
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Special Instructions / Remarks</label>
                             <textarea
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                className="w-full px-4 py-3 bg-gray-50 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium text-sm transition-all"
                                 rows="2"
+                                placeholder="Add any specific details here..."
                                 value={createFormData.remarks}
                                 onChange={e => setCreateFormData({ ...createFormData, remarks: e.target.value })}
                             />
                         </div>
 
-                        <div className="md:col-span-2 flex justify-end space-x-3">
+                        <div className="md:col-span-3 flex items-center justify-end space-x-4 pt-4 border-t">
                             <button
                                 type="button"
                                 onClick={() => setShowCreateForm(false)}
-                                className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                                className="px-6 py-2.5 text-sm font-bold text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-widest"
                             >
-                                Cancel
+                                Dismiss
                             </button>
                             <button
                                 type="submit"
                                 disabled={submitting}
-                                className={`px-6 py-2 text-white font-bold rounded-lg shadow transition hover:opacity-90 ${accentBg}`}
+                                className={`px-10 py-3 text-white font-black rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center uppercase tracking-widest text-xs ${accentBg}`}
                             >
-                                {submitting ? 'Creating...' : 'Create Task'}
+                                {submitting ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent mr-2"></div>
+                                        Creating...
+                                    </>
+                                ) : (
+                                    'Initialize Task'
+                                )}
                             </button>
                         </div>
                     </form>
@@ -513,141 +554,159 @@ const OperationalDashboard = ({ type }) => {
                             <p className="font-medium">No tasks assigned to you yet.</p>
                         </div>
                     ) : (
-                        tasks.map(task => (
-                            <div key={task.id} className="p-5 hover:bg-gray-50/50 transition-all border-b border-gray-100 last:border-0">
-                                <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-                                    {/* 1. Primary Info: Title, Priority, WO */}
-                                    <div className="lg:w-1/3">
-                                        <div className="flex flex-wrap items-center gap-3 mb-2">
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${getPriorityColor(task.priority)}`}>
-                                                {task.priority || 'MEDIUM'}
-                                            </span>
-                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wider">
-                                                WO: {task.work_order_number || '00'}
-                                            </span>
-                                            <h3 className="text-lg font-bold text-gray-900 tracking-tight">
-                                                {task.part_item}
-                                            </h3>
-                                        </div>
-                                        <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
-                                            <div className="flex items-center text-xs text-gray-400 font-bold">
-                                                <Hash size={12} className="mr-1.5 opacity-40" />
-                                                <span>{task.machine_name || task.machine_id || 'HANDWORK'}</span>
-                                            </div>
-                                            <div className="flex items-center text-xs text-gray-400 font-bold">
-                                                <Calendar size={12} className="mr-1.5 opacity-40" />
-                                                <span>DUE: <span className="text-red-500">{formatDueDateTime(task.due_date).split(' •')[0]}</span></span>
-                                            </div>
-                                        </div>
-                                        {task.remarks && (
-                                            <div className="mt-2 flex items-start text-[10px] text-gray-400 font-bold uppercase tracking-tight">
-                                                <MessageSquare size={10} className="mr-1.5 mt-0.5 opacity-40" />
-                                                <span className="truncate max-w-xs">{task.remarks}</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* 2. Assignment */}
-                                    <div className="lg:w-1/6 min-w-[120px]">
-                                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1.5 leading-none">Assign To (Manual)</p>
-                                        {canAssign ? (
-                                            <input
-                                                type="text"
-                                                defaultValue={task.assignee_name || task.assigned_to || ''}
-                                                onBlur={(e) => {
-                                                    const val = e.target.value;
-                                                    if (val !== (task.assignee_name || task.assigned_to)) {
-                                                        handleAssignTask(task.id, val);
-                                                    }
-                                                }}
-                                                className="w-full text-sm font-bold text-gray-800 bg-transparent border-none p-0 focus:ring-0 placeholder:text-gray-300"
-                                                placeholder="Enter Name"
-                                            />
-                                        ) : (
-                                            <p className="text-sm font-bold text-gray-700 leading-none">{task.assignee_name || task.assigned_to || 'Unassigned'}</p>
-                                        )}
-                                    </div>
-
-                                    {/* 3. Action Buttons (HOLD / END) */}
-                                    <div className="flex items-center gap-3 lg:w-1/5 shrink-0">
-                                        {(task.status?.toLowerCase() === 'pending' || task.status?.toLowerCase() === 'on hold' || task.status?.toLowerCase() === 'onhold') && (
-                                            <button
-                                                onClick={() => handleUpdateStatus(task.id, 'In Progress')}
-                                                className="flex-1 flex items-center justify-center space-x-2 bg-green-600 text-white px-5 py-2.5 rounded-lg font-black text-xs hover:bg-green-700 transition-all shadow-sm active:scale-95 uppercase tracking-wider"
-                                            >
-                                                <Play size={14} fill="currentColor" />
-                                                <span>{task.status?.toLowerCase() === 'pending' ? 'START' : 'RESUME'}</span>
-                                            </button>
-                                        )}
-
-                                        {(task.status?.toLowerCase() === 'in progress' || task.status?.toLowerCase() === 'inprogress') && (
-                                            <>
-                                                <button
-                                                    onClick={() => handleUpdateStatus(task.id, 'On Hold')}
-                                                    className="flex-1 flex items-center justify-center space-x-2 bg-[#b45309] text-white px-5 py-2.5 rounded-lg font-black text-xs hover:bg-[#92400e] transition-all shadow-sm active:scale-95 uppercase tracking-wider"
-                                                >
-                                                    <Pause size={14} fill="currentColor" />
-                                                    <span>HOLD</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => handleUpdateStatus(task.id, 'Completed')}
-                                                    className="flex-1 flex items-center justify-center space-x-2 bg-[#0369a1] text-white px-5 py-2.5 rounded-lg font-black text-xs hover:bg-[#075985] transition-all shadow-sm active:scale-95 uppercase tracking-wider"
-                                                >
-                                                    <Square size={14} fill="currentColor" />
-                                                    <span>END</span>
-                                                </button>
-                                            </>
-                                        )}
-
-                                        {task.status?.toLowerCase() === 'completed' && (
-                                            <div className="flex-1 flex items-center justify-center space-x-2 bg-green-50 text-green-700 border border-green-100 px-5 py-2.5 rounded-lg font-black text-xs uppercase tracking-wider">
-                                                <CheckCircle size={14} />
-                                                <span>FINISHED</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* 4. Progress Tracking */}
-                                    <div className="lg:flex-1 flex items-center gap-6">
-                                        <div className="flex-1">
-                                            <div className="flex justify-between items-end mb-2">
-                                                <span className={`text-[11px] font-black uppercase tracking-[0.2em] ${task.status?.toLowerCase() === 'in progress' ? 'text-green-600' : 'text-gray-400'}`}>
-                                                    {task.status === 'InProgress' ? 'IN PROGRESS' : task.status}
+                        tasks.map(task => {
+                            const isStarted = task.status?.toLowerCase().replace(/\s/g, '') === 'inprogress';
+                            return (
+                                <div key={task.id} className="p-5 hover:bg-gray-50/50 transition-all border-b border-gray-100 last:border-0">
+                                    <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+                                        {/* 1. Primary Info: Title, Priority, WO */}
+                                        <div className="lg:w-1/3 min-w-0">
+                                            <div className="flex flex-wrap items-center gap-3 mb-2">
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${getPriorityColor(task.priority)}`}>
+                                                    {task.priority || 'MEDIUM'}
                                                 </span>
-                                                <div className="flex items-baseline gap-2">
-                                                    <span className="text-base font-black text-gray-900 leading-none">{task.completed_quantity}</span>
-                                                    <span className="text-xs text-gray-400 font-bold leading-none">/ {task.quantity}</span>
+                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wider text-nowrap">
+                                                    WO: {task.work_order_number || '00'}
+                                                </span>
+                                                <h3 className="text-lg font-bold text-gray-900 tracking-tight truncate">
+                                                    {task.part_item}
+                                                </h3>
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+                                                <div className="flex items-center text-xs text-gray-400 font-bold">
+                                                    <Hash size={12} className="mr-1.5 opacity-40 shrink-0" />
+                                                    <span className="truncate">{task.machine_name || task.machine_id || 'HANDWORK'}</span>
+                                                </div>
+                                                <div className="flex items-center text-xs text-gray-400 font-bold">
+                                                    <Calendar size={12} className="mr-1.5 opacity-40 shrink-0" />
+                                                    <span className="text-nowrap">DUE: <span className="text-red-500">{formatDueDateTime(task.due_date).split(' •')[0]}</span></span>
                                                 </div>
                                             </div>
-                                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden shadow-inner border border-gray-100">
-                                                <div
-                                                    className={`h-full transition-all duration-1000 cubic-bezier(0.4, 0, 0.2, 1) ${accentBg}`}
-                                                    style={{ width: `${(task.completed_quantity / task.quantity) * 100}%` }}
-                                                />
-                                            </div>
+                                            {task.remarks && (
+                                                <div className="mt-2 flex items-start text-[10px] text-gray-400 font-bold uppercase tracking-tight">
+                                                    <MessageSquare size={10} className="mr-1.5 mt-0.5 opacity-40 shrink-0" />
+                                                    <span className="truncate max-w-xs">{task.remarks}</span>
+                                                </div>
+                                            )}
                                         </div>
 
-                                        {/* Precision Controls */}
-                                        <div className="flex flex-col gap-1.5 shrink-0">
-                                            <button
-                                                onClick={() => handleUpdateQuantity(task, task.completed_quantity + 1)}
-                                                disabled={task.completed_quantity >= task.quantity}
-                                                className={`p-1.5 rounded-lg ${accentBg} text-white hover:scale-110 active:scale-90 transition-all shadow-sm disabled:opacity-20`}
-                                            >
-                                                <ArrowUpCircle size={20} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleUpdateQuantity(task, task.completed_quantity - 1)}
-                                                disabled={task.completed_quantity <= 0}
-                                                className="p-1.5 rounded-lg bg-white border border-gray-200 text-gray-300 hover:text-red-500 hover:border-red-200 transition-all disabled:opacity-20"
-                                            >
-                                                <ArrowDownCircle size={20} />
-                                            </button>
+                                        {/* 2. Assignment */}
+                                        <div className="lg:w-1/6 min-w-[140px]">
+                                            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1.5 leading-none">Assign To (Manual)</p>
+                                            {canAssign ? (
+                                                <input
+                                                    type="text"
+                                                    defaultValue={task.assignee_name || task.assigned_to || ''}
+                                                    onBlur={(e) => {
+                                                        const val = e.target.value;
+                                                        if (val !== (task.assignee_name || task.assigned_to)) {
+                                                            handleAssignTask(task.id, val);
+                                                        }
+                                                    }}
+                                                    className="w-full text-sm font-bold text-gray-800 bg-transparent border-none p-0 focus:ring-0 placeholder:text-gray-300"
+                                                    placeholder="Enter Name"
+                                                />
+                                            ) : (
+                                                <p className="text-sm font-bold text-gray-700 leading-none truncate">{task.assignee_name || task.assigned_to || 'Unassigned'}</p>
+                                            )}
+                                        </div>
+
+                                        {/* 3. Action Buttons (HOLD / END / DELETE) */}
+                                        <div className="flex items-center gap-3 lg:w-1/4 shrink-0">
+                                            <div className="flex-1 flex gap-2">
+                                                {(task.status?.toLowerCase() === 'pending' || task.status?.toLowerCase() === 'on hold' || task.status?.toLowerCase() === 'onhold') && (
+                                                    <button
+                                                        onClick={() => handleUpdateStatus(task.id, 'In Progress')}
+                                                        className="flex-1 flex items-center justify-center space-x-2 bg-green-600 text-white px-5 py-2.5 rounded-lg font-black text-xs hover:bg-green-700 transition-all shadow-sm active:scale-95 uppercase tracking-wider"
+                                                    >
+                                                        <Play size={14} fill="currentColor" />
+                                                        <span>{task.status?.toLowerCase() === 'pending' ? 'START' : 'RESUME'}</span>
+                                                    </button>
+                                                )}
+
+                                                {(task.status?.toLowerCase() === 'in progress' || task.status?.toLowerCase() === 'inprogress') && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleUpdateStatus(task.id, 'On Hold')}
+                                                            className="flex-1 flex items-center justify-center space-x-2 bg-[#b45309] text-white px-4 py-2.5 rounded-lg font-black text-xs hover:bg-[#92400e] transition-all shadow-sm active:scale-95 uppercase tracking-wider"
+                                                        >
+                                                            <Pause size={14} fill="currentColor" />
+                                                            <span>HOLD</span>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleUpdateStatus(task.id, 'Completed')}
+                                                            className="flex-1 flex items-center justify-center space-x-2 bg-[#0369a1] text-white px-4 py-2.5 rounded-lg font-black text-xs hover:bg-[#075985] transition-all shadow-sm active:scale-95 uppercase tracking-wider"
+                                                        >
+                                                            <Square size={14} fill="currentColor" />
+                                                            <span>END</span>
+                                                        </button>
+                                                    </>
+                                                )}
+
+                                                {task.status?.toLowerCase() === 'completed' && (
+                                                    <div className="flex-1 flex items-center justify-center space-x-2 bg-green-50 text-green-700 border border-green-100 px-5 py-2.5 rounded-lg font-black text-xs uppercase tracking-wider">
+                                                        <CheckCircle size={14} />
+                                                        <span>FINISHED</span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Delete Action (Admins/Masters) */}
+                                            {canAssign && (
+                                                <button
+                                                    onClick={() => handleDeleteTask(task.id)}
+                                                    className="p-2.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                    title="Delete Task"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* 4. Progress Tracking */}
+                                        <div className="lg:flex-1 flex items-center gap-6 w-full lg:w-auto">
+                                            <div className="flex-1">
+                                                <div className="flex justify-between items-end mb-2">
+                                                    <span className={`text-[11px] font-black uppercase tracking-[0.2em] ${isStarted ? 'text-green-600' : 'text-gray-400'}`}>
+                                                        {task.status === 'InProgress' ? 'IN PROGRESS' : task.status?.toUpperCase() || 'PENDING'}
+                                                    </span>
+                                                    <div className="flex items-baseline gap-2">
+                                                        <span className="text-base font-black text-gray-900 leading-none">{task.completed_quantity}</span>
+                                                        <span className="text-xs text-gray-400 font-bold leading-none">/ {task.quantity}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="h-2 bg-gray-100 rounded-full overflow-hidden shadow-inner border border-gray-100">
+                                                    <div
+                                                        className={`h-full transition-all duration-1000 cubic-bezier(0.4, 0, 0.2, 1) ${accentBg}`}
+                                                        style={{ width: `${(task.completed_quantity / task.quantity) * 100}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Precision Controls - Locked until started */}
+                                            <div className="flex flex-col gap-1.5 shrink-0">
+                                                <button
+                                                    onClick={() => handleUpdateQuantity(task, task.completed_quantity + 1)}
+                                                    disabled={!isStarted || task.completed_quantity >= task.quantity}
+                                                    className={`p-1.5 rounded-lg ${accentBg} text-white hover:scale-110 active:scale-90 transition-all shadow-sm disabled:opacity-20 disabled:grayscale disabled:scale-100 flex items-center justify-center`}
+                                                    title={!isStarted ? "Start task to update progress" : "Increase Progress"}
+                                                >
+                                                    <ArrowUpCircle size={20} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleUpdateQuantity(task, task.completed_quantity - 1)}
+                                                    disabled={!isStarted || task.completed_quantity <= 0}
+                                                    className="p-1.5 rounded-lg bg-white border border-gray-200 text-gray-300 hover:text-red-500 hover:border-red-200 transition-all disabled:opacity-20 disabled:scale-100 flex items-center justify-center"
+                                                    title={!isStarted ? "Start task to update progress" : "Decrease Progress"}
+                                                >
+                                                    <ArrowDownCircle size={20} />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             </div>
