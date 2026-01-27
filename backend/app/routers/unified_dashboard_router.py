@@ -56,7 +56,9 @@ async def get_admin_dashboard(
         
         # 6.5 Sanitize Tasks (Fix Boolean Status Crash + JOIN Project Names)
         project_map = {str(getattr(p, 'project_id', getattr(p, 'id', ''))): str(getattr(p, 'project_name', '')) for p in projects}
-        
+        user_map = {str(getattr(u, 'user_id', getattr(u, 'id', ''))): str(getattr(u, 'full_name', '') or getattr(u, 'username', '')) for u in users}
+        machine_map = {str(getattr(m, 'machine_id', getattr(m, 'id', ''))): str(getattr(m, 'machine_name', '')) for m in machines_raw}
+
         sanitized_tasks = []
         for idx, t in enumerate(combined_tasks):
             # Convert SQLAlchemy model to dict if needed
@@ -72,6 +74,14 @@ async def get_admin_dashboard(
             if not t_data.get('project') and pid in project_map:
                 t_data['project'] = project_map[pid]
             
+            # Fix Operator Name
+            uid = str(t_data.get('assigned_to', ''))
+            t_data['operator_name'] = user_map.get(uid, uid or "Unassigned")
+
+            # Fix Machine Name
+            mid = str(t_data.get('machine_id', ''))
+            t_data['machine_name'] = machine_map.get(mid, "Handwork" if not mid else mid)
+
             # CRITICAL: Ensure 'id' is present and NOT empty/undefined
             # Fallback chain: task_id -> fabrication_task_id -> filing_task_id -> row_index
             t_id = (
@@ -123,9 +133,9 @@ async def get_admin_dashboard(
                 "id": t.get('id'),
                 "title": t.get('title', 'Unknown'),
                 "project": t.get('project', 'Internal'),
-                "operator_name": t.get('assigned_to', 'Unknown'), # assigned_to is resolved to name in sanitization
-                "machine_name": t.get('machine_id', 'Handwork'),   # machine_id is resolved to name
-                "machine_id": t.get('machine_id'),
+                "operator_name": t.get('operator_name', 'Unknown'), 
+                "machine_name": t.get('machine_name', 'Handwork'),
+                "machine_id": str(t.get('machine_id', '')),
                 "duration_seconds": int(t.get('total_duration_seconds', 0) or 0),
                 "total_held_seconds": int(t.get('total_held_seconds', 0) or 0),
                 "due_date": t.get('due_date'),

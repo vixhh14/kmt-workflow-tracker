@@ -102,6 +102,7 @@ class TaskUpdate(BaseModel):
 
 class TaskOut(TaskBase):
     task_id: str
+    id: Optional[str] = None # Alias for task_id to support frontend 'task.id'
     created_at: Optional[Union[datetime, str]] = None
     updated_at: Optional[Union[datetime, str]] = None
     started_at: Optional[Union[datetime, str]] = None

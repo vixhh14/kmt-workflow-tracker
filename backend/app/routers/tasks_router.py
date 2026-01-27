@@ -143,7 +143,14 @@ async def read_tasks(
             due = t.get('due_date') or t.get('due_datetime') or ""
 
             # CRITICAL: Sanitize IDs
-            t_id = str(t.get('task_id', '')).strip()
+            # Check all possible ID fields from different task models
+            t_id = (
+                str(t.get('task_id', '')).strip() or 
+                str(t.get('fabrication_task_id', '')).strip() or 
+                str(t.get('filing_task_id', '')).strip() or
+                str(t.get('id', '')).strip()
+            )
+
             if not t_id or t_id.lower() == "undefined":
                 # Create a traceable temporary ID if missing in DB
                 row_idx = t.get('_row_idx', idx + 1)

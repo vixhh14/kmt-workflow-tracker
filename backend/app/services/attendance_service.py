@@ -114,32 +114,17 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         
         def normalize_date_str(d_str):
             if not d_str: return ""
-            # If it's already an ISO string or similar, get the first part
             s = str(d_str).strip().split('T')[0].split(' ')[0]
-            
-            # Handle DD/MM/YYYY or D/M/YYYY
-            if '/' in s:
-                p = s.split('/')
-                if len(p) == 3:
-                     try:
-                         # Handle YYYY/MM/DD vs DD/MM/YYYY
-                         if len(p[0]) == 4: # YYYY/MM/DD
-                             return f"{p[0]}-{int(p[1]):02d}-{int(p[2]):02d}"
-                         return f"{p[2]}-{int(p[1]):02d}-{int(p[0]):02d}"
-                     except: pass
-            
-            # Handle DD-MM-YYYY or D-M-YYYY
+            s = s.replace('/', '-').replace('.', '-')
             if '-' in s:
                 p = s.split('-')
                 if len(p) == 3:
                      try:
-                         # If first part is YYYY, it's already Good-ish
-                         if len(p[0]) == 4:
+                         if len(p[0]) == 4: # YYYY-MM-DD
                              return f"{p[0]}-{int(p[1]):02d}-{int(p[2]):02d}"
-                         # Else assume DD-MM-YYYY
-                         return f"{p[2]}-{int(p[1]):02d}-{int(p[0]):02d}"
+                         if len(p[2]) == 4: # DD-MM-YYYY
+                             return f"{p[2]}-{int(p[1]):02d}-{int(p[0]):02d}"
                      except: pass
-            
             return s
 
         attendance_map = {}
