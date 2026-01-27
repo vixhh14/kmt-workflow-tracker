@@ -165,25 +165,26 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         for user in all_users:
             # Try multiple ID aliases
             user_id = str(user.get("user_id") or user.get("id") or "").strip().lower()
-            username = str(user.get("username", "Unknown")).strip().lower()
+            username = str(user.get("username") or user.get("full_name") or "unknown_user").strip().lower()
             
             if not user_id and not username:
                 continue
 
             # 1. Soft Delete Check
-            is_deleted = str(user.get("is_deleted", "false")).lower().strip()
-            if is_deleted in ["true", "1", "yes"]:
+            is_deleted = user.get("is_deleted", False)
+            if is_deleted in [True, "true", "1", "yes"]:
                 filtered_count += 1
                 continue
             
             # 2. Active Check
-            is_active = str(user.get("active", "true")).lower().strip()
-            if is_active in ["false", "0", "no", "inactive"]:
+            is_active = user.get("active", True)
+            if is_active in [False, "false", "0", "no", "inactive"]:
                 filtered_count += 1
                 continue
             
-            # 3. Role check (Removed filtering, but keep role for display)
-            role = str(user.get("role", "user")).lower().strip()
+            # 3. Role check
+            role = str(user.get("role", "operator")).lower().strip()
+            if not role or role == "": role = "operator"
                 
             # Check attendance map by ID or Username
             att = attendance_map.get(user_id)

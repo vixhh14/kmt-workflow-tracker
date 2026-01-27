@@ -77,8 +77,15 @@ def normalize_row(sheet_name: str, data: Dict[str, Any], partial: bool = False) 
         if header in ["active", "is_active", "is_deleted"]:
              if isinstance(val, str):
                  low = val.lower()
-                 if low in ["true", "1", "yes"]: val = True
-                 elif low in ["false", "0", "no", ""]: val = False
+                 if low in ["true", "1", "yes"]: 
+                     val = True
+                 elif low in ["false", "0", "no"]: 
+                     val = False
+                 elif low == "":
+                     # Default active to True, deleted to False
+                     val = False if header == "is_deleted" else True
+                 else:
+                     val = bool(val)
              else:
                  val = bool(val)
 
