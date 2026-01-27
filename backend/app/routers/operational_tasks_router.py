@@ -155,20 +155,101 @@ async def create_fab_task(data: OperationalTaskCreate, db: Any = Depends(get_db)
 
 @router.put("/filing/{task_id}", response_model=OperationalTaskOut)
 async def update_filing_task(task_id: str, data: OperationalTaskUpdate, db: Any = Depends(get_db)):
-    task = db.query(FilingTask).filter(filing_task_id=task_id).first()
+    # Robust lookup for filing_task_id
+    all_tasks = db.query(FilingTask).all()
+    task = None
+    for t in all_tasks:
+        ids = [
+            str(getattr(t, 'filing_task_id', '')).strip(),
+            str(getattr(t, 'id', '')).strip(),
+            str(task_id).strip()
+        ]
+        if str(task_id).strip() in ids:
+            task = t
+            break
+
     if not task: raise HTTPException(status_code=404, detail="Task not found")
-    for k, v in data.dict(exclude_unset=True).items():
+    
+    update_dict = data.dict(exclude_unset=True)
+    
+    # Handle status-based timestamp logic
+    now = get_current_time_ist().isoformat()
+    status = update_dict.get('status')
+    if status == 'In Progress':
+        update_dict['started_at'] = now
+    elif status == 'On Hold':
+        update_dict['on_hold_at'] = now
+    elif status == 'Completed':
+        update_dict['completed_at'] = now
+    
+    for k, v in update_dict.items():
         setattr(task, k, v)
-    task.updated_at = get_current_time_ist().isoformat()
+    
+    task.updated_at = now
     db.commit()
     return task
 
 @router.put("/fabrication/{task_id}", response_model=OperationalTaskOut)
 async def update_fab_task(task_id: str, data: OperationalTaskUpdate, db: Any = Depends(get_db)):
-    task = db.query(FabricationTask).filter(fabrication_task_id=task_id).first()
+    # Robust lookup for fabrication_task_id
+    all_tasks = db.query(FabricationTask).all()
+    task = None
+    for t in all_tasks:
+        ids = [
+            str(getattr(t, 'fabrication_task_id', '')).strip(),
+            str(getattr(t, 'id', '')).strip(),
+            str(task_id).strip()
+        ]
+        if str(task_id).strip() in ids:
+            task = t
+            break
+            
     if not task: raise HTTPException(status_code=404, detail="Task not found")
-    for k, v in data.dict(exclude_unset=True).items():
+    
+    update_dict = data.dict(exclude_unset=True)
+    
+    # Handle status-based timestamp logic
+    now = get_current_time_ist().isoformat()
+    status = update_dict.get('status')
+    if status == 'In Progress':
+        update_dict['started_at'] = now
+    elif status == 'On Hold':
+        update_dict['on_hold_at'] = now
+    elif status == 'Completed':
+        update_dict['completed_at'] = now
+        
+    for k, v in update_dict.items():
         setattr(task, k, v)
-    task.updated_at = get_current_time_ist().isoformat()
+        
+    task.updated_at = now
     db.commit()
     return task
+
+@router.delete("/{task_type}/{task_id}")
+async def delete_operational_task(task_type: str, task_id: str, db: Any = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Delete an operational task robustly"""
+    if current_user.role not in ["admin", "supervisor", "planning", "file_master", "fab_master"]:
+        raise HTTPException(status_code=403, detail="Not authorized to delete tasks")
+        
+    model = FilingTask if task_type == 'filing' else FabricationTask
+    all_tasks = db.query(model).all()
+    db_task = None
+    
+    id_field = 'filing_task_id' if task_type == 'filing' else 'fabrication_task_id'
+    
+    for t in all_tasks:
+        ids = [
+            str(getattr(t, id_field, '')).strip(),
+            str(getattr(t, 'id', '')).strip(),
+            str(task_id).strip()
+        ]
+        if str(task_id).strip() in ids:
+            db_task = t
+            break
+
+    if not db_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+        
+    db_task.is_deleted = True
+    db.commit()
+    return {"message": "Task deleted successfully"}
