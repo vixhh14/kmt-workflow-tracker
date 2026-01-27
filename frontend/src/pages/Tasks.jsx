@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getTasks, createTask, deleteTask, getMachines, getUsers, updateTask, getProjects, endTask, getProjectsDropdown, getMachinesDropdown, getAssignableUsers } from '../api/services';
-import { Plus, Trash2, CheckSquare, Search, Filter, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Clock, Square } from 'lucide-react';
+import { Plus, Trash2, CheckSquare, Search, Filter, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Clock, Square, Pause } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Subtask from '../components/Subtask';
 import { minutesToHHMM, hhmmToMinutes, validateHHMM } from '../utils/timeFormat';

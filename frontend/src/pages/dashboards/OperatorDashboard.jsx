@@ -281,17 +281,45 @@ const OperatorDashboard = () => {
                                             {task.nos_unit && <div><p className="text-gray-400 font-bold text-[10px] uppercase tracking-wider mb-0.5">Quantity</p><p className="font-semibold text-gray-800">{task.nos_unit}</p></div>}
                                         </div>
 
-                                        <div className="mt-6 flex flex-wrap gap-4 text-xs border-t border-gray-50 pt-5">
-                                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
-                                                <Clock size={14} className="text-blue-500" />
-                                                <span className="text-gray-500 font-medium">Runtime:</span>
-                                                <span className="font-bold text-gray-900">{formatDuration(task.total_duration_seconds)}</span>
+                                        <div className="mt-6 space-y-3 border-t border-gray-50 pt-5">
+                                            <div className="flex flex-wrap gap-4 text-xs">
+                                                <div className="flex items-center gap-2 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100">
+                                                    <Clock size={14} className="text-blue-500" />
+                                                    <span className="text-gray-500 font-medium">Net Runtime:</span>
+                                                    <span className="font-bold text-gray-900">{formatDuration(task.total_duration_seconds)}</span>
+                                                </div>
+                                                {task.total_held_seconds > 0 && (
+                                                    <div className="flex items-center gap-2 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100 text-amber-900">
+                                                        <Pause size={14} />
+                                                        <span className="font-medium">Total Pause:</span>
+                                                        <span className="font-bold">{formatDuration(task.total_held_seconds)}</span>
+                                                    </div>
+                                                )}
+                                                {task.actual_start_time && (
+                                                    <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+                                                        <Play size={14} className="text-green-500" />
+                                                        <span className="text-gray-500 font-medium">Started:</span>
+                                                        <span className="font-bold text-gray-900">{formatDate(task.actual_start_time)}</span>
+                                                    </div>
+                                                )}
+                                                {task.actual_end_time && (
+                                                    <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100">
+                                                        <CheckCircle size={14} className="text-emerald-500" />
+                                                        <span className="text-gray-500 font-medium">Finished:</span>
+                                                        <span className="font-bold text-gray-900">{formatDate(task.actual_end_time)}</span>
+                                                    </div>
+                                                )}
                                             </div>
-                                            {task.total_held_seconds > 0 && (
-                                                <div className="flex items-center gap-2 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100 text-amber-900">
-                                                    <Pause size={14} />
-                                                    <span className="font-medium">Hold Time:</span>
-                                                    <span className="font-bold">{formatDuration(task.total_held_seconds)}</span>
+
+                                            {task.actual_start_time && (task.status === 'completed' || task.status === 'ended' || task.status === 'in_progress') && (
+                                                <div className="flex items-center gap-2 px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                                    <span>Total Time (Inc. Holds): {
+                                                        (() => {
+                                                            const start = new Date(task.actual_start_time).getTime();
+                                                            const end = task.actual_end_time ? new Date(task.actual_end_time).getTime() : Date.now();
+                                                            return formatDuration(Math.floor((end - start) / 1000));
+                                                        })()
+                                                    }</span>
                                                 </div>
                                             )}
                                         </div>

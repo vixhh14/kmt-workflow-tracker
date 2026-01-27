@@ -256,11 +256,31 @@ const SupervisorDashboard = () => {
                                             <p>Due: <b>{task.due_date ? new Date(task.due_date).toLocaleDateString() : '-'}</b></p>
                                             <p>Part: <b>{task.part_item || '-'}</b></p>
                                         </div>
-                                        {task.status === 'in_progress' && (
-                                            <p className="text-xs text-green-700 mt-2 font-mono">
-                                                Started: {formatTime(task.actual_start_time)} |
-                                                Duration: {formatDuration(task.total_duration_seconds)}
-                                            </p>
+                                        {task.actual_start_time && (
+                                            <div className="mt-2 space-y-1">
+                                                <div className="flex flex-wrap gap-3">
+                                                    <span className="text-[10px] text-green-700 font-bold uppercase tracking-tight flex items-center gap-1">
+                                                        <Play size={10} /> Started: {formatTime(task.actual_start_time)}
+                                                    </span>
+                                                    <span className="text-[10px] text-blue-700 font-bold uppercase tracking-tight flex items-center gap-1">
+                                                        <Clock size={10} /> Net: {formatDuration(task.total_duration_seconds)}
+                                                    </span>
+                                                    {task.total_held_seconds > 0 && (
+                                                        <span className="text-[10px] text-amber-700 font-bold uppercase tracking-tight flex items-center gap-1">
+                                                            <Pause size={10} /> Held: {formatDuration(task.total_held_seconds)}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="text-[9px] text-gray-400 font-black uppercase tracking-widest">
+                                                    Total Duration: {
+                                                        (() => {
+                                                            const start = new Date(task.actual_start_time).getTime();
+                                                            const end = task.actual_end_time ? new Date(task.actual_end_time).getTime() : Date.now();
+                                                            return formatDuration(Math.floor((end - start) / 1000));
+                                                        })()
+                                                    }
+                                                </div>
+                                            </div>
                                         )}
                                     </div>
 
@@ -331,9 +351,26 @@ const SupervisorDashboard = () => {
                                         <p className="text-xs text-gray-600 mt-1">
                                             👤 <b>{task.operator_name}</b> | ⚙️ {task.machine_name || 'Handwork'}
                                         </p>
-                                        <p className="text-xs text-gray-600">
-                                            Running for: <b className="text-green-700">{formatDuration(task.duration_seconds)}</b>
-                                        </p>
+                                        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                                            <p className="text-[11px] text-gray-600">
+                                                Net Runtime: <b className="text-blue-700">{formatDuration(task.duration_seconds)}</b>
+                                            </p>
+                                            {task.total_held_seconds > 0 && (
+                                                <p className="text-[11px] text-gray-600">
+                                                    Hold Time: <b className="text-amber-700">{formatDuration(task.total_held_seconds)}</b>
+                                                </p>
+                                            )}
+                                        </div>
+                                        {task.actual_start_time && (
+                                            <p className="text-[10px] text-gray-400 font-bold uppercase mt-1 tracking-tighter">
+                                                Total Time: {
+                                                    (() => {
+                                                        const start = new Date(task.actual_start_time).getTime();
+                                                        return formatDuration(Math.floor((Date.now() - start) / 1000));
+                                                    })()
+                                                }
+                                            </p>
+                                        )}
                                     </div>
                                     <button
                                         onClick={() => handleEndTask(task)}
