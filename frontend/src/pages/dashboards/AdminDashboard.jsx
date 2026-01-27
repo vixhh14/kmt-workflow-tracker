@@ -417,77 +417,73 @@ const AdminDashboard = () => {
             {/* Attendance Summary */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 {/* Present Users */}
-                <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                    <div className="flex items-center justify-between mb-4">
+                <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
+                    <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center">
-                            <UserCheck className="text-green-600 mr-2" size={24} />
-                            <h2 className="text-lg font-semibold text-gray-900">
+                            <UserCheck className="text-green-600 mr-2.5" size={20} />
+                            <h2 className="text-lg font-bold text-gray-900 tracking-tight">
                                 Present Today ({attendanceSummary.present || 0})
                             </h2>
                         </div>
-                        <span className="text-xs text-gray-500">{attendanceSummary.date}</span>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{attendanceSummary.date}</span>
                     </div>
                     {attendanceSummary.present_users && attendanceSummary.present_users.length > 0 ? (
-                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                        <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
                             {attendanceSummary.present_users.map((user, idx) => (
                                 <div
                                     key={user.user_id || user.id || idx}
-                                    className="flex items-center justify-between p-2 bg-green-50 rounded-lg"
+                                    className="flex items-center justify-between p-3 bg-gray-50/50 rounded-xl border border-gray-100 hover:border-green-200 transition-colors"
                                 >
                                     <div>
-                                        <p className="font-medium text-gray-900">{user.username || user.name || user.full_name || 'Unknown User'}</p>
-                                        {(user.role || user.user_role) && (
-                                            <p className="text-xs text-gray-600 capitalize">{user.role || user.user_role}</p>
-                                        )}
+                                        <p className="font-bold text-gray-900 leading-none mb-1">{user.username || user.name || user.full_name || 'Unknown'}</p>
+                                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">{user.role || user.user_role || 'Operator'}</p>
                                     </div>
-                                    <div className="h-2 w-2 bg-green-500 rounded-full"></div>
+                                    <div className="h-2 w-2 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <div className="text-center py-8 text-gray-500">
-                            <UserCheck className="mx-auto mb-2" size={32} />
-                            <p>No users marked present today</p>
+                        <div className="text-center py-12 text-gray-400">
+                            <UserCheck className="mx-auto mb-3 opacity-20" size={40} />
+                            <p className="text-sm font-medium">No users marked present today</p>
                         </div>
                     )}
                 </div>
 
                 {/* Absent Users */}
-                <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                    <div className="flex items-center justify-between mb-4">
+                <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
+                    <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center">
-                            <UserX className="text-red-600 mr-2" size={24} />
-                            <h2 className="text-lg font-semibold text-gray-900">
+                            <UserX className="text-red-500 mr-2.5" size={20} />
+                            <h2 className="text-lg font-bold text-gray-900 tracking-tight">
                                 Absent Today ({attendanceSummary.absent || 0})
                             </h2>
                         </div>
                         {attendanceSummary.late > 0 && (
-                            <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded">
+                            <span className="text-[10px] font-black px-2 py-1 bg-yellow-100 text-yellow-800 rounded uppercase">
                                 {attendanceSummary.late} late
                             </span>
                         )}
                     </div>
                     {attendanceSummary.absent_users && attendanceSummary.absent_users.length > 0 ? (
-                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                        <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
                             {attendanceSummary.absent_users.map((user, idx) => (
                                 <div
                                     key={user.user_id || user.id || idx}
-                                    className="flex items-center justify-between p-2 bg-red-50 rounded-lg"
+                                    className="flex items-center justify-between p-3 bg-red-50/30 rounded-xl border border-red-50/50 hover:border-red-200 transition-colors"
                                 >
                                     <div>
-                                        <p className="font-medium text-gray-900">{user.username || user.name || user.full_name || 'Unknown User'}</p>
-                                        {(user.role || user.user_role) && (
-                                            <p className="text-xs text-gray-600 capitalize">{user.role || user.user_role}</p>
-                                        )}
+                                        <p className="font-bold text-gray-900 leading-none mb-1">{user.username || user.name || user.full_name || 'Unknown'}</p>
+                                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">{user.role || user.user_role || 'Operator'}</p>
                                     </div>
-                                    <div className="h-2 w-2 bg-red-500 rounded-full"></div>
+                                    <div className="h-2 w-2 bg-red-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <div className="text-center py-8 text-gray-500">
-                            <UserCheck className="mx-auto mb-2" size={32} />
-                            <p>All users are present today (or none monitored)</p>
+                        <div className="text-center py-12 text-gray-400">
+                            <UserX className="mx-auto mb-3 opacity-20" size={40} />
+                            <p className="text-sm font-medium">Everyone is present today!</p>
                         </div>
                     )}
                 </div>

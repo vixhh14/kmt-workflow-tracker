@@ -514,171 +514,134 @@ const OperationalDashboard = ({ type }) => {
                         </div>
                     ) : (
                         tasks.map(task => (
-                            <div key={task.id} className="p-4 sm:p-6 hover:bg-gray-50/50 transition-colors group">
-                                <div className="flex flex-col lg:flex-row gap-6">
-                                    {/* Task Identifiers */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${getPriorityColor(task.priority)}`}>
-                                                {task.priority || 'Medium'}
+                            <div key={task.id} className="p-5 hover:bg-gray-50/50 transition-all border-b border-gray-100 last:border-0">
+                                <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+                                    {/* 1. Primary Info: Title, Priority, WO */}
+                                    <div className="lg:w-1/3">
+                                        <div className="flex flex-wrap items-center gap-3 mb-2">
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${getPriorityColor(task.priority)}`}>
+                                                {task.priority || 'MEDIUM'}
                                             </span>
-                                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 uppercase">
-                                                WO: {task.work_order_number}
+                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wider">
+                                                WO: {task.work_order_number || '00'}
                                             </span>
-                                            <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                                            <h3 className="text-lg font-bold text-gray-900 tracking-tight">
                                                 {task.part_item}
                                             </h3>
                                         </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4">
-                                            <div className="flex items-center text-sm text-gray-600">
-                                                <Hash size={14} className="mr-2 text-gray-400" />
-                                                <span className="font-medium">{task.project_name || 'Generic Project'}</span>
+                                        <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+                                            <div className="flex items-center text-xs text-gray-400 font-bold">
+                                                <Hash size={12} className="mr-1.5 opacity-40" />
+                                                <span>{task.machine_name || task.machine_id || 'HANDWORK'}</span>
                                             </div>
-                                            <div className="flex items-center text-sm text-gray-600">
-                                                <Calendar size={14} className="mr-2 text-gray-400" />
-                                                <span>Deadline: <span className="font-bold text-red-600">{formatDueDateTime(task.due_date)}</span></span>
+                                            <div className="flex items-center text-xs text-gray-400 font-bold">
+                                                <Calendar size={12} className="mr-1.5 opacity-40" />
+                                                <span>DUE: <span className="text-red-500">{formatDueDateTime(task.due_date).split(' •')[0]}</span></span>
                                             </div>
                                         </div>
-
-                                        {/* Assignee / Master Actions */}
-                                        <div className="mt-4 flex flex-col sm:flex-row gap-3">
-                                            <div className="flex-1">
-                                                <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Notes / Remarks</label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Add notes..."
-                                                    defaultValue={task.remarks || ''}
-                                                    onBlur={(e) => {
-                                                        if (e.target.value !== task.remarks) {
-                                                            updateOperationalTask(type, task.id, { remarks: e.target.value })
-                                                                .then(() => fetchTasks());
-                                                        }
-                                                    }}
-                                                    className={`w-full text-xs border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 ${(!canAssign && task.assigned_to !== currentUser?.user_id) ? 'bg-gray-50' : ''}`}
-                                                    disabled={!canAssign && task.assigned_to !== currentUser?.user_id}
-                                                    readOnly={!canAssign && task.assigned_to !== currentUser?.user_id}
-                                                />
+                                        {task.remarks && (
+                                            <div className="mt-2 flex items-start text-[10px] text-gray-400 font-bold uppercase tracking-tight">
+                                                <MessageSquare size={10} className="mr-1.5 mt-0.5 opacity-40" />
+                                                <span className="truncate max-w-xs">{task.remarks}</span>
                                             </div>
-
-                                            {canAssign && (
-                                                <div className="sm:w-48">
-                                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Assign To (Manual)</label>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Enter Name or ID"
-                                                        defaultValue={task.assignee_name || task.assigned_to || ''}
-                                                        onBlur={(e) => {
-                                                            const val = e.target.value;
-                                                            if (val !== (task.assignee_name || task.assigned_to)) {
-                                                                handleAssignTask(task.id, val);
-                                                            }
-                                                        }}
-                                                        className="w-full text-xs border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 py-1.5 px-2"
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {!canAssign && (task.assignee_name || task.assigned_to) && (
-                                                <div className="sm:w-48">
-                                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Assigned To</label>
-                                                    <div className="text-xs font-semibold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
-                                                        {task.assignee_name || task.assigned_to}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
+                                        )}
                                     </div>
 
-                                    {/* Task Execution / Progress */}
-                                    <div className="flex flex-col sm:flex-row items-center gap-4 shrink-0 lg:w-[450px]">
-                                        {/* Status Controls */}
-                                        <div className="flex items-center gap-2 pr-4 border-r border-gray-100">
-                                            {(task.status === 'Pending' || task.status === 'On Hold' || task.status === 'onhold') && (
+                                    {/* 2. Assignment */}
+                                    <div className="lg:w-1/6 min-w-[120px]">
+                                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1.5 leading-none">Assign To (Manual)</p>
+                                        {canAssign ? (
+                                            <input
+                                                type="text"
+                                                defaultValue={task.assignee_name || task.assigned_to || ''}
+                                                onBlur={(e) => {
+                                                    const val = e.target.value;
+                                                    if (val !== (task.assignee_name || task.assigned_to)) {
+                                                        handleAssignTask(task.id, val);
+                                                    }
+                                                }}
+                                                className="w-full text-sm font-bold text-gray-800 bg-transparent border-none p-0 focus:ring-0 placeholder:text-gray-300"
+                                                placeholder="Enter Name"
+                                            />
+                                        ) : (
+                                            <p className="text-sm font-bold text-gray-700 leading-none">{task.assignee_name || task.assigned_to || 'Unassigned'}</p>
+                                        )}
+                                    </div>
+
+                                    {/* 3. Action Buttons (HOLD / END) */}
+                                    <div className="flex items-center gap-3 lg:w-1/5 shrink-0">
+                                        {(task.status?.toLowerCase() === 'pending' || task.status?.toLowerCase() === 'on hold' || task.status?.toLowerCase() === 'onhold') && (
+                                            <button
+                                                onClick={() => handleUpdateStatus(task.id, 'In Progress')}
+                                                className="flex-1 flex items-center justify-center space-x-2 bg-green-600 text-white px-5 py-2.5 rounded-lg font-black text-xs hover:bg-green-700 transition-all shadow-sm active:scale-95 uppercase tracking-wider"
+                                            >
+                                                <Play size={14} fill="currentColor" />
+                                                <span>{task.status?.toLowerCase() === 'pending' ? 'START' : 'RESUME'}</span>
+                                            </button>
+                                        )}
+
+                                        {(task.status?.toLowerCase() === 'in progress' || task.status?.toLowerCase() === 'inprogress') && (
+                                            <>
                                                 <button
-                                                    onClick={() => handleUpdateStatus(task.id, 'In Progress')}
-                                                    className="flex items-center space-x-1.5 bg-green-500 text-white px-3 py-2 rounded-lg font-bold text-xs hover:bg-green-600 transition-all shadow-sm"
+                                                    onClick={() => handleUpdateStatus(task.id, 'On Hold')}
+                                                    className="flex-1 flex items-center justify-center space-x-2 bg-[#b45309] text-white px-5 py-2.5 rounded-lg font-black text-xs hover:bg-[#92400e] transition-all shadow-sm active:scale-95 uppercase tracking-wider"
                                                 >
-                                                    <Play size={14} fill="currentColor" />
-                                                    <span>{task.status === 'Pending' ? 'START' : 'RESUME'}</span>
+                                                    <Pause size={14} fill="currentColor" />
+                                                    <span>HOLD</span>
                                                 </button>
-                                            )}
+                                                <button
+                                                    onClick={() => handleUpdateStatus(task.id, 'Completed')}
+                                                    className="flex-1 flex items-center justify-center space-x-2 bg-[#0369a1] text-white px-5 py-2.5 rounded-lg font-black text-xs hover:bg-[#075985] transition-all shadow-sm active:scale-95 uppercase tracking-wider"
+                                                >
+                                                    <Square size={14} fill="currentColor" />
+                                                    <span>END</span>
+                                                </button>
+                                            </>
+                                        )}
 
-                                            {(task.status === 'In Progress' || task.status === 'inprogress') && (
-                                                <>
-                                                    <button
-                                                        onClick={() => handleUpdateStatus(task.id, 'On Hold')}
-                                                        className="flex items-center space-x-1.5 bg-orange-500 text-white px-3 py-2 rounded-lg font-bold text-xs hover:bg-orange-600 transition-all shadow-sm"
-                                                    >
-                                                        <Pause size={14} fill="currentColor" />
-                                                        <span>HOLD</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleUpdateStatus(task.id, 'Completed')}
-                                                        className="flex items-center space-x-1.5 bg-blue-600 text-white px-3 py-2 rounded-lg font-bold text-xs hover:bg-blue-700 transition-all shadow-sm"
-                                                    >
-                                                        <Square size={14} fill="currentColor" />
-                                                        <span>END</span>
-                                                    </button>
-                                                </>
-                                            )}
+                                        {task.status?.toLowerCase() === 'completed' && (
+                                            <div className="flex-1 flex items-center justify-center space-x-2 bg-green-50 text-green-700 border border-green-100 px-5 py-2.5 rounded-lg font-black text-xs uppercase tracking-wider">
+                                                <CheckCircle size={14} />
+                                                <span>FINISHED</span>
+                                            </div>
+                                        )}
+                                    </div>
 
-                                            {task.status === 'Completed' && (
-                                                <div className="flex flex-col items-center text-green-600">
-                                                    <CheckCircle size={20} />
-                                                    <span className="text-[10px] font-black uppercase mt-1">Done</span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="w-full flex-1">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className={`text-[10px] font-black uppercase tracking-wider ${task.status === 'In Progress' ? 'text-green-600' : 'text-gray-400'}`}>
-                                                    {task.status}
+                                    {/* 4. Progress Tracking */}
+                                    <div className="lg:flex-1 flex items-center gap-6">
+                                        <div className="flex-1">
+                                            <div className="flex justify-between items-end mb-2">
+                                                <span className={`text-[11px] font-black uppercase tracking-[0.2em] ${task.status?.toLowerCase() === 'in progress' ? 'text-green-600' : 'text-gray-400'}`}>
+                                                    {task.status === 'InProgress' ? 'IN PROGRESS' : task.status}
                                                 </span>
-                                                <div className="flex items-center space-x-2">
-                                                    <input
-                                                        type="number"
-                                                        value={task.completed_quantity}
-                                                        onChange={(e) => handleUpdateQuantity(task, e.target.value)}
-                                                        className="w-14 text-center text-sm font-black text-gray-900 border-gray-200 rounded-lg p-1 focus:ring-1 focus:ring-blue-500"
-                                                        min="0"
-                                                        max={task.quantity}
-                                                    />
-                                                    <span className="text-gray-400 font-medium">/ {task.quantity}</span>
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-base font-black text-gray-900 leading-none">{task.completed_quantity}</span>
+                                                    <span className="text-xs text-gray-400 font-bold leading-none">/ {task.quantity}</span>
                                                 </div>
                                             </div>
-                                            <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden border border-gray-100 shadow-inner">
+                                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden shadow-inner border border-gray-100">
                                                 <div
-                                                    className={`h-full transition-all duration-500 ease-out shadow-sm ${accentBg}`}
+                                                    className={`h-full transition-all duration-1000 cubic-bezier(0.4, 0, 0.2, 1) ${accentBg}`}
                                                     style={{ width: `${(task.completed_quantity / task.quantity) * 100}%` }}
                                                 />
                                             </div>
-                                            {task.completed_at && (
-                                                <p className="text-[9px] text-gray-400 mt-1 font-medium italic">
-                                                    Finished: {new Date(task.completed_at).toLocaleString()}
-                                                </p>
-                                            )}
-                                            {task.total_active_duration > 0 && (
-                                                <p className="text-[10px] text-gray-500 mt-1 font-bold">
-                                                    ⏱ Active Time: {Math.floor(task.total_active_duration / 3600)}h {Math.floor((task.total_active_duration % 3600) / 60)}m {task.total_active_duration % 60}s
-                                                </p>
-                                            )}
                                         </div>
 
-                                        <div className="flex flex-col items-center justify-center gap-1 min-w-[60px]">
+                                        {/* Precision Controls */}
+                                        <div className="flex flex-col gap-1.5 shrink-0">
                                             <button
                                                 onClick={() => handleUpdateQuantity(task, task.completed_quantity + 1)}
                                                 disabled={task.completed_quantity >= task.quantity}
-                                                className={`p-1.5 rounded-lg ${accentBg} text-white shadow-sm hover:scale-110 active:scale-90 transition-all disabled:opacity-30`}
+                                                className={`p-1.5 rounded-lg ${accentBg} text-white hover:scale-110 active:scale-90 transition-all shadow-sm disabled:opacity-20`}
                                             >
-                                                <ArrowUpCircle size={18} />
+                                                <ArrowUpCircle size={20} />
                                             </button>
                                             <button
                                                 onClick={() => handleUpdateQuantity(task, task.completed_quantity - 1)}
-                                                disabled={task.completed_quantity === 0}
-                                                className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:text-red-500 transition-all bg-white disabled:opacity-30"
+                                                disabled={task.completed_quantity <= 0}
+                                                className="p-1.5 rounded-lg bg-white border border-gray-200 text-gray-300 hover:text-red-500 hover:border-red-200 transition-all disabled:opacity-20"
                                             >
-                                                <ArrowDownCircle size={18} />
+                                                <ArrowDownCircle size={20} />
                                             </button>
                                         </div>
                                     </div>
