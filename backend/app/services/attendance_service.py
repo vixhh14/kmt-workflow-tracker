@@ -15,10 +15,20 @@ def mark_present(db: SheetsDB, user_id: str, ip_address: Optional[str] = None) -
         today_str = get_today_date_ist().isoformat()
         now_ist = get_current_time_ist().isoformat()
         
+        def normalize_date_str(d_str):
+            if not d_str: return ""
+            s = str(d_str).strip().split('T')[0]
+            if '/' in s:
+                p = s.split('/')
+                if len(p) == 3:
+                     try: return f"{p[2]}-{int(p[1]):02d}-{int(p[0]):02d}"
+                     except: pass
+            return s
+
         # 1. Fetch all attendance for today (cached)
         all_att = sheets_repo.get_all("attendance")
         
-        existing = next((a for a in all_att if str(a.get("user_id")) == str(user_id) and str(a.get("date")) == today_str), None)
+        existing = next((a for a in all_att if str(a.get("user_id")) == str(user_id) and normalize_date_str(a.get("date")) == today_str), None)
         
         if existing:
             # Update missing login_time or status
@@ -102,17 +112,30 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         print(f"📊 Total users in system: {len(all_users)}")
         print(f"📊 Total attendance records: {len(all_att)}")
         
+        def normalize_date_str(d_str):
+            if not d_str: return ""
+            s = str(d_str).strip().split('T')[0]
+            if '/' in s:
+                p = s.split('/')
+                if len(p) == 3:
+                     try:
+                         # Handle D/M/YYYY or DD/MM/YYYY
+                         return f"{p[2]}-{int(p[1]):02d}-{int(p[0]):02d}"
+                     except: pass
+            return s
+
         attendance_map = {}
         for a in all_att:
-            # 1. Date normalization (ensure match even with time)
-            row_date = str(a.get("date", "")).split('T')[0].strip()
-            if row_date == target_date_compare:
-                # 2. Map by both user_id AND username for redundancy
+            # 1. Date normalization (ensure match even with time or different formats)
+            raw_date = normalize_date_str(a.get("date", ""))
+            if raw_date == target_date_compare:
+                # 2. Map by user_id primarily, fallback to username
                 uid = str(a.get("user_id", "")).strip().lower()
-                uname = str(a.get("username", "")).strip().lower()
                 if uid:
                     attendance_map[uid] = a
-                if uname:
+                
+                uname = str(a.get("username", "")).strip().lower()
+                if uname and uname not in attendance_map:
                     attendance_map[uname] = a
         
         print(f"📊 Attendance records for {target_date_compare}: {len(attendance_map)}")
@@ -120,41 +143,34 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         present_records = []
         absent_users = []
         
-        # 3. Tracked roles - EXPANDED to include all roles
-        tracked_roles = ['operator', 'supervisor', 'planning', 'admin', 'file_master', 'fab_master']
-        
         filtered_count = 0
         for user in all_users:
-            user_id = str(user.get("user_id", user.get("id", ""))).strip().lower()
+            # Try multiple ID aliases
+            user_id = str(user.get("user_id") or user.get("id") or "").strip().lower()
             username = str(user.get("username", "Unknown")).strip().lower()
             
-            # CRITICAL: Very lenient filtering
-            # Only exclude if EXPLICITLY deleted or inactive
+            if not user_id and not username:
+                continue
+
+            # 1. Soft Delete Check
             is_deleted = str(user.get("is_deleted", "false")).lower().strip()
             if is_deleted in ["true", "1", "yes"]:
                 filtered_count += 1
-                print(f"  ❌ Filtered (deleted): {username}")
                 continue
             
-            # Check status - only exclude if explicitly "inactive"
-            status = str(user.get("status", "active")).lower().strip()
-            if status == "inactive":
+            # 2. Active Check
+            is_active = str(user.get("active", "true")).lower().strip()
+            if is_active in ["false", "0", "no", "inactive"]:
                 filtered_count += 1
-                print(f"  ❌ Filtered (inactive status): {username}")
                 continue
             
-            # REMOVED: approval_status check - include ALL users regardless of approval
-            # This was causing users to not show up
-            
-            # Check role
-            role = str(user.get("role", "")).lower().strip()
-            if role and role not in tracked_roles:
-                filtered_count += 1
-                print(f"  ❌ Filtered (role '{role}' not tracked): {username}")
-                continue
+            # 3. Role check (Removed filtering, but keep role for display)
+            role = str(user.get("role", "user")).lower().strip()
                 
             # Check attendance map by ID or Username
-            att = attendance_map.get(user_id) or attendance_map.get(username)
+            att = attendance_map.get(user_id)
+            if not att and username:
+                att = attendance_map.get(username)
             
             if att and str(att.get("status", "")).lower() == "present":
                 present_records.append({

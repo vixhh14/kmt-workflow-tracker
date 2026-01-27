@@ -4,7 +4,8 @@ from typing import Dict, Any, List
 # Worksheet names as specified by user - strictly canonical and locked
 SHEETS_SCHEMA = {
     "users": [
-        "user_id", "username", "role", "email", "active", "created_at", "password_hash", "approval_status"
+        "user_id", "username", "role", "email", "active", "created_at", "password_hash", 
+        "approval_status", "full_name", "unit_id", "machine_types", "contact_number", "updated_at", "is_deleted"
     ],
     "machines": [
         "machine_id", "machine_name", "category", "unit", "status", 
@@ -15,7 +16,7 @@ SHEETS_SCHEMA = {
     ],
     "projects": [
         "project_id", "project_name", "client_name", "project_code", 
-        "is_deleted", "created_at", "updated_at"
+        "is_deleted", "created_at", "updated_at", "work_order_number"
     ],
     "tasks": [
         "task_id", "title", "project_id", "assigned_to", "assigned_by", "status", 
@@ -23,7 +24,8 @@ SHEETS_SCHEMA = {
         "description", "part_item", "nos_unit", "machine_id", "started_at", 
         "completed_at", "total_duration_seconds", "hold_reason", "denial_reason", 
         "actual_start_time", "actual_end_time", "total_held_seconds", 
-        "ended_by", "end_reason", "work_order_number", "expected_completion_time"
+        "ended_by", "end_reason", "work_order_number", "expected_completion_time",
+        "project", "due_date"
     ],
     "fabricationtasks": [
         "fabrication_task_id", "project_id", "part_item", "quantity", "due_date", "priority", 
@@ -50,9 +52,10 @@ SHEETS_SCHEMA = {
     "subtasks": ["id", "task_id", "title", "status", "notes", "created_at", "updated_at", "is_deleted"]
 }
 
-def normalize_row(sheet_name: str, data: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_row(sheet_name: str, data: Dict[str, Any], partial: bool = False) -> Dict[str, Any]:
     """
     Unified normalization layer. Ensures all writes are schema-aligned.
+    If 'partial' is True, only headers present in 'data' are processed and returned.
     """
     if sheet_name not in SHEETS_SCHEMA:
         return data
@@ -61,6 +64,9 @@ def normalize_row(sheet_name: str, data: Dict[str, Any]) -> Dict[str, Any]:
     normalized = {}
 
     for header in canonical_headers:
+        if partial and header not in data:
+            continue
+            
         val = data.get(header, "")
         
         # 1. Trim strings
@@ -78,4 +84,10 @@ def normalize_row(sheet_name: str, data: Dict[str, Any]) -> Dict[str, Any]:
 
         normalized[header] = val
         
+    # CRITICAL: Preserve metadata keys (starting with _) like _row_idx
+    # These are NOT in SHEETS_SCHEMA but are required for repository core logic
+    for k, v in data.items():
+        if k.startswith("_"):
+            normalized[k] = v
+
     return normalized

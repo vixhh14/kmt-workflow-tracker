@@ -127,6 +127,9 @@ async def read_tasks(
             m_id = t.get('machine_id', '')
             machine_name = machine_map.get(m_id, {}).get("machine_name", m_id) if m_id else None
 
+            # Resolve Due Date (Fallback to due_datetime)
+            due = t.get('due_date') or t.get('due_datetime') or ""
+
             # Build final dict matching TaskOut schema
             task_data = {
                 "id": t['task_id'],
@@ -134,7 +137,7 @@ async def read_tasks(
                 "title": t['title'],
                 "description": t['description'],
                 "project": project_name,
-                "project_id": project_name, # Map name to ID field as requested by frontend quirks
+                "project_id": t.get('project_id', ''),
                 "part_item": t['part_item'],
                 "nos_unit": t['nos_unit'],
                 "status": t['status'],
@@ -142,7 +145,7 @@ async def read_tasks(
                 "assigned_by": assigner_name,
                 "assigned_to": assignee_name,
                 "machine_id": machine_name,
-                "due_date": t['due_date'],
+                "due_date": due,
                 "created_at": t['created_at'],
                 "started_at": t['started_at'],
                 "completed_at": t['completed_at'],
@@ -659,7 +662,10 @@ async def update_task(
     current_user: User = Depends(get_current_user)
 ):
     from app.models.models_db import Project as DBProject
-    db_task = db.query(Task).filter(task_id=task_id).first()
+    # Robust lookup for task_id (Checks both 'id' and 'task_id' aliases)
+    all_tasks = db.query(Task).all()
+    db_task = next((t for t in all_tasks if str(getattr(t, 'task_id', getattr(t, 'id', ''))) == str(task_id)), None)
+    
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
     
@@ -722,7 +728,10 @@ async def delete_task(
     if current_user.role not in ["admin", "supervisor", "planning"]:
         raise HTTPException(status_code=403, detail="Not authorized to delete tasks")
         
-    db_task = db.query(Task).filter(task_id=task_id).first()
+    # Robust lookup for task_id (Checks both 'id' and 'task_id' aliases)
+    all_tasks = db.query(Task).all()
+    db_task = next((t for t in all_tasks if str(getattr(t, 'task_id', getattr(t, 'id', ''))) == str(task_id)), None)
+
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
     db_task.is_deleted = True

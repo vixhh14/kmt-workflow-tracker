@@ -115,7 +115,6 @@ class QueryWrapper:
     def filter(self, *args, **kwargs):
         filtered = list(self._data)
         
-        # 1. Handle Keyword Filters
         for key, value in kwargs.items():
             def match_kw(row, k, filter_val):
                 row_val = getattr(row, k, None)
@@ -131,6 +130,9 @@ class QueryWrapper:
                         low = row_val.lower()
                         row_val = low in ['true', '1', 'yes']
                     return bool(row_val) == filter_val
+                
+                if isinstance(filter_val, str) and isinstance(row_val, str):
+                    return str(row_val).strip().lower() == str(filter_val).strip().lower()
                 
                 return str(row_val) == str(filter_val)
             
@@ -231,6 +233,9 @@ class SheetsDB:
                 updates.append(update_entry)
             
             if updates:
+                # Use partial normalization for updates to avoid wiping out non-dirty fields
+                from app.core.sheets_config import normalize_row
+                updates = [normalize_row(sheet_name, u, partial=True) for u in updates]
                 sheets_repo.batch_update(sheet_name, updates)
         
         self._dirty_rows = []

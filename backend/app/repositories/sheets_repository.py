@@ -223,7 +223,7 @@ class SheetsRepository:
             update_payload["updated_at"] = get_current_time_ist().isoformat()
 
         # MANDATORY: Schema Normalization before write
-        update_payload = normalize_row(sheet_name, update_payload)
+        update_payload = normalize_row(sheet_name, update_payload, partial=True)
 
         # 1. Update Sheets
         success = google_sheets.update_row_by_idx(sheet_name, row_idx, update_payload, raw_headers)
@@ -282,7 +282,7 @@ class SheetsRepository:
         raw_headers = self.get_raw_headers(sheet_name)
         
         # MANDATORY: Schema Normalization
-        updates = [normalize_row(sheet_name, u) for u in updates]
+        updates = [normalize_row(sheet_name, u, partial=True) for u in updates]
         
         success = google_sheets.batch_update(sheet_name, updates, raw_headers)
         
