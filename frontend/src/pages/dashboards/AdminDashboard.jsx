@@ -69,37 +69,24 @@ const AdminDashboard = () => {
 
     useEffect(() => {
         fetchDashboard();
-        const interval = setInterval(fetchRunningTasksOnly, 60000); // Auto-refresh running tasks every minute
+        const interval = setInterval(() => fetchDashboard(true), 60000); // Refresh everything every minute silently
         return () => clearInterval(interval);
     }, [selectedProject, selectedOperator]);
 
-    const fetchRunningTasksOnly = async () => {
+    const fetchDashboard = async (silent = false) => {
         try {
-            const res = await getRunningTasks(selectedProject, selectedOperator);
-            setRunningTasks(Array.isArray(res?.data) ? res.data : []);
-        } catch (err) {
-            console.error('Failed to auto-refresh running tasks', err);
-        }
-    };
-
-    const fetchDashboard = async () => {
-        try {
-            setLoading(true);
+            if (!silent) setLoading(true);
             setError(null);
 
             console.log('🔄 Fetching admin dashboard data...', { project: selectedProject, operator: selectedOperator });
 
-            const [unifiedRes, attendanceRes, runningTasksRes] = await Promise.all([
-                getAdminUnifiedDashboard(selectedProject, selectedOperator),
-                getAttendanceSummary(),
-                getRunningTasks(selectedProject, selectedOperator)
-            ]);
+            const unifiedRes = await getAdminUnifiedDashboard(selectedProject, selectedOperator);
 
             console.log('✅ Admin dashboard data loaded');
 
             const unified = unifiedRes?.data || {};
             const overview = unified.overview || {};
-            const tasks = overview.tasks || { total: 0, pending: 0, in_progress: 0, completed: 0, on_hold: 0 };
+            const tasks_stats = overview.tasks || { total: 0, pending: 0, in_progress: 0, completed: 0, on_hold: 0 };
             const projectsData = unified.projects || [];
             const projectStatsData = overview.projects || { total: 0, yet_to_start: 0, in_progress: 0, completed: 0, held: 0 };
 
@@ -109,17 +96,18 @@ const AdminDashboard = () => {
 
             // 1. Task Stats (from Dashboard Overview)
             setTaskStats({
-                total: tasks.total || 0,
-                pending: tasks.pending || 0,
-                in_progress: tasks.in_progress || 0,
-                completed: (tasks.completed || 0) + (tasks.ended || 0),
-                on_hold: tasks.on_hold || 0
+                total: tasks_stats.total || 0,
+                pending: tasks_stats.pending || 0,
+                in_progress: tasks_stats.in_progress || 0,
+                completed: (tasks_stats.completed || 0) + (tasks_stats.ended || 0),
+                on_hold: tasks_stats.on_hold || 0
             });
 
             // 2. Project Stats (Unified logic)
             setProjectStats(projectStatsData);
 
-            setAttendanceSummary(attendanceRes?.data || {
+            // 3. Attendance (from Unified response)
+            setAttendanceSummary(unified.attendance || {
                 date: '',
                 present: 0,
                 absent: 0,
@@ -129,7 +117,9 @@ const AdminDashboard = () => {
                 total_users: 0,
                 records: []
             });
-            setRunningTasks(Array.isArray(runningTasksRes?.data) ? runningTasksRes.data : []);
+
+            // 4. Running Tasks (from Unified response)
+            setRunningTasks(Array.isArray(unified.running_tasks) ? unified.running_tasks : []);
 
         } catch (err) {
             console.error('❌ Failed to fetch admin dashboard data:', err);

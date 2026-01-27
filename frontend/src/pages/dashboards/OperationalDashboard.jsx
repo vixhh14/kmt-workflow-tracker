@@ -84,10 +84,10 @@ const OperationalDashboard = ({ type }) => {
             try {
                 await fetchTasks();
                 consecutiveErrors = 0; // Reset on success
-                timeoutId = setTimeout(pollTasks, 15000); // 15s normal poll
+                timeoutId = setTimeout(pollTasks, 45000); // 45s normal poll
             } catch (err) {
                 consecutiveErrors++;
-                const backoff = Math.min(60000, 15000 * Math.pow(1.5, consecutiveErrors));
+                const backoff = Math.max(60000, 15000 * Math.pow(1.5, consecutiveErrors));
                 console.warn(`Polling failed (${consecutiveErrors}). Retrying in ${Math.round(backoff / 1000)}s...`);
                 timeoutId = setTimeout(pollTasks, backoff);
             }
@@ -206,7 +206,7 @@ const OperationalDashboard = ({ type }) => {
                 remarks: createFormData.remarks
             };
 
-            await import('../../api/services').then(mod => mod.createOperationalTask(type, payload));
+            await createOperationalTask(type, payload);
 
             setCreateFormData({
                 project_id: '',

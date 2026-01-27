@@ -42,7 +42,7 @@ const OperatorDashboard = () => {
 
     useEffect(() => {
         fetchTasks();
-        const interval = setInterval(fetchTasks, 30000); // Refresh every 30 seconds
+        const interval = setInterval(fetchTasks, 45000); // Refresh every 45 seconds
         return () => clearInterval(interval);
     }, []);
 

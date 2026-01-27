@@ -32,7 +32,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 45000, // Increased timeout for Render cold starts
+  timeout: 90000, // 90 seconds for ultra-robust cold start handling
 });
 
 // Request interceptor - attach token
