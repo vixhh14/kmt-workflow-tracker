@@ -110,6 +110,15 @@ async def get_admin_dashboard(
                 "hourly_rate": getattr(m, 'hourly_rate', 0)
             })
         
+        # 8. Attendance Summary (Integrated)
+        from app.services.attendance_service import get_attendance_summary
+        from app.core.time_utils import get_today_date_ist
+        attendance = get_attendance_summary(db, get_today_date_ist().isoformat())
+        
+        # 9. Running Tasks (Integrated)
+        # Using sanitized_tasks list already prepared
+        running_tasks = [t for t in sanitized_tasks if t.get('status') == 'in_progress']
+
         return {
             "projects": [
                 {
@@ -121,10 +130,12 @@ async def get_admin_dashboard(
                 } for p in projects
             ], 
             "tasks": sanitized_tasks, 
+            "running_tasks": running_tasks,
             "machines": machines_data,  
             "users": [u.dict() for u in users], 
             "operators": [u.dict() for u in users if str(getattr(u, 'role', '')).lower() == 'operator'],
-            "overview": overview
+            "overview": overview,
+            "attendance": attendance
         }
     except Exception as e:
         print(f"❌ Error in unified dashboard: {e}")
@@ -136,20 +147,22 @@ async def get_supervisor_dashboard(project_id: Optional[str] = None, operator_id
 
 @router.get("/operator")
 async def get_operator_dashboard(user_id: str, db: any = Depends(get_db)):
-    from app.services.operator_service import get_operator_tasks
-    return get_operator_tasks(db, user_id)
+    from app.routers.operator_router import get_operator_tasks
+    return await get_operator_tasks(user_id, db)
 
 @router.get("/planning")
 async def get_planning_dashboard(db: any = Depends(get_db)):
-    from app.services.planning_service import get_planning_overview
-    return get_planning_overview(db)
+    from app.routers.planning_router import get_planning_dashboard_summary
+    return await get_planning_dashboard_summary(db=db)
 
 @router.get("/file-master")
 async def get_file_master_dashboard(db: any = Depends(get_db)):
-    from app.services.task_service import get_tasks_by_type
-    return {"tasks": get_tasks_by_type(db, "filing")}
+    from app.models.models_db import FilingTask
+    tasks = db.query(FilingTask).all()
+    return {"tasks": [t.dict() if hasattr(t, "dict") else t.__dict__ for t in tasks if not getattr(t, "is_deleted", False)]}
 
 @router.get("/fab-master")
 async def get_fab_master_dashboard(db: any = Depends(get_db)):
-    from app.services.task_service import get_tasks_by_type
-    return {"tasks": get_tasks_by_type(db, "fabrication")}
+    from app.models.models_db import FabricationTask
+    tasks = db.query(FabricationTask).all()
+    return {"tasks": [t.dict() if hasattr(t, "dict") else t.__dict__ for t in tasks if not getattr(t, "is_deleted", False)]}

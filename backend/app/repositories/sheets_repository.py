@@ -14,7 +14,16 @@ _CACHE_EXPIRY = {}
 _RAW_HEADERS = {} # Store actual sheet headers for mapping
 _NO_CACHE = {} # Store timestamps for failed fetches
 _CACHE_LOCK = threading.Lock()
-CACHE_TTL = 45  # Seconds (between 30-60 as requested)
+_FETCH_LOCKS = {} # Thundering herd protection
+_FETCH_LOCKS_LOCK = threading.Lock()
+CACHE_TTL = 90  # Seconds (Freshness)
+STALE_TTL = 300 # Seconds (Serve stale while background refreshing)
+
+def get_sheet_fetch_lock(sheet_name: str):
+    with _FETCH_LOCKS_LOCK:
+        if sheet_name not in _FETCH_LOCKS:
+            _FETCH_LOCKS[sheet_name] = threading.Lock()
+        return _FETCH_LOCKS[sheet_name]
 
 class SheetsRepository:
     def __init__(self):
@@ -23,27 +32,62 @@ class SheetsRepository:
     def _get_sheet_data(self, sheet_name: str, force_refresh: bool = False) -> List[Dict[str, Any]]:
         now = time.time()
         
-        # 1. Check if we have valid cache
+        # 1. Check if we have valid cache (First Chance)
         if not force_refresh:
             with _CACHE_LOCK:
-                if sheet_name in _GLOBAL_CACHE and now < _CACHE_EXPIRY.get(sheet_name, 0):
-                    return _GLOBAL_CACHE[sheet_name]
+                expiry = _CACHE_EXPIRY.get(sheet_name, 0)
+                if sheet_name in _GLOBAL_CACHE:
+                    if now < expiry:
+                        # Fresh data
+                        return _GLOBAL_CACHE[sheet_name]
+                    elif now < expiry + STALE_TTL:
+                        # Stale but serving while revalidating
+                        self._trigger_background_refresh(sheet_name)
+                        return _GLOBAL_CACHE[sheet_name]
 
-        # 2. Cache expired or missing, refresh it
-        try:
-            # OPTIMIZATION: If we're hitting 'machines', 'users', 'projects', or 'units' 
-            # and they are ALL expired, consider a batch bootstrap read
-            sheets_to_bootstrap = ["machines", "users", "projects", "units", "tasks", "attendance", "fabricationtasks", "filingtasks"]
+        # 2. Acquire fetch lock to prevent redundant API calls (Thundering Herd Protection)
+        fetch_lock = get_sheet_fetch_lock(sheet_name)
+        with fetch_lock:
+            # 3. Second Chance: Check if another thread just refreshed it
+            if not force_refresh:
+                with _CACHE_LOCK:
+                    expiry = _CACHE_EXPIRY.get(sheet_name, 0)
+                    if sheet_name in _GLOBAL_CACHE and time.time() < expiry:
+                        return _GLOBAL_CACHE[sheet_name]
+
+            # 4. Mandatory Sync Refresh
+            return self._refresh_sheet_data(sheet_name)
+
+    def _trigger_background_refresh(self, sheet_name: str):
+        """Spawns a background thread to refresh data if not already being refreshed."""
+        # Simple flag to avoid too many threads
+        lock = get_sheet_fetch_lock(sheet_name)
+        if lock.locked():
+            return
             
-            # Check if current sheet is one of these and others are also expired
+        def job():
+            with lock:
+                # Check expiry again inside thread
+                with _CACHE_LOCK:
+                    if time.time() < _CACHE_EXPIRY.get(sheet_name, 0):
+                        return
+                self._refresh_sheet_data(sheet_name)
+        
+        threading.Thread(target=job, daemon=True).start()
+
+    def _refresh_sheet_data(self, sheet_name: str) -> List[Dict[str, Any]]:
+        try:
+            now = time.time()
+            # Bootstrap optimization
+            sheets_to_bootstrap = ["machines", "users", "projects", "units", "tasks", "attendance", "fabricationtasks", "filingtasks"]
             should_bootstrap = False
             if sheet_name in sheets_to_bootstrap:
-                expired_count = sum(1 for s in sheets_to_bootstrap if s not in _GLOBAL_CACHE or now >= _CACHE_EXPIRY.get(s, 0))
-                if expired_count >= 3: # If 3 or more are stale, do a bulk load
+                with _CACHE_LOCK:
+                    expired_count = sum(1 for s in sheets_to_bootstrap if s not in _GLOBAL_CACHE or now >= _CACHE_EXPIRY.get(s, 0))
+                if expired_count >= 3:
                     should_bootstrap = True
             
             if should_bootstrap:
-                print(f"🚀 [SheetsRepo] TRIGGERING BOOTSTRAP BATCH READ for {len(sheets_to_bootstrap)} sheets")
                 batch_data = google_sheets.batch_get_all(sheets_to_bootstrap)
                 with _CACHE_LOCK:
                     for s_name, s_data in batch_data.items():
@@ -52,21 +96,16 @@ class SheetsRepository:
                         self._extract_headers(s_name, s_data)
                 return _GLOBAL_CACHE.get(sheet_name, [])
 
-            # Single Bulk Read
             data = google_sheets.read_all_bulk(sheet_name)
-            
             with _CACHE_LOCK:
                 _GLOBAL_CACHE[sheet_name] = data
                 _CACHE_EXPIRY[sheet_name] = now + CACHE_TTL
                 self._extract_headers(sheet_name, data)
-                print(f"🔄 [SheetsRepo] Cache Refreshed: {sheet_name} ({len(data)} rows)")
             return data
         except Exception as e:
             print(f"❌ [SheetsRepo] Failed to fetch {sheet_name}: {e}")
             with _CACHE_LOCK:
-                if sheet_name in _GLOBAL_CACHE:
-                    return _GLOBAL_CACHE[sheet_name]
-                return []
+                return _GLOBAL_CACHE.get(sheet_name, [])
 
     def _extract_headers(self, sheet_name: str, data: List[Dict[str, Any]]):
         """Helper to sync headers from data."""

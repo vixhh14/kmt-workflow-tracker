@@ -277,48 +277,48 @@ def verify_sheets_structure():
     Mandatory startup verification: Perform strict header validation.
     Refuses to start if schemas do not match.
     """
-    print("[Startup] Verifying Google Sheets structure (STRICT MODE)...")
+    print("[Startup] Verifying Google Sheets structure (OPTIMIZED BATCH MODE)...")
     try:
+        # 1. Fetch ALL sheets metadata and headers in ONE/TWO calls
+        spreadsheet = google_sheets._get_spreadsheet()
+        all_worksheets = spreadsheet.worksheets()
+        ws_dict = {ws.title: ws for ws in all_worksheets}
+        
+        # Pre-populate google_sheets._worksheets cache
+        with google_sheets._lock:
+            for title, ws in ws_dict.items():
+                google_sheets._worksheets[title] = ws
+
+        # Batch get first row (headers) of all expected sheets
+        ranges = [f"'{name}'!1:1" for name in SHEETS_SCHEMA.keys() if name in ws_dict]
+        batch_headers = {}
+        if ranges:
+            batch_res = spreadsheet.values_batch_get(ranges)
+            value_ranges = batch_res.get('valueRanges', [])
+            for name, v_range in zip([n for n in SHEETS_SCHEMA.keys() if n in ws_dict], value_ranges):
+                vals = v_range.get('values', [])
+                batch_headers[name] = vals[0] if vals else []
+
         errs = []
         for sheet_name, expected_headers in SHEETS_SCHEMA.items():
-            print(f"  Checking {sheet_name}...")
-            try:
-                # 1. Ensure sheet exists
-                worksheet = google_sheets.get_worksheet(sheet_name)
-                
-                # 2. Validate Headers
-                all_vals = worksheet.get_all_values()
-                actual_headers = all_vals[0] if all_vals else []
-                
-                # Compare only the count of columns requested at minimum
-                # OR do exact match of first N columns
-                match = True
-                if len(actual_headers) < len(expected_headers):
-                    match = False
-                else:
-                    for i, h in enumerate(expected_headers):
-                        if actual_headers[i].strip().lower() != h.strip().lower():
-                            match = False
-                            break
-                
-                if not match:
-                    print(f"  🔧 Auto-repairing headers for '{sheet_name}'...")
-                    google_sheets.ensure_worksheet(sheet_name, expected_headers, force_headers=True)
-                    # Re-validate to be sure
-                    print(f"  ✅ Headers for '{sheet_name}' repaired.")
-            except (gspread.WorksheetNotFound, Exception) as e:
-                # Explicitly check for WorksheetNotFound type or string
-                if isinstance(e, gspread.WorksheetNotFound) or "WorksheetNotFound" in str(e):
-                    # One-time auto-creation is allowed if missing completely
-                    print(f"  ⚡ Sheet {sheet_name} missing. Creating with canonical headers...")
-                    google_sheets.ensure_worksheet(sheet_name, expected_headers)
-                else:
-                    errs.append(f"Failed to verify {sheet_name}: {e}")
-
-        if errs:
-            print("\n🔴 CRITICAL SCHEMA ERRORS DETECTED. PREVENTING STARTUP.")
-            for e in errs: print(f" - {e}")
-            raise RuntimeError("Startup failed due to Google Sheets schema drift. Please check connection and worksheet permissions.")
+            if sheet_name not in ws_dict:
+                print(f"  ⚡ Sheet {sheet_name} missing. Creating...")
+                google_sheets.ensure_worksheet(sheet_name, expected_headers)
+                continue
+            
+            actual_headers = batch_headers.get(sheet_name, [])
+            match = True
+            if len(actual_headers) < len(expected_headers):
+                match = False
+            else:
+                for i, h in enumerate(expected_headers):
+                    if str(actual_headers[i]).strip().lower() != h.strip().lower():
+                        match = False
+                        break
+            
+            if not match:
+                print(f"  🔧 Auto-repairing headers for '{sheet_name}'...")
+                google_sheets.ensure_worksheet(sheet_name, expected_headers, force_headers=True)
 
         # 2. Trigger a Bootstrap Batch Read to pre-warm the cache
         print("[Startup] Pre-warming Cache via Bootstrap...")

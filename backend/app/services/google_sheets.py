@@ -35,6 +35,7 @@ class GoogleSheetsService:
                 cls._instance = super(GoogleSheetsService, cls).__new__(cls)
                 cls._instance._client = None
                 cls._instance._spreadsheet = None
+                cls._instance._worksheets = {}  # Cache worksheet objects
             return cls._instance
 
     def _get_client(self):
@@ -96,13 +97,22 @@ class GoogleSheetsService:
 
     def get_worksheet(self, name: str):
         """Returns a gspread Worksheet object by name (exact or case-insensitive fallback)."""
+        with self._lock:
+            if name in self._worksheets:
+                return self._worksheets[name]
+                
         spreadsheet = self._get_spreadsheet()
         try:
-            return spreadsheet.worksheet(name)
+            ws = spreadsheet.worksheet(name)
+            with self._lock:
+                self._worksheets[name] = ws
+            return ws
         except gspread.WorksheetNotFound:
             # Try case-insensitive fallback
             for sheet in spreadsheet.worksheets():
                 if sheet.title.lower() == name.lower():
+                    with self._lock:
+                        self._worksheets[name] = sheet
                     return sheet
             raise
         except Exception as e:
