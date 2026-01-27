@@ -19,67 +19,92 @@ router = APIRouter(
 
 def calculate_detailed_machine_activity(db: any, machine_id: str, target_date: date) -> List[dict]:
     p = target_date.isoformat()
+    from app.models.models_db import FilingTask, FabricationTask
+    
     logs = [l for l in db.query(MachineRuntimeLog).all() if str(l.machine_id) == str(machine_id) and str(l.date).startswith(p)]
-    tasks = {str(t.id): t for t in db.query(Task).all()}
+    
+    # Pre-build unified task map
+    gen = {str(t.id): t for t in db.query(Task).all()}
+    filing = {str(t.id): t for t in db.query(FilingTask).all()}
+    fab = {str(t.id): t for t in db.query(FabricationTask).all()}
+    tasks = {**gen, **filing, **fab}
+    
     users = {str(u.user_id): u for u in db.query(User).all()}
     
     res = []
     for l in logs:
         t = tasks.get(str(l.task_id))
+        title = "Unknown"
+        if t:
+            title = getattr(t, 'title', getattr(t, 'part_item', 'Untitled'))
+            
         res.append({
             "task_id": str(l.task_id),
-            "task_title": t.title if t else "Unknown",
-            "operator": users.get(str(t.assigned_to)).username if t and str(t.assigned_to) in users else "Unknown",
+            "task_title": title,
+            "operator": users.get(str(t.assigned_to)).username if t and str(getattr(t, 'assigned_to', '')) in users else "Unknown",
             "start_time": str(l.start_time),
             "end_time": str(l.end_time or ""),
             "runtime_seconds": int(l.duration_seconds or 0),
-            "status": "Completed" if l.end_time else "Running"
+            "status": "Completed" if l.end_time else "In Progress"
         })
     return res
 
 def calculate_detailed_user_activity(db: any, user_id: str, target_date: date) -> List[dict]:
     p = target_date.isoformat()
+    from app.models.models_db import FilingTask, FabricationTask
+
     logs = [l for l in db.query(UserWorkLog).all() if str(l.user_id) == str(user_id) and str(l.date).startswith(p)]
-    tasks = {str(t.id): t for t in db.query(Task).all()}
+    
+    # Pre-build unified task map
+    gen = {str(t.id): t for t in db.query(Task).all()}
+    filing = {str(t.id): t for t in db.query(FilingTask).all()}
+    fab = {str(t.id): t for t in db.query(FabricationTask).all()}
+    tasks = {**gen, **filing, **fab}
+    
     machines = {str(m.id): m for m in db.query(Machine).all()}
     
     res = []
     for l in logs:
         t = tasks.get(str(l.task_id))
         m = machines.get(str(l.machine_id))
+        title = "Unknown"
+        if t:
+            title = getattr(t, 'title', getattr(t, 'part_item', 'Untitled'))
+            
         res.append({
             "task_id": str(l.task_id),
-            "task_title": t.title if t else "Unknown",
+            "task_title": title,
             "machine_name": m.machine_name if m else "None",
             "start_time": str(l.start_time),
             "end_time": str(l.end_time or ""),
             "duration_seconds": int(l.duration_seconds or 0),
-            "status": "Completed" if l.end_time else "Working"
+            "status": "Completed" if l.end_time else "In Progress"
         })
     return res
 
 # Helper functions refactored for SheetsDB
 def calculate_machine_runtime(db: any, target_date: date) -> List[dict]:
     target_date_str = target_date.isoformat()
-    target_date_str = target_date.isoformat()
-    # Filter: Not deleted (handle boolean/string nuances)
+    from app.models.models_db import FilingTask, FabricationTask
+    
+    # 1. Fetch Machines
     all_machines = db.query(Machine).all()
-    machines = []
-    for m in all_machines:
-        is_del = str(getattr(m, 'is_deleted', 'False')).lower()
-        if is_del in ['true', '1', 'yes']:
-            continue
-        machines.append(m)
+    machines = [m for m in all_machines if not getattr(m, 'is_deleted', False)]
+    
     units = {str(getattr(u, 'unit_id', getattr(u, 'id', ''))): str(u.name) for u in db.query(Unit).all()}
     categories = {str(c.id): str(c.name) for c in db.query(MachineCategory).all()}
     
-    # Logs for specifically this date
+    # 2. Daily Logs for Runtime
     logs = [l for l in db.query(MachineRuntimeLog).all() if str(l.date).startswith(target_date_str)]
     
-    # Tasks completed on this date
-    completed_on_date = [t for t in db.query(Task).all() if not t.is_deleted and str(t.status).lower() == 'completed' and t.actual_end_time and str(t.actual_end_time).startswith(target_date_str)]
+    # 3. Tasks completed across all 3 sheets
+    completed_gen = [t for t in db.query(Task).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and str(getattr(t, 'actual_end_time', '')).startswith(target_date_str)]
+    completed_filing = [t for t in db.query(FilingTask).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and str(getattr(t, 'actual_end_time', '')).startswith(target_date_str)]
+    completed_fab = [t for t in db.query(FabricationTask).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and str(getattr(t, 'actual_end_time', '')).startswith(target_date_str)]
     
-    # Initialize stats for ALL valid machines (using robust ID lookup)
+    all_completed = completed_gen + completed_filing + completed_fab
+
+    # 4. Aggregate Stats
     machine_stats = {}
     for m in machines:
         mid = str(getattr(m, 'machine_id', getattr(m, 'id', '')))
@@ -87,16 +112,12 @@ def calculate_machine_runtime(db: any, target_date: date) -> List[dict]:
     
     for log in logs:
         mid_str = str(log.machine_id)
-        # Try finding key match
         if mid_str in machine_stats:
             machine_stats[mid_str]["runtime"] += int(log.duration_seconds or 0)
             if not log.end_time: # Still running
                 machine_stats[mid_str]["is_running_now"] = True
-        else:
-            # Fallback for ID mismatch if log stores different ID format
-            pass # (Optional: add smart lookup if needed)
     
-    for t in completed_on_date:
+    for t in all_completed:
         mid_str = str(t.machine_id)
         if mid_str in machine_stats:
             machine_stats[mid_str]["completed_tasks"] += 1
@@ -105,6 +126,14 @@ def calculate_machine_runtime(db: any, target_date: date) -> List[dict]:
     for m_id, stats in machine_stats.items():
         m = stats["obj"]
         m_id_actual = str(getattr(m, 'machine_id', getattr(m, 'id', '')))
+        
+        # More descriptive status for machines
+        status_label = "Idle"
+        if stats["is_running_now"]:
+            status_label = "In Use"
+        elif stats["runtime"] > 0:
+            status_label = "Active"
+            
         results.append({
             "machine_id": m_id_actual,
             "machine_name": str(m.machine_name),
@@ -114,43 +143,66 @@ def calculate_machine_runtime(db: any, target_date: date) -> List[dict]:
             "runtime_seconds": stats["runtime"],
             "tasks_run_count": stats["completed_tasks"],
             "is_running_now": stats["is_running_now"],
-            "status": "Active" if stats["runtime"] > 0 else "Idle"
+            "status": status_label
         })
     return results
 
 def calculate_user_activity(db: any, target_date: date) -> List[dict]:
     target_date_str = target_date.isoformat()
-    target_date_str = target_date.isoformat()
-    # Filter: Not deleted, specific roles, AND approved (or legacy empty)
+    from app.models.models_db import FilingTask, FabricationTask
+    
+    # 1. Fetch Users (Operators & Masters)
     users = []
     all_users = db.query(User).all()
     for u in all_users:
-        if u.is_deleted: continue
-        
-        # Check Role
+        if getattr(u, 'is_deleted', False): continue
         if str(getattr(u, 'role', '')).lower() not in ['operator', 'supervisor', 'fab_master', 'file_master']:
             continue
-            
-        # Check Approval (Strict)
         approval = str(getattr(u, 'approval_status', 'approved')).lower().strip()
         if approval in ['pending', 'rejected']:
             continue
-            
         users.append(u)
     
+    # 2. Daily Logs for Work Time
     logs = [l for l in db.query(UserWorkLog).all() if str(l.date).startswith(target_date_str)]
     
-    completed_on_date = [t for t in db.query(Task).all() if not t.is_deleted and str(t.status).lower() == 'completed' and t.actual_end_time and str(t.actual_end_time).startswith(target_date_str)]
+    # 3. Tasks completed across all 3 sheets
+    completed_gen = [t for t in db.query(Task).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and str(getattr(t, 'actual_end_time', '')).startswith(target_date_str)]
+    completed_filing = [t for t in db.query(FilingTask).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and str(getattr(t, 'actual_end_time', '')).startswith(target_date_str)]
+    completed_fab = [t for t in db.query(FabricationTask).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and str(getattr(t, 'actual_end_time', '')).startswith(target_date_str)]
     
+    all_completed = completed_gen + completed_filing + completed_fab
+
+    # 4. Attendance sync - Robust matching
+    attendance_data = db.query(Attendance).all()
+    attendees = set()
+    for att in attendance_data:
+        # Normalize date for comparison
+        raw_att_date = str(getattr(att, 'date', getattr(att, 'check_in', '')))
+        if not raw_att_date: continue
+        
+        att_day = raw_att_date.split('T')[0].split(' ')[0]
+        # Handle DD/MM/YYYY vs YYYY-MM-DD
+        if '/' in att_day:
+            p = att_day.split('/')
+            if len(p) == 3:
+                # If it looks like DD/MM/YYYY
+                if len(p[0]) <= 2: att_day = f"{p[2]}-{int(p[1]):02d}-{int(p[0]):02d}"
+        
+        if att_day == target_date_str:
+            attendees.add(str(getattr(att, 'user_id', '')).strip().lower())
+
+    # 5. Aggregate Stats
     user_stats = {str(u.user_id): {"work_time": 0, "completed_tasks": 0, "obj": u, "machines": set()} for u in users}
     
     for log in logs:
         uid_str = str(log.user_id)
         if uid_str in user_stats:
             user_stats[uid_str]["work_time"] += int(log.duration_seconds or 0)
-            if log.machine_id: user_stats[uid_str]["machines"].add(str(log.machine_id))
+            if log.machine_id: 
+                user_stats[uid_str]["machines"].add(str(log.machine_id))
             
-    for t in completed_on_date:
+    for t in all_completed:
         uid_str = str(t.assigned_to)
         if uid_str in user_stats:
             user_stats[uid_str]["completed_tasks"] += 1
@@ -163,7 +215,7 @@ def calculate_user_activity(db: any, target_date: date) -> List[dict]:
         "tasks_worked_count": s["completed_tasks"],
         "total_work_seconds": s["work_time"],
         "machines_used": list(s["machines"]),
-        "status": "Present" if s["work_time"] > 0 else "Absent"
+        "status": "Present" if (s["work_time"] > 0 or str(uid).strip().lower() in attendees or s["completed_tasks"] > 0) else "Absent"
     } for uid, s in user_stats.items()]
 
 def calculate_monthly_performance(db: any, year: int) -> dict:

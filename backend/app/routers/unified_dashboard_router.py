@@ -52,7 +52,7 @@ async def get_admin_dashboard(
         for t in fab_all: combined_tasks.append(t)
 
         # 6. Aggregate Stats Memory-Only
-        overview = get_operations_overview(db)
+        overview = get_operations_overview(db, active_project_id, active_operator_id)
         
         # 6.5 Sanitize Tasks (Fix Boolean Status Crash + JOIN Project Names)
         project_map = {str(getattr(p, 'project_id', getattr(p, 'id', ''))): str(getattr(p, 'project_name', '')) for p in projects}

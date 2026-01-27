@@ -412,7 +412,9 @@ async def hold_task(
     db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    task = db.query(Task).filter(task_id=task_id).first()
+    from app.utils.task_lookup import find_any_task
+    task, task_type = find_any_task(db, task_id)
+    
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
@@ -478,6 +480,17 @@ async def resume_task(
     db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    from app.utils.task_lookup import find_any_task
+    task, task_type = find_any_task(db, task_id)
+    
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    # The start_task function already handles the logic for resuming from 'pending' or 'on_hold'
+    # and setting status to 'in_progress'.
+    # We just need to ensure the task found by find_any_task is passed to start_task.
+    # The original instruction's status check "if task.status != 'in_progress'" was incorrect for resume.
+    # The start_task function itself contains the necessary status checks.
     return await start_task(task_id, db, current_user)
 
 @router.post("/{task_id}/complete")
@@ -486,11 +499,14 @@ async def complete_task(
     db: Any = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    task = db.query(Task).filter(task_id=task_id).first()
+    from app.utils.task_lookup import find_any_task
+    task, task_type = find_any_task(db, task_id)
+    
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    if task.status != "in_progress":
-        raise HTTPException(status_code=400, detail="Task must be in progress to complete")
+
+    if task.status == "completed":
+        return {"message": "Task already completed", "status": task.status}
     
     now = get_current_time_ist()
     
@@ -740,20 +756,9 @@ async def delete_task(
     if current_user.role not in ["admin", "supervisor", "planning"]:
         raise HTTPException(status_code=403, detail="Not authorized to delete tasks")
         
-    # Robust lookup for task_id (Checks multiple ID aliases for safety)
-    available_tasks = db.query(Task).all()
-    db_task = None
-    
-    for t in available_tasks:
-        ids = [
-            str(getattr(t, 'task_id', '')).strip(),
-            str(getattr(t, 'id', '')).strip(),
-            str(getattr(t, 'fabrication_task_id', '')).strip(),
-            str(getattr(t, 'filing_task_id', '')).strip()
-        ]
-        if str(task_id).strip() in ids:
-            db_task = t
-            break
+    # Robust lookup for task_id
+    from app.utils.task_lookup import find_any_task
+    db_task, task_type = find_any_task(db, task_id)
 
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")

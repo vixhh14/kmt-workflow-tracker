@@ -10,42 +10,39 @@ router = APIRouter(
 )
 
 @router.get("/dashboard-summary")
-async def get_planning_dashboard_summary(db: any = Depends(get_db)):
-    """Refactored for SheetsDB with comprehensive aggregation"""
+async def get_planning_dashboard_summary(
+    project_id: Optional[str] = None,
+    operator_id: Optional[str] = None,
+    db: any = Depends(get_db)
+):
+    """Refactored for SheetsDB with comprehensive aggregation and filtering"""
     try:
         # Fetch all task types
         gen_tasks = [t for t in db.query(Task).all() if not getattr(t, 'is_deleted', False)]
         filing_tasks = [t for t in db.query(FilingTask).all() if not getattr(t, 'is_deleted', False)]
         fab_tasks = [t for t in db.query(FabricationTask).all() if not getattr(t, 'is_deleted', False)]
         
-        # Combine and normalize
+        # Combine and apply filters
+        all_tasks_raw = []
+        for t in gen_tasks: all_tasks_raw.append(t)
+        for t in filing_tasks: all_tasks_raw.append(t)
+        for t in fab_tasks: all_tasks_raw.append(t)
+
+        if project_id and project_id != "all":
+            all_tasks_raw = [t for t in all_tasks_raw if str(getattr(t, 'project_id', '')) == str(project_id) or str(getattr(t, 'project', '')) == str(project_id)]
+        
+        if operator_id and operator_id != "all":
+            all_tasks_raw = [t for t in all_tasks_raw if str(getattr(t, 'assigned_to', '')) == str(operator_id)]
+
         all_tasks_data = []
-        for t in gen_tasks:
+        for t in all_tasks_raw:
             all_tasks_data.append({
                 'status': getattr(t, 'status', 'pending'), 
                 'project_id': str(getattr(t, 'project_id', '')), 
-                'project': getattr(t, 'project', ''), 
+                'project': getattr(t, 'project', None), 
                 'machine_id': str(getattr(t, 'machine_id', '')), 
                 'assigned_to': str(getattr(t, 'assigned_to', '')), 
-                'title': getattr(t, 'title', '')
-            })
-        for t in filing_tasks:
-            all_tasks_data.append({
-                'status': getattr(t, 'status', 'pending'), 
-                'project_id': str(getattr(t, 'project_id', '')), 
-                'project': None, 
-                'machine_id': str(getattr(t, 'machine_id', '')), 
-                'assigned_to': str(getattr(t, 'assigned_to', '')), 
-                'title': getattr(t, 'part_item', '')
-            })
-        for t in fab_tasks:
-            all_tasks_data.append({
-                'status': getattr(t, 'status', 'pending'), 
-                'project_id': str(getattr(t, 'project_id', '')), 
-                'project': None, 
-                'machine_id': str(getattr(t, 'machine_id', '')), 
-                'assigned_to': str(getattr(t, 'assigned_to', '')), 
-                'title': getattr(t, 'part_item', '')
+                'title': getattr(t, 'title', getattr(t, 'part_item', 'Untitled'))
             })
         
         projects = db.query(DBProject).all()
@@ -66,7 +63,14 @@ async def get_planning_dashboard_summary(db: any = Depends(get_db)):
                 project_stats[p_name] = {'total': 0, 'completed': 0, 'ended': 0, 'in_progress': 0, 'pending': 0, 'on_hold': 0}
             
             project_stats[p_name]['total'] += 1
-            status = str(t['status']).lower().replace(" ", "_")
+            status_raw = str(t['status']).lower().strip()
+            # Normalize status for consistency
+            status = 'pending'
+            if status_raw in ('completed', 'finished', 'done'): status = 'completed'
+            elif status_raw in ('in_progress', 'running', 'started'): status = 'in_progress'
+            elif status_raw in ('on_hold', 'paused'): status = 'on_hold'
+            elif status_raw == 'ended': status = 'ended'
+            
             if status in project_stats[p_name]: 
                 project_stats[p_name][status] += 1
             
@@ -83,7 +87,7 @@ async def get_planning_dashboard_summary(db: any = Depends(get_db)):
                 
         project_summary = []
         for name, s in project_stats.items():
-            if s['total'] == 0 and name != "Unassigned": continue
+            if s['total'] == 0: continue
             done = s['completed'] + s['ended']
             prog = (done / s['total'] * 100) if s['total'] > 0 else 0
             
@@ -101,18 +105,20 @@ async def get_planning_dashboard_summary(db: any = Depends(get_db)):
             })
         project_summary.sort(key=lambda x: x['progress'], reverse=True)
         
-        # Operators
-        ops = [u for u in db.query(User).all() 
+        # Operators Status
+        ops_query = [u for u in db.query(User).all() 
                if not getattr(u, 'is_deleted', False) 
-               and str(getattr(u, 'role', '')).lower() == 'operator'
-               and str(getattr(u, 'approval_status', '')).lower() == 'approved']
+               and str(getattr(u, 'role', '')).lower() == 'operator']
         
+        if operator_id and operator_id != "all":
+            ops_query = [u for u in ops_query if str(getattr(u, 'user_id', getattr(u, 'id', ''))) == str(operator_id)]
+
         op_status = []
-        for op in ops:
+        for op in ops_query:
             op_id_str = str(getattr(op, 'user_id', getattr(op, 'id', '')))
             curr = None
             for t in all_tasks_data:
-                if t['assigned_to'] == op_id_str and str(t['status']).lower().replace(" ", "_") == 'in_progress':
+                if t['assigned_to'] == op_id_str and str(t['status']).lower().strip() in ('in_progress', 'running'):
                     curr = t['title']
                     break
             op_status.append({
@@ -123,7 +129,7 @@ async def get_planning_dashboard_summary(db: any = Depends(get_db)):
             })
             
         return {
-            "total_projects": len(p_map_info),
+            "total_projects": len(project_summary),
             "total_tasks": len(all_tasks_data),
             "total_tasks_running": total_running,
             "machines_active": len(active_machine_ids),
@@ -134,7 +140,8 @@ async def get_planning_dashboard_summary(db: any = Depends(get_db)):
             "operator_status": op_status
         }
     except Exception as e:
-        print(f"Error in planning dashboard: {e}")
+        import logging
+        logging.getLogger(__name__).error(f"Error in planning dashboard: {e}")
         return {
             "total_projects": 0, "total_tasks": 0, "total_tasks_running": 0, 
             "machines_active": 0, "pending_tasks": 0, "completed_tasks": 0, 

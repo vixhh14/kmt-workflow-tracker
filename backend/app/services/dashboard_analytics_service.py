@@ -5,14 +5,18 @@ Purpose: Provide accurate, consistent dashboard metrics across all roles using G
 Strategy: Load relevant sheets and perform in-memory aggregation.
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from app.models.models_db import User, Machine, Project, Task, FilingTask, FabricationTask
 from app.core.sheets_db import SheetsDB
 
-def get_operations_overview(db: SheetsDB) -> Dict[str, Any]:
+def get_operations_overview(
+    db: SheetsDB, 
+    project_id: Optional[str] = None, 
+    operator_id: Optional[str] = None
+) -> Dict[str, Any]:
     """
     SINGLE SOURCE OF TRUTH for Admin, Supervisor, and Planning dashboards.
-    Aggregates metrics from Projects, Tasks, Machines, and Users.
+    Aggregates metrics from Projects, Tasks, Machines, and Users, with optional filtering.
     """
     stats = {
         "tasks": {"total": 0, "pending": 0, "in_progress": 0, "completed": 0, "on_hold": 0, "ended": 0},
@@ -24,13 +28,14 @@ def get_operations_overview(db: SheetsDB) -> Dict[str, Any]:
     try:
         # 1. Projects
         all_projects = [p for p in db.query(Project).all() if not getattr(p, 'is_deleted', False)]
+        if project_id and project_id != "all":
+            all_projects = [p for p in all_projects if str(getattr(p, 'project_id', getattr(p, 'id', ''))) == str(project_id)]
         stats["projects"]["total"] = len(all_projects)
-        project_ids = {str(getattr(p, 'project_id', getattr(p, 'id', ''))) for p in all_projects}
         
         # 2. Tasks Aggregation (Main Tasks Sheet)
         all_tasks = [t for t in db.query(Task).all() if not getattr(t, 'is_deleted', False)]
         
-        # Include Filing and Fabrication in the overview
+        # Include Filing and Fabrication
         try:
             filing_tasks = [t for t in db.query(FilingTask).all() if not getattr(t, 'is_deleted', False)]
             all_tasks.extend(filing_tasks)
@@ -43,10 +48,13 @@ def get_operations_overview(db: SheetsDB) -> Dict[str, Any]:
         except Exception as e:
             print(f"⚠️ Fabrication tasks fetch failed for analytics: {e}")
 
+        # Applying Filters
+        if project_id and project_id != "all":
+            all_tasks = [t for t in all_tasks if str(getattr(t, 'project_id', '')) == str(project_id)]
+        if operator_id and operator_id != "all":
+            all_tasks = [t for t in all_tasks if str(getattr(t, 'assigned_to', '')) == str(operator_id)]
+
         for t in all_tasks:
-            # Check if task belongs to a valid project (non-deleted)
-            pid = str(getattr(t, 'project_id', ''))
-            
             stats["tasks"]["total"] += 1
             status = str(getattr(t, 'status', 'pending')).lower().strip()
             
