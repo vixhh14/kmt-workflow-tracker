@@ -98,9 +98,11 @@ def calculate_machine_runtime(db: any, target_date: date) -> List[dict]:
     logs = [l for l in db.query(MachineRuntimeLog).all() if str(l.date).startswith(target_date_str)]
     
     # 3. Tasks completed across all 3 sheets
-    completed_gen = [t for t in db.query(Task).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and str(getattr(t, 'actual_end_time', '')).startswith(target_date_str)]
-    completed_filing = [t for t in db.query(FilingTask).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and str(getattr(t, 'actual_end_time', '')).startswith(target_date_str)]
-    completed_fab = [t for t in db.query(FabricationTask).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and str(getattr(t, 'actual_end_time', '')).startswith(target_date_str)]
+    def get_comp_date(t): return str(getattr(t, 'completed_at', '') or getattr(t, 'actual_end_time', '') or '')
+
+    completed_gen = [t for t in db.query(Task).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and get_comp_date(t).startswith(target_date_str)]
+    completed_filing = [t for t in db.query(FilingTask).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and get_comp_date(t).startswith(target_date_str)]
+    completed_fab = [t for t in db.query(FabricationTask).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and get_comp_date(t).startswith(target_date_str)]
     
     all_completed = completed_gen + completed_filing + completed_fab
 
@@ -167,9 +169,11 @@ def calculate_user_activity(db: any, target_date: date) -> List[dict]:
     logs = [l for l in db.query(UserWorkLog).all() if str(l.date).startswith(target_date_str)]
     
     # 3. Tasks completed across all 3 sheets
-    completed_gen = [t for t in db.query(Task).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and str(getattr(t, 'actual_end_time', '')).startswith(target_date_str)]
-    completed_filing = [t for t in db.query(FilingTask).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and str(getattr(t, 'actual_end_time', '')).startswith(target_date_str)]
-    completed_fab = [t for t in db.query(FabricationTask).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and str(getattr(t, 'actual_end_time', '')).startswith(target_date_str)]
+    def get_comp_date(t): return str(getattr(t, 'completed_at', '') or getattr(t, 'actual_end_time', '') or '')
+
+    completed_gen = [t for t in db.query(Task).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and get_comp_date(t).startswith(target_date_str)]
+    completed_filing = [t for t in db.query(FilingTask).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and get_comp_date(t).startswith(target_date_str)]
+    completed_fab = [t for t in db.query(FabricationTask).all() if not getattr(t, 'is_deleted', False) and str(t.status).lower() == 'completed' and get_comp_date(t).startswith(target_date_str)]
     
     all_completed = completed_gen + completed_filing + completed_fab
 

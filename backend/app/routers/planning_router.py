@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List
+from typing import List, Optional
 from app.core.database import get_db
 from app.models.models_db import Task, User, Machine, FilingTask, FabricationTask, Project as DBProject
 
