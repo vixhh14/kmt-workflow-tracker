@@ -115,8 +115,24 @@ async def get_admin_dashboard(
         attendance = get_attendance_summary(db, get_today_date_ist().isoformat())
         
         # 9. Running Tasks (Integrated)
-        # Using sanitized_tasks list already prepared
-        running_tasks = [t for t in sanitized_tasks if t.get('status') == 'in_progress']
+        running_tasks_raw = [t for t in sanitized_tasks if str(t.get('status')).lower() == 'in_progress']
+        running_tasks = []
+        for t in running_tasks_raw:
+            # Map into RunningTask schema
+            running_tasks.append({
+                "id": t.get('id'),
+                "title": t.get('title', 'Unknown'),
+                "project": t.get('project', 'Internal'),
+                "operator_name": t.get('assigned_to', 'Unknown'), # assigned_to is resolved to name in sanitization
+                "machine_name": t.get('machine_id', 'Handwork'),   # machine_id is resolved to name
+                "machine_id": t.get('machine_id'),
+                "duration_seconds": int(t.get('total_duration_seconds', 0) or 0),
+                "total_held_seconds": int(t.get('total_held_seconds', 0) or 0),
+                "due_date": t.get('due_date'),
+                "started_at": t.get('started_at'),
+                "status": "in_progress",
+                "holds": t.get('holds', [])
+            })
 
         return {
             "projects": [

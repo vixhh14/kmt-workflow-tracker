@@ -199,7 +199,9 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
             
             if att and str(att.get("status", "")).lower() == "present":
                 present_records.append({
+                    "id": user_id,
                     "user_id": user_id,
+                    "name": str(user.get("full_name") or user.get("username") or "User"),
                     "username": username,
                     "role": role,
                     "login_time": str(att.get("login_time", "")),
@@ -210,9 +212,12 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
                 print(f"  ✅ PRESENT: {username} ({role})")
             else:
                 absent_users.append({
+                    "id": user_id,
                     "user_id": user_id,
+                    "name": str(user.get("full_name") or user.get("username") or "User"),
                     "username": username,
-                    "role": role
+                    "role": role,
+                    "status": "Absent"
                 })
                 print(f"  ⚪ ABSENT: {username} ({role})")
 
@@ -231,11 +236,18 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
             "absent_count": len(absent_users),
             "present": len(present_records),
             "absent": len(absent_users),
+            "total_users": len(present_records) + len(absent_users),
             "total_tracked": len(present_records) + len(absent_users),
-            "records": present_records,
-            "all_records": present_records + [{"user_id": u["user_id"], "username": u["username"], "status": "Absent", "role": u["role"]} for u in absent_users],
             "present_users": present_records,
-            "absent_users": absent_users
+            "absent_users": absent_users,
+            "records": [
+                {
+                    **r, 
+                    "user": r["name"],
+                    "check_in": r.get("login_time"), 
+                    "check_out": r.get("logout_time")
+                } for r in present_records
+            ]
         }
     except Exception as e:
         print(f"❌ Error in get_attendance_summary: {e}")

@@ -142,10 +142,17 @@ async def read_tasks(
             # Resolve Due Date (Fallback to due_datetime)
             due = t.get('due_date') or t.get('due_datetime') or ""
 
+            # CRITICAL: Sanitize IDs
+            t_id = str(t.get('task_id', '')).strip()
+            if not t_id or t_id.lower() == "undefined":
+                # Create a traceable temporary ID if missing in DB
+                row_idx = t.get('_row_idx', idx + 1)
+                t_id = f"T-REFIX-{row_idx}-{uuid.uuid4().hex[:4]}"
+
             # Build final dict matching TaskOut schema
             task_data = {
-                "id": t['task_id'],
-                "task_id": t['task_id'],
+                "id": t_id,
+                "task_id": t_id,
                 "title": t.get('title', 'Unknown Task'),
                 "description": t.get('description', ''),
                 "project": project_name,
@@ -659,9 +666,20 @@ async def end_task(
     # Close any open intervals
     if task.status == "in_progress":
         # Calculate duration
+        # Calculate duration
         if task.started_at:
             duration = safe_datetime_diff(now, task.started_at)
-            task.total_duration_seconds = (task.total_duration_seconds or 0) + duration
+            try:
+                # Handle potential string values from Google Sheets or empty strings
+                val = getattr(task, 'total_duration_seconds', 0)
+                if val == "" or val is None:
+                    current_total = 0
+                else:
+                    current_total = int(float(str(val)))
+            except (ValueError, TypeError):
+                current_total = 0
+            
+            task.total_duration_seconds = current_total + duration
         
         # Close logs
         for m_log in db.query(MachineRuntimeLog).filter(task_id=task_id, end_time=None).all():

@@ -81,6 +81,20 @@ class DashboardOverview(BaseModel):
     machines: DashboardMachineOverview
     projects: DashboardProjectOverview
 
+class RunningTask(BaseModel):
+    id: str
+    title: str
+    project: str
+    operator_name: str
+    machine_name: str
+    machine_id: Optional[str] = None
+    duration_seconds: int = 0
+    total_held_seconds: int = 0
+    due_date: Optional[str] = None
+    started_at: Optional[str] = None
+    status: str = "in_progress"
+    holds: List[Dict[str, Any]] = []
+
 class AdminDashboardOut(BaseModel):
     projects: List[DashboardProject]
     tasks: List[DashboardTask]
@@ -88,6 +102,8 @@ class AdminDashboardOut(BaseModel):
     users: List[DashboardUser]
     operators: List[DashboardOperator]
     overview: DashboardOverview
+    attendance: Optional[AttendanceSummaryOut] = None
+    running_tasks: List[RunningTask] = []
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -100,6 +116,8 @@ class SupervisorDashboardOut(BaseModel):
     machines: List[DashboardMachine]
     operators: List[DashboardOperator]
     overview: DashboardOverview
+    attendance: Optional[AttendanceSummaryOut] = None
+    running_tasks: List[RunningTask] = []
 
     model_config = ConfigDict(
         from_attributes=True,
