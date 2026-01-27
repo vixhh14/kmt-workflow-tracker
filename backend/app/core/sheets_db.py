@@ -24,7 +24,8 @@ MODEL_MAP = {
     "RescheduleRequest": "reschedulerequests",
     "PlanningTask": "planningtasks",
     "Unit": "units",
-    "MachineCategory": "machinecategories"
+    "MachineCategory": "machinecategories",
+    "Subtask": "subtasks"
 }
 
 from app.repositories.sheets_repository import sheets_repo
@@ -293,8 +294,9 @@ def verify_sheets_structure():
                     google_sheets.ensure_worksheet(sheet_name, expected_headers, force_headers=True)
                     # Re-validate to be sure
                     print(f"  ✅ Headers for '{sheet_name}' repaired.")
-            except Exception as e:
-                if "WorksheetNotFound" in str(e):
+            except (gspread.WorksheetNotFound, Exception) as e:
+                # Explicitly check for WorksheetNotFound type or string
+                if isinstance(e, gspread.WorksheetNotFound) or "WorksheetNotFound" in str(e):
                     # One-time auto-creation is allowed if missing completely
                     print(f"  ⚡ Sheet {sheet_name} missing. Creating with canonical headers...")
                     google_sheets.ensure_worksheet(sheet_name, expected_headers)
