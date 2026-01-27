@@ -51,23 +51,37 @@ async def get_admin_attendance_summary(db: any = Depends(get_db)):
     today = get_today_date_ist().isoformat()
     summary_data = attendance_service.get_attendance_summary(db, today)
     return {
+        "present": summary_data.get("present", 0),
+        "absent": summary_data.get("absent", 0),
         "present_count": summary_data.get("present_count", 0), 
+        "absent_count": summary_data.get("absent_count", 0),
         "total_users": summary_data.get("total_tracked", 0), 
-        "attendance": summary_data.get("all_records", [])
+        "present_users": summary_data.get("present_users", []),
+        "absent_users": summary_data.get("absent_users", []),
+        "records": summary_data.get("records", []),
+        "attendance": summary_data.get("all_records", []),
+        "date": summary_data.get("date", today)
     }
 
 @router.get("/project-analytics")
 async def get_project_analytics(project: Optional[str] = None, db: any = Depends(get_db)):
-    """Get project-specific analytics for admin dashboard"""
-    from app.models.models_db import Task
+    """Get project-specific analytics for admin dashboard (Aggregates ALL task types)"""
+    from app.models.models_db import Task, FilingTask, FabricationTask
+    
+    # Fetch all types
     all_tasks = db.query(Task).all()
+    try:
+        all_tasks.extend(db.query(FilingTask).all())
+        all_tasks.extend(db.query(FabricationTask).all())
+    except: pass
+    
     tasks = [t for t in all_tasks if not getattr(t, 'is_deleted', False)]
     
     if project and project != "all":
-        tasks = [t for t in tasks if str(getattr(t, 'project_id', '')) == project]
+        tasks = [t for t in tasks if str(getattr(t, 'project_id', '')) == project or str(getattr(t, 'project', '')) == project]
     
     status_counts = {
-        "pending": len([t for t in tasks if str(getattr(t, 'status', '')).lower() == 'pending']),
+        "pending": len([t for t in tasks if str(getattr(t, 'status', 'pending')).lower() in ['pending', 'todo', 'active']]),
         "in_progress": len([t for t in tasks if str(getattr(t, 'status', '')).lower() == 'in_progress']),
         "completed": len([t for t in tasks if str(getattr(t, 'status', '')).lower() == 'completed']),
         "on_hold": len([t for t in tasks if str(getattr(t, 'status', '')).lower() == 'on_hold'])
@@ -81,16 +95,23 @@ async def get_project_analytics(project: Optional[str] = None, db: any = Depends
 
 @router.get("/overall-stats")
 async def get_overall_stats(db: any = Depends(get_db)):
-    """Get overall counts for admin dashboard cards"""
-    from app.models.models_db import Task, Project, Machine
+    """Get overall counts for admin dashboard cards (Aggregates ALL task types)"""
+    from app.models.models_db import Task, Project, Machine, FilingTask, FabricationTask
     users_count = len([u for u in db.query(User).all() if not getattr(u, 'is_deleted', False)])
-    tasks_count = len([t for t in db.query(Task).all() if not getattr(t, 'is_deleted', False)])
+    
+    # Aggregate ALL tasks
+    t_count = len([t for t in db.query(Task).all() if not getattr(t, 'is_deleted', False)])
+    try:
+        t_count += len([t for t in db.query(FilingTask).all() if not getattr(t, 'is_deleted', False)])
+        t_count += len([t for t in db.query(FabricationTask).all() if not getattr(t, 'is_deleted', False)])
+    except: pass
+    
     projects_count = len([p for p in db.query(Project).all() if not getattr(p, 'is_deleted', False)])
     machines_count = len([m for m in db.query(Machine).all() if not getattr(m, 'is_deleted', False)])
     
     return {
         "users": users_count,
-        "tasks": tasks_count,
+        "tasks": t_count,
         "projects": projects_count,
         "machines": machines_count
     }

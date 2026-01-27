@@ -112,7 +112,7 @@ class GoogleSheetsService:
     def batch_get_all(self, names: List[str]) -> Dict[str, List[Dict[str, Any]]]:
         """Fetches multiple sheets in a single call using values_batch_get."""
         spreadsheet = self._get_spreadsheet()
-        ranges = [f"'{name}'!A1:Z5000" for name in names]
+        ranges = [f"'{name}'!A1:AZ5000" for name in names]
         try:
             batch_results = spreadsheet.values_batch_get(ranges)
             value_ranges = batch_results.get('valueRanges', [])

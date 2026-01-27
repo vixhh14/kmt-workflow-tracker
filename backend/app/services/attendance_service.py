@@ -114,14 +114,32 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
         
         def normalize_date_str(d_str):
             if not d_str: return ""
-            s = str(d_str).strip().split('T')[0]
+            # If it's already an ISO string or similar, get the first part
+            s = str(d_str).strip().split('T')[0].split(' ')[0]
+            
+            # Handle DD/MM/YYYY or D/M/YYYY
             if '/' in s:
                 p = s.split('/')
                 if len(p) == 3:
                      try:
-                         # Handle D/M/YYYY or DD/MM/YYYY
+                         # Handle YYYY/MM/DD vs DD/MM/YYYY
+                         if len(p[0]) == 4: # YYYY/MM/DD
+                             return f"{p[0]}-{int(p[1]):02d}-{int(p[2]):02d}"
                          return f"{p[2]}-{int(p[1]):02d}-{int(p[0]):02d}"
                      except: pass
+            
+            # Handle DD-MM-YYYY or D-M-YYYY
+            if '-' in s:
+                p = s.split('-')
+                if len(p) == 3:
+                     try:
+                         # If first part is YYYY, it's already Good-ish
+                         if len(p[0]) == 4:
+                             return f"{p[0]}-{int(p[1]):02d}-{int(p[2]):02d}"
+                         # Else assume DD-MM-YYYY
+                         return f"{p[2]}-{int(p[1]):02d}-{int(p[0]):02d}"
+                     except: pass
+            
             return s
 
         attendance_map = {}
@@ -135,7 +153,7 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
                     attendance_map[uid] = a
                 
                 uname = str(a.get("username", "")).strip().lower()
-                if uname and uname not in attendance_map:
+                if uname and (uname not in attendance_map or not uid):
                     attendance_map[uname] = a
         
         print(f"📊 Attendance records for {target_date_compare}: {len(attendance_map)}")

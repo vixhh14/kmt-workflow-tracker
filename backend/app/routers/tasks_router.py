@@ -36,8 +36,16 @@ async def read_tasks(
     if current_user.role == "operator":
         assigned_to = str(getattr(current_user, 'id', ''))
 
-    # Get all tasks that are not deleted (from cache)
+    # 1. Fetch ALL task types for a complete management view
+    from app.models.models_db import Task, FilingTask, FabricationTask
     all_tasks = db.query(Task).all()
+    try:
+        all_tasks.extend(db.query(FilingTask).all())
+        all_tasks.extend(db.query(FabricationTask).all())
+    except Exception as e:
+        print(f"⚠️ Warning: Could not fetch specialized tasks: {e}")
+
+    # Preliminary filter for active tasks
     tasks = [t for t in all_tasks if not getattr(t, 'is_deleted', False)]
     
     # Filter by month and year
@@ -45,10 +53,14 @@ async def read_tasks(
         from datetime import datetime
         filtered_tasks = []
         for t in tasks:
+            # Use 'created_at' for filtering
             created = getattr(t, 'created_at', None)
-            if not created: continue
+            if not created: 
+                filtered_tasks.append(t)
+                continue
             try:
                 if isinstance(created, str):
+                    # Handle robust ISO parsing
                     dt = datetime.fromisoformat(created.replace('Z', '+00:00'))
                 else:
                     dt = created
