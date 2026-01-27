@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import api from '../../api/axios';
 import { getPlanningDashboardSummary } from '../../api/planning';
 
 import { Folder, TrendingUp, Settings, Clock, CheckCircle, Users, Activity, RefreshCw, Pause, UserPlus } from 'lucide-react';
@@ -32,22 +33,41 @@ const PlanningDashboard = () => {
         project_summary: [],
         operator_status: []
     });
+    const [projects, setProjects] = useState([]);
+    const [operators, setOperators] = useState([]);
+    const [selectedProject, setSelectedProject] = useState('all');
+    const [selectedOperator, setSelectedOperator] = useState('all');
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        fetchDashboard();
+        const loadInitial = async () => {
+            try {
+                const [projRes, userRes] = await Promise.all([
+                    api.get('/dropdowns/projects'),
+                    api.get('/dropdowns/users/assignable')
+                ]);
+                setProjects(Array.isArray(projRes?.data) ? projRes.data : []);
+                setOperators(Array.isArray(userRes?.data) ? userRes.data : []);
+            } catch (e) {
+                console.error("Dropdown load failed", e);
+            }
+        };
+        loadInitial();
     }, []);
 
-
+    useEffect(() => {
+        fetchDashboard();
+    }, [selectedProject, selectedOperator]);
 
     const fetchDashboard = async () => {
         try {
             setLoading(true);
             setError(null);
 
-            console.log('🔄 Fetching planning dashboard...');
-            const response = await getPlanningDashboardSummary();
+            console.log('🔄 Fetching planning dashboard...', { project: selectedProject, operator: selectedOperator });
+            const response = await getPlanningDashboardSummary(selectedProject, selectedOperator);
             console.log('✅ Planning dashboard loaded');
 
             const data = response.data;
@@ -116,14 +136,36 @@ const PlanningDashboard = () => {
                     <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Planning Dashboard</h1>
                     <p className="text-sm sm:text-base text-gray-600">Overview of projects and resources</p>
                 </div>
-                <button
-                    onClick={fetchDashboard}
-                    className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition w-full sm:w-auto"
-                    disabled={loading}
-                >
-                    <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-                    <span>Refresh</span>
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <select
+                        value={selectedProject}
+                        onChange={(e) => setSelectedProject(e.target.value)}
+                        className="p-2 border rounded text-sm bg-white shadow-sm focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="all">All Projects</option>
+                        {projects.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                    </select>
+                    <select
+                        value={selectedOperator}
+                        onChange={(e) => setSelectedOperator(e.target.value)}
+                        className="p-2 border rounded text-sm bg-white shadow-sm focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="all">All Operators</option>
+                        {operators.map(o => (
+                            <option key={o.user_id} value={o.user_id}>{o.full_name || o.username}</option>
+                        ))}
+                    </select>
+                    <button
+                        onClick={fetchDashboard}
+                        className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition w-full sm:w-auto shadow-sm"
+                        disabled={loading}
+                    >
+                        <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                        <span>Refresh</span>
+                    </button>
+                </div>
             </div>
 
             {/* Summary Cards */}

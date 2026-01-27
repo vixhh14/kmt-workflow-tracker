@@ -33,6 +33,9 @@ const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
 const AdminDashboard = () => {
     const [projects, setProjects] = useState([]);
     const [selectedProject, setSelectedProject] = useState('all');
+    const [selectedOperator, setSelectedOperator] = useState('all');
+    const [operators, setOperators] = useState([]);
+
     // Separate state for project-level stats vs task-level stats
     const [projectStats, setProjectStats] = useState({
         total: 0,
@@ -68,11 +71,11 @@ const AdminDashboard = () => {
         fetchDashboard();
         const interval = setInterval(fetchRunningTasksOnly, 60000); // Auto-refresh running tasks every minute
         return () => clearInterval(interval);
-    }, []);
+    }, [selectedProject, selectedOperator]);
 
     const fetchRunningTasksOnly = async () => {
         try {
-            const res = await getRunningTasks();
+            const res = await getRunningTasks(selectedProject, selectedOperator);
             setRunningTasks(Array.isArray(res?.data) ? res.data : []);
         } catch (err) {
             console.error('Failed to auto-refresh running tasks', err);
@@ -84,12 +87,12 @@ const AdminDashboard = () => {
             setLoading(true);
             setError(null);
 
-            console.log('🔄 Fetching admin dashboard data...');
+            console.log('🔄 Fetching admin dashboard data...', { project: selectedProject, operator: selectedOperator });
 
             const [unifiedRes, attendanceRes, runningTasksRes] = await Promise.all([
-                getAdminUnifiedDashboard(),
+                getAdminUnifiedDashboard(selectedProject, selectedOperator),
                 getAttendanceSummary(),
-                getRunningTasks()
+                getRunningTasks(selectedProject, selectedOperator)
             ]);
 
             console.log('✅ Admin dashboard data loaded');
@@ -102,6 +105,7 @@ const AdminDashboard = () => {
 
             setProjects(Array.isArray(projectsData) ? projectsData : []);
             setUsers(Array.isArray(unified.users) ? unified.users : []);
+            setOperators(Array.isArray(unified.operators) ? unified.operators : []);
 
             // 1. Task Stats (from Dashboard Overview)
             setTaskStats({
@@ -238,13 +242,35 @@ const AdminDashboard = () => {
                     <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Admin Dashboard</h1>
                     <p className="text-sm sm:text-base text-gray-600">Overview of projects, tasks, and team</p>
                 </div>
-                <button
-                    onClick={fetchDashboard}
-                    className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition w-full sm:w-auto"
-                >
-                    <RefreshCw size={18} />
-                    <span>Refresh</span>
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <select
+                        value={selectedProject}
+                        onChange={(e) => setSelectedProject(e.target.value)}
+                        className="p-2 border rounded text-sm bg-white shadow-sm focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="all">All Projects</option>
+                        {projects.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                    </select>
+                    <select
+                        value={selectedOperator}
+                        onChange={(e) => setSelectedOperator(e.target.value)}
+                        className="p-2 border rounded text-sm bg-white shadow-sm focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="all">All Operators</option>
+                        {operators.map(o => (
+                            <option key={o.user_id} value={o.user_id}>{o.full_name || o.username}</option>
+                        ))}
+                    </select>
+                    <button
+                        onClick={fetchDashboard}
+                        className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition w-full sm:w-auto shadow-sm"
+                    >
+                        <RefreshCw size={18} />
+                        <span>Refresh</span>
+                    </button>
+                </div>
             </div>
 
             {/* Unified Operations Overview */}
@@ -510,44 +536,6 @@ const AdminDashboard = () => {
             {/* Reports Section */}
             <ReportsSection />
 
-            {/* Attendance Records (if available) */}
-            {attendanceSummary.records && attendanceSummary.records.length > 0 && (
-                <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Today's Attendance Records</h2>
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check In</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Check Out</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {attendanceSummary.records.map((record, index) => (
-                                    <tr key={index}>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            {record.user}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {formatTime(record.check_in)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {formatTime(record.check_out)}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">
-                                                {record.status}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

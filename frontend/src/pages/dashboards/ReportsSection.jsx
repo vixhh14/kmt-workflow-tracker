@@ -250,26 +250,28 @@ const ReportsSection = () => {
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Machine</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Runtime</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tasks</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Export</th>
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Machine</th>
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Runtime</th>
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tasks</th>
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Export</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
                                 {loadingMachine ? (
-                                    <tr><td colSpan="4" className="text-center py-4">Loading...</td></tr>
+                                    <tr><td colSpan="5" className="text-center py-6 text-gray-500 italic">Processing data...</td></tr>
                                 ) : machineData.length === 0 ? (
-                                    <tr><td colSpan="4" className="text-center py-4 text-gray-500">No data available</td></tr>
+                                    <tr><td colSpan="5" className="text-center py-10 text-gray-500">No machine activity found for this date</td></tr>
                                 ) : (
                                     machineData.map((row) => (
-                                        <tr key={row.machine_id}>
-                                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.machine_name}</td>
-                                            <td className="px-4 py-3 text-sm text-gray-600">{formatDuration(row.runtime_seconds)}</td>
-                                            <td className="px-4 py-3 text-sm text-gray-600">{row.tasks_run_count}</td>
+                                        <tr key={row.machine_id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-4 py-3 text-sm font-bold text-gray-900">{row.machine_name}</td>
+                                            <td className="px-4 py-3 text-sm text-gray-700 font-medium">{formatDuration(row.runtime_seconds)}</td>
+                                            <td className="px-4 py-3 text-sm text-gray-700 font-bold">{row.tasks_run_count}</td>
                                             <td className="px-4 py-3 text-sm">
-                                                <span className={`px-2 py-1 text-xs rounded-full ${row.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                                                <span className={`px-2 py-1 text-[10px] font-black uppercase rounded-full ${row.status === 'In Use' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                                        row.status === 'Active' ? 'bg-green-100 text-green-800 border border-green-200' :
+                                                            'bg-gray-100 text-gray-600 border border-gray-200'
                                                     }`}>
                                                     {row.status}
                                                 </span>
@@ -277,8 +279,8 @@ const ReportsSection = () => {
                                             <td className="px-4 py-3 text-right text-sm">
                                                 <button
                                                     onClick={() => handleDownloadMachineDetailed(row.machine_id)}
-                                                    className="text-blue-600 hover:text-blue-800"
-                                                    title="Detailed CSV"
+                                                    className="inline-flex items-center p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                    title="Download Detailed Log"
                                                 >
                                                     <Download size={16} />
                                                 </button>
@@ -292,23 +294,26 @@ const ReportsSection = () => {
                 </div>
 
                 {/* 3. User Activity Report */}
-                <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-                    <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+                <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
                         <div className="flex items-center">
                             <Users className="text-orange-600 mr-2" size={24} />
-                            <h3 className="text-lg font-semibold text-gray-900">User Activity Report</h3>
+                            <h3 className="text-lg font-bold text-gray-900 tracking-tight">User Activity Report</h3>
                         </div>
                         <div className="flex items-center space-x-2">
-                            <input
-                                type="date"
-                                value={userDate}
-                                onChange={(e) => setUserDate(e.target.value)}
-                                className="px-2 py-1 border border-gray-300 rounded text-sm"
-                            />
+                            <div className="relative">
+                                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                                <input
+                                    type="date"
+                                    value={userDate}
+                                    onChange={(e) => setUserDate(e.target.value)}
+                                    className="pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                            </div>
                             <button
                                 onClick={handleDownloadUser}
-                                className="p-2 text-blue-600 hover:bg-blue-50 rounded transition"
-                                title="Export CSV"
+                                className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-all border border-blue-100"
+                                title="Export All Users CSV"
                             >
                                 <Download size={20} />
                             </button>
@@ -319,26 +324,27 @@ const ReportsSection = () => {
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Work Time</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tasks</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Export</th>
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">User</th>
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Work Time</th>
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tasks</th>
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Export</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
                                 {loadingUser ? (
-                                    <tr><td colSpan="4" className="text-center py-4">Loading...</td></tr>
+                                    <tr><td colSpan="5" className="text-center py-6 text-gray-500 italic">Processing logs...</td></tr>
                                 ) : userData.length === 0 ? (
-                                    <tr><td colSpan="4" className="text-center py-4 text-gray-500">No data available</td></tr>
+                                    <tr><td colSpan="5" className="text-center py-10 text-gray-500">No user activity recorded</td></tr>
                                 ) : (
                                     userData.map((row) => (
-                                        <tr key={row.user_id}>
-                                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.full_name || row.username}</td>
-                                            <td className="px-4 py-3 text-sm text-gray-600">{formatDuration(row.total_work_seconds)}</td>
-                                            <td className="px-4 py-3 text-sm text-gray-600">{row.tasks_worked_count}</td>
+                                        <tr key={row.user_id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-4 py-3 text-sm font-bold text-gray-900">{row.full_name || row.username}</td>
+                                            <td className="px-4 py-3 text-sm text-gray-700 font-medium">{formatDuration(row.total_work_seconds)}</td>
+                                            <td className="px-4 py-3 text-sm text-gray-700 font-bold">{row.tasks_worked_count}</td>
                                             <td className="px-4 py-3 text-sm">
-                                                <span className={`px-2 py-1 text-xs rounded-full ${row.status === 'Present' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                <span className={`px-2 py-1 text-[10px] font-black uppercase rounded-full ${row.status === 'Present' ? 'bg-green-100 text-green-800 border border-green-200' :
+                                                        'bg-red-50 text-red-700 border border-red-100 opacity-80'
                                                     }`}>
                                                     {row.status}
                                                 </span>
@@ -346,8 +352,8 @@ const ReportsSection = () => {
                                             <td className="px-4 py-3 text-right text-sm">
                                                 <button
                                                     onClick={() => handleDownloadUserDetailed(row.user_id)}
-                                                    className="text-blue-600 hover:text-blue-800"
-                                                    title="Detailed CSV"
+                                                    className="inline-flex items-center p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                    title="Download Session History"
                                                 >
                                                     <Download size={16} />
                                                 </button>

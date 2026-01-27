@@ -111,7 +111,12 @@ export const downloadUserReport = (dateStr) => {
     });
 };
 /* -------------------- UNIFIED DASHBOARDS -------------------- */
-export const getAdminUnifiedDashboard = () => api.get('/dashboard/admin');
+export const getAdminUnifiedDashboard = (projectId = null, operatorId = null) => {
+    const params = {};
+    if (projectId && projectId !== 'all') params.project_id = projectId;
+    if (operatorId && operatorId !== 'all') params.operator_id = operatorId;
+    return api.get('/dashboard/admin', { params });
+};
 export const getSupervisorUnifiedDashboard = (projectId = null, operatorId = null) => {
     const params = {};
     if (projectId && projectId !== 'all') params.project_id = projectId;

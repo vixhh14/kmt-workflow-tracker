@@ -72,6 +72,10 @@ const Tasks = () => {
     const [endReason, setEndReason] = useState('');
     const [taskToEnd, setTaskToEnd] = useState(null);
 
+    const [showHoldModal, setShowHoldModal] = useState(false);
+    const [holdReason, setHoldReason] = useState('');
+    const [taskToHold, setTaskToHold] = useState(null);
+
     useEffect(() => {
         fetchData();
     }, []);
@@ -200,6 +204,31 @@ const Tasks = () => {
             const detail = error.response?.data?.detail;
             const message = typeof detail === 'string' ? detail : `Failed to create ${formData.category} task`;
             alert(message);
+        }
+    };
+
+    const handleHoldTask = (task) => {
+        setTaskToHold(task);
+        setHoldReason('');
+        setShowHoldModal(true);
+    };
+
+    const confirmHoldTask = async () => {
+        if (!taskToHold) return;
+        if (!holdReason.trim()) {
+            alert('Please provide a reason to hold the task.');
+            return;
+        }
+
+        try {
+            await holdTask(taskToHold.id, holdReason);
+            setShowHoldModal(false);
+            setTaskToHold(null);
+            setHoldReason('');
+            fetchData();
+        } catch (error) {
+            console.error('Failed to hold task:', error);
+            alert(error.response?.data?.detail || 'Failed to hold task');
         }
     };
 
@@ -816,6 +845,16 @@ const Tasks = () => {
                                         <td className="px-2 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm font-medium">
                                             <div className="flex items-center space-x-2">
 
+                                                {['admin', 'supervisor'].includes(currentUser?.role) && task.status === 'in_progress' && (
+                                                    <button
+                                                        onClick={() => handleHoldTask(task)}
+                                                        className="text-amber-600 hover:text-amber-900 p-1 flex items-center space-x-1 border border-amber-200 rounded hover:bg-amber-50"
+                                                        title="Hold Task"
+                                                    >
+                                                        <Pause size={14} fill="currentColor" />
+                                                        <span className="text-[10px] uppercase font-bold">Hold</span>
+                                                    </button>
+                                                )}
                                                 {['admin', 'supervisor'].includes(currentUser?.role) && task.status !== 'ended' && task.status !== 'completed' && (
                                                     <button
                                                         onClick={() => handleEndTask(task)}

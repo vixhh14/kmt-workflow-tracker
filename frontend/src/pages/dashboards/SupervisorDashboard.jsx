@@ -130,8 +130,11 @@ const SupervisorDashboard = () => {
     const fetchMyTasks = async () => {
         try {
             const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-            if (currentUser.user_id) {
-                const res = await getOperatorTasks(currentUser.user_id);
+            // If an operator is selected, fetch THEIR tasks. Otherwise fetch MINE.
+            const targetUserId = (selectedOperator && selectedOperator !== 'all') ? selectedOperator : currentUser.user_id;
+
+            if (targetUserId) {
+                const res = await getOperatorTasks(targetUserId);
                 setMyTasks(Array.isArray(res?.data?.tasks) ? res.data.tasks : []);
             }
         } catch (e) {
@@ -220,14 +223,19 @@ const SupervisorDashboard = () => {
 
             <QuickAssign onAssignSuccess={fetchDashboard} />
 
-            {/* =============== MY ASSIGNED TASKS (NEW SECTION) ================= */}
+            {/* =============== OPERATOR TASKS SECTION ================= */}
             <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                     <Users className="text-blue-600" />
-                    My Assigned Tasks ({myTasks.length})
+                    {selectedOperator !== 'all'
+                        ? `Tasks for ${operators.find(o => o.id === selectedOperator)?.name || 'Operator'} (${myTasks.length})`
+                        : `My Assigned Tasks (${myTasks.length})`
+                    }
                 </h2>
                 {myTasks.length === 0 ? (
-                    <p className="text-gray-500 text-center py-4">No tasks assigned to you right now.</p>
+                    <p className="text-gray-500 text-center py-4">
+                        {selectedOperator !== 'all' ? 'This operator has no tasks assigned.' : 'No tasks assigned to you right now.'}
+                    </p>
                 ) : (
                     <div className="space-y-3">
                         {myTasks.map(task => (
@@ -237,9 +245,9 @@ const SupervisorDashboard = () => {
                                         <div className="flex items-center gap-2 mb-1">
                                             <h3 className="font-bold">{task.title}</h3>
                                             <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${task.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                                    task.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                                        task.status === 'on_hold' ? 'bg-yellow-100 text-yellow-800' :
-                                                            'bg-gray-100 text-gray-800'
+                                                task.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                                    task.status === 'on_hold' ? 'bg-yellow-100 text-yellow-800' :
+                                                        'bg-gray-100 text-gray-800'
                                                 }`}>{task.status.replace('_', ' ')}</span>
                                         </div>
                                         <div className="text-xs text-gray-600 grid grid-cols-2 md:grid-cols-4 gap-2">
