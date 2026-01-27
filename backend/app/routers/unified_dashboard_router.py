@@ -63,9 +63,8 @@ async def get_admin_dashboard(
             t_data = t.dict() if hasattr(t, 'dict') else t.__dict__.copy() if hasattr(t, '__dict__') else t
             
             # Ensure status is always a string and lowercase
-            status = str(t_data.get('status', 'pending')).lower().strip()
-            if status in ('true', '1', 'yes', 'active'): status = 'pending'
-            if status in ('false', '0', 'no', 'inactive'): status = 'completed'
+            from app.core.normalizer import normalize_status
+            status = normalize_status(t_data.get('status', 'pending'))
             t_data['status'] = status
             
             # Fix Project Name (Join)

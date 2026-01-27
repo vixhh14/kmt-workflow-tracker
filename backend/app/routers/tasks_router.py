@@ -128,15 +128,15 @@ async def read_tasks(
                 pass
                 
             # Resolve Assigned To
-            assignee_id = t.get('assigned_to', '')
+            assignee_id = str(t.get('assigned_to', '')).strip()
             assignee_name = user_map.get(assignee_id, {}).get("username", assignee_id)
             
             # Resolve Assigned By
-            assigner_id = t.get('assigned_by', '')
+            assigner_id = str(t.get('assigned_by', '')).strip()
             assigner_name = user_map.get(assigner_id, {}).get("username", assigner_id)
             
             # Resolve Machine
-            m_id = t.get('machine_id', '')
+            m_id = str(t.get('machine_id', '')).strip()
             machine_name = machine_map.get(m_id, {}).get("machine_name", m_id) if m_id else None
 
             # Resolve Due Date (Fallback to due_datetime)
@@ -146,31 +146,31 @@ async def read_tasks(
             task_data = {
                 "id": t['task_id'],
                 "task_id": t['task_id'],
-                "title": t['title'],
-                "description": t['description'],
+                "title": t.get('title', 'Unknown Task'),
+                "description": t.get('description', ''),
                 "project": project_name,
                 "project_id": t.get('project_id', ''),
-                "part_item": t['part_item'],
-                "nos_unit": t['nos_unit'],
-                "status": t['status'],
-                "priority": t['priority'],
+                "part_item": t.get('part_item', '-'),
+                "nos_unit": t.get('nos_unit', ''),
+                "status": t.get('status', 'pending'),
+                "priority": t.get('priority', 'MEDIUM'),
                 "assigned_by": assigner_name,
                 "assigned_to": assignee_name,
                 "machine_id": machine_name,
                 "due_date": due,
-                "created_at": t['created_at'],
-                "started_at": t['started_at'],
-                "completed_at": t['completed_at'],
-                "total_duration_seconds": t['total_duration_seconds'],
-                "hold_reason": t['hold_reason'],
-                "denial_reason": t['denial_reason'],
-                "actual_start_time": t['actual_start_time'],
-                "actual_end_time": t['actual_end_time'],
-                "total_held_seconds": t['total_held_seconds'],
-                "work_order_number": t['work_order_number'],
-                "ended_by": t['ended_by'],
-                "end_reason": t['end_reason'],
-                "expected_completion_time": t['expected_completion_time']
+                "created_at": t.get('created_at'),
+                "started_at": t.get('started_at'),
+                "completed_at": t.get('completed_at'),
+                "total_duration_seconds": t.get('total_duration_seconds', 0),
+                "hold_reason": t.get('hold_reason', ""),
+                "denial_reason": t.get('denial_reason', ""),
+                "actual_start_time": t.get('actual_start_time'),
+                "actual_end_time": t.get('actual_end_time'),
+                "total_held_seconds": t.get('total_held_seconds', 0),
+                "work_order_number": t.get('work_order_number', "N/A"),
+                "ended_by": t.get('ended_by', ""),
+                "end_reason": t.get('end_reason', ""),
+                "expected_completion_time": t.get('expected_completion_time', 0)
             }
             results.append(task_data)
         except Exception as e:
@@ -599,7 +599,11 @@ async def request_reschedule(
 
 @router.post("/{task_id}/deny")
 async def deny_task(task_id: str, request: TaskActionRequest, db: Any = Depends(get_db)):
-    task = db.query(Task).filter(task_id=task_id).first()
+    if not task_id or task_id == "undefined":
+        raise HTTPException(status_code=400, detail="Cannot deny task: Undefined ID")
+        
+    from app.utils.task_lookup import find_any_task
+    task, task_type = find_any_task(db, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
@@ -627,10 +631,25 @@ async def end_task(
     from app.models.models_db import User
     
     # Check if admin or supervisor
-    if current_user.role not in ['admin', 'supervisor']:
-        raise HTTPException(status_code=403, detail="Only admins and supervisors can end tasks")
+    # Authorization: Admin, Supervisor, or Operator assigned to the task
+    is_authorized = False
+    if current_user.role in ['admin', 'supervisor', 'planning']:
+        is_authorized = True
+    elif current_user.role in ['operator', 'file_master', 'fab_master']:
+        # For these roles, check if the task is assigned to them
+        from app.utils.task_lookup import find_any_task
+        task_obj, _ = find_any_task(db, task_id)
+        if task_obj and str(getattr(task_obj, 'assigned_to', '')) == str(current_user.id):
+            is_authorized = True
+            
+    if not is_authorized:
+        raise HTTPException(status_code=403, detail="Not authorized to end this task")
 
-    task = db.query(Task).filter(task_id=task_id).first()
+    if not task_id or task_id == "undefined":
+        raise HTTPException(status_code=400, detail="Cannot deny task: Undefined ID")
+        
+    from app.utils.task_lookup import find_any_task
+    task, task_type = find_any_task(db, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
@@ -756,7 +775,9 @@ async def delete_task(
     if current_user.role not in ["admin", "supervisor", "planning"]:
         raise HTTPException(status_code=403, detail="Not authorized to delete tasks")
         
-    # Robust lookup for task_id
+    if not task_id or task_id == "undefined":
+        raise HTTPException(status_code=400, detail="Cannot delete task: Undefined ID")
+        
     from app.utils.task_lookup import find_any_task
     db_task, task_type = find_any_task(db, task_id)
 

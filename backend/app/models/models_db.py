@@ -159,6 +159,10 @@ class UserMachine(SheetsModel):
 
 class Subtask(SheetsModel):
     __tablename__ = "subtasks"
+    def __init__(self, **kwargs):
+        s_id = kwargs.get("id") or str(uuid.uuid4())
+        kwargs["id"] = s_id
+        super().__init__(**kwargs)
 
 class OutsourceItem(SheetsModel):
     __tablename__ = "outsourceitems"

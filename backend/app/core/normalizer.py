@@ -66,33 +66,35 @@ def normalize_status(value: Any) -> str:
     if value is None or value == "":
         return "pending"
     
-    # Handle boolean values from Sheets
+    # Handle boolean values from Sheets (e.g. if column was checkboxes)
     if isinstance(value, bool):
-        return "active" if value else "inactive"
+        return "completed" if value else "pending"
     
     # Handle string values
     value_str = str(value).lower().strip()
     
     # Map common variations
     status_map = {
-        'true': 'active',
-        'false': 'inactive',
-        '1': 'active',
-        '0': 'inactive',
-        'yes': 'active',
-        'no': 'inactive',
+        'true': 'completed',
+        'false': 'pending',
+        '1': 'completed',
+        '0': 'pending',
+        'yes': 'completed',
+        'no': 'pending',
+        'active': 'in_progress',
+        'inactive': 'on_hold'
     }
     
     if value_str in status_map:
         return status_map[value_str]
     
     # Valid status values
-    valid_statuses = ['pending', 'in_progress', 'completed', 'on_hold', 'denied', 'ended', 'active', 'inactive']
+    valid_statuses = ['pending', 'in_progress', 'completed', 'on_hold', 'denied', 'ended']
     
     if value_str in valid_statuses:
         return value_str
     
-    # Default
+    # Default fallback
     return "pending"
 
 def normalize_priority(value: Any) -> str:

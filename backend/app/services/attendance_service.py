@@ -182,7 +182,13 @@ def get_attendance_summary(db: SheetsDB, target_date_str: Optional[str] = None):
                 filtered_count += 1
                 continue
             
-            # 3. Role check
+            # 3. Approval Check (MANDATORY)
+            approval_status = str(user.get("approval_status", "pending")).lower().strip()
+            if approval_status != "approved":
+                filtered_count += 1
+                continue
+            
+            # 4. Role check
             role = str(user.get("role", "operator")).lower().strip()
             if not role or role == "": role = "operator"
                 

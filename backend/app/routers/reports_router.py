@@ -185,16 +185,20 @@ def calculate_user_activity(db: any, target_date: date) -> List[dict]:
         raw_att_date = str(getattr(att, 'date', getattr(att, 'check_in', '')))
         if not raw_att_date: continue
         
-        att_day = raw_att_date.split('T')[0].split(' ')[0]
-        # Handle DD/MM/YYYY vs YYYY-MM-DD
+        # Robust date extraction (supporting various formats from sheets)
+        att_day = str(raw_att_date).strip().split('T')[0].split(' ')[0]
         if '/' in att_day:
             p = att_day.split('/')
             if len(p) == 3:
-                # If it looks like DD/MM/YYYY
-                if len(p[0]) <= 2: att_day = f"{p[2]}-{int(p[1]):02d}-{int(p[0]):02d}"
+                try:
+                    if len(p[0]) == 4: # YYYY/MM/DD
+                        att_day = f"{p[0]}-{int(p[1]):02d}-{int(p[2]):02d}"
+                    else: # Assume DD/MM/YYYY
+                        att_day = f"{p[2]}-{int(p[1]):02d}-{int(p[0]):02d}"
+                except: pass
         
         if att_day == target_date_str:
-            attendees.add(str(getattr(att, 'user_id', '')).strip().lower())
+            attendees.add(str(getattr(att, 'user_id', getattr(att, 'id', ''))).strip().lower())
 
     # 5. Aggregate Stats
     user_stats = {str(u.user_id): {"work_time": 0, "completed_tasks": 0, "obj": u, "machines": set()} for u in users}
